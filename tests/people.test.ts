@@ -4,6 +4,7 @@ import {
   createPerson,
   updatePerson,
   listPeople,
+  listUnlinkedUsers,
   linkUserToPerson,
   unlinkUser,
 } from '#/server/people'
@@ -229,6 +230,30 @@ describe('account linking', () => {
     assert.deepEqual(await linkUserToPerson(db, token, user.id, 999), {
       ok: false,
       error: 'not_found',
+    })
+  })
+
+  it('listUnlinkedUsers: admin sees only unlinked accounts; members denied', async () => {
+    const { db } = await createTestDb()
+    const { token, user } = await signedInUser(db) // admin
+    const member = await signedInUser(db, 'member')
+
+    // Owner (seeded) and the admin are unlinked; the member fixture below too.
+    const person = await createPerson(db, token, { fullName: 'Linked Person' })
+    if (!person.ok) throw new Error('fixture failed')
+    assert.equal((await linkUserToPerson(db, token, user.id, person.value.id)).ok, true)
+
+    const adminResult = await listUnlinkedUsers(db, token)
+    assert.equal(adminResult.ok, true)
+    if (adminResult.ok) {
+      const ids = adminResult.value.map((u) => u.id)
+      assert(!ids.includes(user.id), 'linked admin must not appear')
+      assert(ids.includes(member.user.id), 'unlinked member must appear')
+    }
+
+    assert.deepEqual(await listUnlinkedUsers(db, member.token), {
+      ok: false,
+      error: 'forbidden',
     })
   })
 

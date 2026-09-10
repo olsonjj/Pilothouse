@@ -85,6 +85,9 @@ export async function getCurrentUser(db: Db, token: string | undefined): Promise
   const row = await db
     .select({ user: users, personName: people.fullName, expiresAt: sessions.expiresAt })
     .from(sessions)
+    // Join-aliasing constraint (see db.ts): only people columns whose names
+    // don't collide with users/sessions columns may be selected unaliased
+    // here. If you add more people columns to this select, SQL-alias them.
     .innerJoin(users, eq(sessions.userId, users.id))
     .leftJoin(people, eq(users.personId, people.id))
     .where(eq(sessions.token, token))
