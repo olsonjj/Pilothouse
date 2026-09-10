@@ -64,6 +64,7 @@ export function formatWeekLabel(monday: string): string {
 export type QuarterNumber = 1 | 2 | 3 | 4
 
 export function quarterKey(date: string): { year: number; quarter: QuarterNumber } {
+  assertValidDate(date)
   const [y, m] = date.split('-').map(Number)
   return { year: y, quarter: (Math.floor((m - 1) / 3) + 1) as QuarterNumber }
 }

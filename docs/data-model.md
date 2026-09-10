@@ -16,7 +16,8 @@ decision in `overview.md` and the specs — no open questions remain.
   helper (spread into each Drizzle table definition), **not** a polymorphic
   base table. Immutable tables skip `updated_at`: `vto_versions` (snapshots —
   restoring creates a new row), `issue_resolutions` (resolution notes are
-  write-once), `sessions`. Everything else mutates and carries `updated_at`,
+  write-once), `sessions`, `quarters` (seeded once, never mutated). Everything
+  else mutates and carries `updated_at`,
   maintained by the ORM/app on every write.
 - **Dates:** `TEXT` `YYYY-MM-DD` (dates only where time-of-day is meaningless —
   weeks, due dates, quarter boundaries).
