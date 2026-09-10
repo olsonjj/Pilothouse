@@ -665,6 +665,7 @@ function OccupantGwc(props: {
           <input
             value={draft.note ?? ''}
             disabled={props.busy}
+            maxLength={1000}
             placeholder="note (optional)"
             onChange={(e) => setDraft({ ...draft, note: e.target.value })}
             className="flex-1 rounded border border-slate-300 px-2 py-0.5 text-xs"

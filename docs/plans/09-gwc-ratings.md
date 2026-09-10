@@ -4,7 +4,7 @@
 
 **Blocked by:** 04: Seats & assignments.
 
-**Status:** ready-for-agent
+**Status:** done (reviewer sign-off; GWC visibility read-as-all/edit-admin documented in ticket)
 
 - [x] Admin records GWC per active assignment with an optional note
 - [x] Ratings belong to the person-in-seat; ending an assignment keeps its history
