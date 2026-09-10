@@ -1,16 +1,20 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { getCurrentUserFn, signOutFn } from '../functions/auth'
+import { getCurrentPeriodFn } from '../functions/quarters'
 
 export const Route = createFileRoute('/')({
   // Root guard already redirected unauthenticated visitors; loader refreshes the user.
-  loader: () => getCurrentUserFn(),
+  loader: async () => {
+    const [me, period] = await Promise.all([getCurrentUserFn(), getCurrentPeriodFn()])
+    return { me, period }
+  },
   component: Home,
 })
 
 function Home() {
   const navigate = useNavigate()
   const data = Route.useLoaderData()
-  const user = data.ok ? data.user : null
+  const user = data.me.ok ? data.me.user : null
   if (!user) return null
 
   async function handleSignOut() {
@@ -29,6 +33,11 @@ function Home() {
           </span>
         </p>
         <p className="mt-1 text-sm text-slate-500">{user.email}</p>
+        <p className="mt-1 text-sm text-slate-500">
+          {data.period.ok && data.period.value.quarter
+            ? `${data.period.value.quarter.label} · ${data.period.value.weekLabel}`
+            : 'No current quarter'}
+        </p>
         <nav className="mt-6 flex gap-4 text-sm">
           <Link to="/people" className="text-blue-600 hover:underline">
             People

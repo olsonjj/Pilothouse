@@ -67,7 +67,23 @@ export const sessions = sqliteTable('sessions', {
   expiresAt: text('expires_at').notNull(),
 })
 
+/**
+ * Immutable once seeded: quarters skip `updated_at` — rows are inserted by the
+ * seeder and never updated (quarter boundaries are calendar facts).
+ */
+export const quarters = sqliteTable(
+  'quarters',
+  {
+    ...baseFields,
+    label: text('label').notNull().unique(),
+    startDate: text('start_date').notNull(),
+    endDate: text('end_date').notNull(),
+  },
+  (t) => [check('quarters_label_check', sql`${t.label} GLOB '[0-9][0-9][0-9][0-9] Q[1-4]'`)],
+)
+
 export type User = typeof users.$inferSelect
 export type Session = typeof sessions.$inferSelect
+export type Quarter = typeof quarters.$inferSelect
 export type Person = typeof people.$inferSelect
 export type Role = 'admin' | 'member'

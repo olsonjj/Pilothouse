@@ -100,6 +100,8 @@ overview assumption; no team-management UI.
 
 Seeded for the current + next calendar years. Rocks, meeting archives, and
 People Analyzer scores are quarter-scoped; scorecard weeks and to-dos are not.
+**Delta (ticket 03):** quarters are seed-only and immutable — they skip
+`updated_at` (added to the immutable list above).
 
 ## V/TO tables
 

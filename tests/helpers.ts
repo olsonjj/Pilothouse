@@ -5,6 +5,7 @@ import path from 'node:path'
 import { createDb, migrateDb, type Db } from '../src/server/db'
 import * as schema from '../src/server/schema'
 import { seedOwner, OWNER_EMAIL, DEFAULT_OWNER_PASSWORD } from '../src/server/seed'
+import { ensureCurrentYearQuarters } from '../src/server/quarters'
 import { hashPassword, signIn, type PublicUser } from '../src/server/auth'
 import type { Role } from '../src/server/schema'
 
@@ -19,6 +20,8 @@ export async function createTestDb(): Promise<{ db: Db; sqlite: DatabaseSync; di
   const { db, sqlite } = createDb(dbFile)
   await migrateDb(db)
   await seedOwner(db)
+  // Every ticket's tests can assume quarters exist (ticket 03+).
+  await ensureCurrentYearQuarters(db)
   return { db, sqlite, dir }
 }
 

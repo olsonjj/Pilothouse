@@ -4,6 +4,7 @@ import { migrate as proxyMigrate } from 'drizzle-orm/sqlite-proxy/migrator'
 import { sql } from 'drizzle-orm'
 import * as schema from './schema'
 import { seedOwner } from './seed'
+import { ensureCurrentYearQuarters } from './quarters'
 import { scheduleBackups } from './backup'
 import path from 'node:path'
 import fs from 'node:fs'
@@ -98,6 +99,9 @@ export function getDb(): Promise<Db> {
       const created = createDb(DB_FILE)
       await migrateDb(created.db)
       await seedOwner(created.db)
+      // Idempotent quarter seed (current + next calendar year); cheap enough
+      // to run on every init, so new years roll over without manual steps.
+      await ensureCurrentYearQuarters(created.db)
       // Scheduled snapshot job; disabled during tests.
       if (!process.env.OPENEOS_DISABLE_BACKUP) {
         scheduleBackups(created.sqlite, DB_FILE)

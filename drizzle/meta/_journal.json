@@ -15,6 +15,13 @@
       "when": 1789081175199,
       "tag": "0001_natural_oracle",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789081813202,
+      "tag": "0002_add_quarters",
+      "breakpoints": true
     }
   ]
 }
