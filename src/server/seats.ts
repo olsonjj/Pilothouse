@@ -43,9 +43,18 @@ export type SeatOccupant = {
   personId: number
   personName: string
   startedAt: string
+  /** GWC of the active assignment (ticket 09); nulls = unrated. */
+  gwc: GwcView
 }
 
-/** Seat row plus its active occupants (populated by listSeats/getSeat). */
+/** GWC read view: null = unrated. */
+export type GwcView = {
+  get: boolean | null
+  want: boolean | null
+  capacity: boolean | null
+  note: string | null
+}
+
 export type SeatWithOccupants = SeatView & { occupants: SeatOccupant[] }
 
 export type AssignmentRow = {
@@ -56,6 +65,8 @@ export type AssignmentRow = {
   personName: string
   startedAt: string
   endedAt: string | null
+  /** Stored GWC (kept after ending — history is immutable). */
+  gwc: GwcView
 }
 
 function parseResponsibilities(input: string[] | undefined): string[] | 'invalid' {
@@ -167,6 +178,30 @@ export type AssignmentInput = {
   startDate?: string
 }
 
+/** GWC write input (ticket 09): booleans or null to clear; note ≤1000 chars. */
+export type GwcInput = {
+  get: boolean | null
+  want: boolean | null
+  capacity: boolean | null
+  note: string | null
+}
+
+const GWC_NOTE_MAX = 1000
+
+function toGwcBit(v: boolean | null | undefined): 0 | 1 | null {
+  if (v == null) return null
+  return v ? 1 : 0
+}
+
+function gwcView(get: unknown, want: unknown, capacity: unknown, note: unknown): GwcView {
+  return {
+    get: get == null ? null : Boolean(get),
+    want: want == null ? null : Boolean(want),
+    capacity: capacity == null ? null : Boolean(capacity),
+    note: note == null ? null : String(note),
+  }
+}
+
 /**
  * Assigns a person to a seat, enforcing the two app-level caps:
  * a person holds at most 2 active seats, and a seat has at most 1 active
@@ -241,6 +276,49 @@ export async function endAssignment(
   return { ok: true, value: assignment! }
 }
 
+/**
+ * Sets GWC on an assignment (ticket 09). Admin-gated; only ACTIVE assignments
+ * are editable — ended history rows keep their stored ratings forever.
+ * Full overwrite: omitted/null fields clear (null = unrated).
+ */
+export async function setGwc(
+  db: Db,
+  token: string | undefined,
+  assignmentId: number,
+  input: GwcInput,
+): Promise<SeatResult<GwcView>> {
+  const auth = await requireRole(db, token, 'admin')
+  if (!auth.ok) return auth
+  const existing = await db
+    .select()
+    .from(seatAssignments)
+    .where(eq(seatAssignments.id, assignmentId))
+    .get()
+  if (!existing) return { ok: false, error: 'not_found' }
+  if (existing.endedAt != null) return { ok: false, error: 'already_ended' }
+  for (const v of [input.get, input.want, input.capacity]) {
+    if (v != null && typeof v !== 'boolean') return { ok: false, error: 'invalid_input' }
+  }
+  const note = input.note == null ? null : String(input.note).trim() || null
+  if (note != null && note.length > GWC_NOTE_MAX) return { ok: false, error: 'invalid_input' }
+  const [assignment] = await db
+    .update(seatAssignments)
+    .set({
+      gwcGet: toGwcBit(input.get),
+      gwcWant: toGwcBit(input.want),
+      gwcCapacity: toGwcBit(input.capacity),
+      gwcNote: note,
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(seatAssignments.id, assignmentId))
+    .returning()
+  const row = assignment!
+  return {
+    ok: true,
+    value: gwcView(row.gwcGet, row.gwcWant, row.gwcCapacity, row.gwcNote),
+  }
+}
+
 function parseResponsibilitiesColumn(seat: Seat): SeatView {
   let responsibilities: string[] = []
   try {
@@ -268,6 +346,10 @@ async function activeOccupants(db: Db, seatId: number): Promise<SeatOccupant[]> 
       personId: sql<number>`"people"."id"`.as('o_person_id'),
       personName: sql<string>`"people"."full_name"`.as('o_person_name'),
       startedAt: sql<string>`"seat_assignments"."started_at"`.as('o_started_at'),
+      gwcGet: sql<number | null>`"seat_assignments"."gwc_get"`.as('o_gwc_get'),
+      gwcWant: sql<number | null>`"seat_assignments"."gwc_want"`.as('o_gwc_want'),
+      gwcCapacity: sql<number | null>`"seat_assignments"."gwc_capacity"`.as('o_gwc_cap'),
+      gwcNote: sql<string | null>`"seat_assignments"."gwc_note"`.as('o_gwc_note'),
     })
     .from(seatAssignments)
     .innerJoin(people, eq(seatAssignments.personId, people.id))
@@ -278,6 +360,7 @@ async function activeOccupants(db: Db, seatId: number): Promise<SeatOccupant[]> 
     personId: Number(r.personId),
     personName: r.personName,
     startedAt: r.startedAt,
+    gwc: gwcView(r.gwcGet, r.gwcWant, r.gwcCapacity, r.gwcNote),
   }))
 }
 
@@ -328,6 +411,10 @@ async function seatHistory(db: Db, seatId: number): Promise<AssignmentRow[]> {
       personName: sql<string>`"people"."full_name"`.as('h_person_name'),
       startedAt: sql<string>`"seat_assignments"."started_at"`.as('h_started'),
       endedAt: sql<string | null>`"seat_assignments"."ended_at"`.as('h_ended'),
+      gwcGet: sql<number | null>`"seat_assignments"."gwc_get"`.as('h_gwc_get'),
+      gwcWant: sql<number | null>`"seat_assignments"."gwc_want"`.as('h_gwc_want'),
+      gwcCapacity: sql<number | null>`"seat_assignments"."gwc_capacity"`.as('h_gwc_cap'),
+      gwcNote: sql<string | null>`"seat_assignments"."gwc_note"`.as('h_gwc_note'),
     })
     .from(seatAssignments)
     .innerJoin(people, eq(seatAssignments.personId, people.id))
@@ -356,6 +443,10 @@ export async function getPersonAssignments(
       personName: sql<string>`"people"."full_name"`.as('pa_person_name'),
       startedAt: sql<string>`"seat_assignments"."started_at"`.as('pa_started'),
       endedAt: sql<string | null>`"seat_assignments"."ended_at"`.as('pa_ended'),
+      gwcGet: sql<number | null>`"seat_assignments"."gwc_get"`.as('pa_gwc_get'),
+      gwcWant: sql<number | null>`"seat_assignments"."gwc_want"`.as('pa_gwc_want'),
+      gwcCapacity: sql<number | null>`"seat_assignments"."gwc_capacity"`.as('pa_gwc_cap'),
+      gwcNote: sql<string | null>`"seat_assignments"."gwc_note"`.as('pa_gwc_note'),
     })
     .from(seatAssignments)
     .innerJoin(people, eq(seatAssignments.personId, people.id))
@@ -373,6 +464,10 @@ function mapAssignmentRow(r: {
   personName: string
   startedAt: string
   endedAt: string | null
+  gwcGet: unknown
+  gwcWant: unknown
+  gwcCapacity: unknown
+  gwcNote: unknown
 }): AssignmentRow {
   return {
     id: Number(r.assignmentId),
@@ -382,5 +477,6 @@ function mapAssignmentRow(r: {
     personName: r.personName,
     startedAt: r.startedAt,
     endedAt: r.endedAt,
+    gwc: gwcView(r.gwcGet, r.gwcWant, r.gwcCapacity, r.gwcNote),
   }
 }

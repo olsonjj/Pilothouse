@@ -9,6 +9,8 @@ import {
   linkUserFn,
   unlinkUserFn,
 } from '../functions/people'
+import { getPersonAssignmentsFn } from '../functions/seats'
+import type { AssignmentRow, GwcView } from '../server/seats'
 import type { PersonWithAccount } from '../server/people'
 
 export const Route = createFileRoute('/people')({
@@ -226,12 +228,15 @@ function PeoplePage() {
       )}
 
       {editing && isAdmin && !showCreate && editingPerson && (
-        <AccountLinker
-          person={editingPerson}
-          disabled={busy}
-          onLink={(userId) => handleLink(editingPerson.id, userId)}
-          onUnlink={() => handleUnlink(editingPerson)}
-        />
+        <>
+          <AccountLinker
+            person={editingPerson}
+            disabled={busy}
+            onLink={(userId) => handleLink(editingPerson.id, userId)}
+            onUnlink={() => handleUnlink(editingPerson)}
+          />
+          <PersonAssignments personId={editingPerson.id} />
+        </>
       )}
 
       <table className="mt-6 w-full rounded border border-slate-200 bg-white text-sm shadow-sm">
@@ -349,5 +354,50 @@ function AccountLinker(props: {
         </div>
       )}
     </div>
+  )
+}
+/** Person detail: their seat history with stored GWC (ticket 09). */
+function PersonAssignments({ personId }: { personId: number }) {
+  const [rows, setRows] = useState<AssignmentRow[] | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    getPersonAssignmentsFn({ data: { personId } }).then((result) => {
+      if (!cancelled) setRows(result.ok ? result.value : [])
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [personId])
+
+  return (
+    <div className="mt-3 rounded border border-slate-200 bg-white p-4 shadow-sm">
+      <h3 className="text-sm font-medium text-slate-700">Seats &amp; GWC</h3>
+      {rows === null && <p className="mt-1 text-sm text-slate-400">Loading…</p>}
+      {rows != null && rows.length === 0 && (
+        <p className="mt-1 text-sm text-slate-400">No seat assignments yet.</p>
+      )}
+      {rows != null && rows.length > 0 && (
+        <ul className="mt-1 space-y-1 text-sm text-slate-600">
+          {rows.map((r) => (
+            <li key={r.id}>
+              {r.seatName} — {r.startedAt} → {r.endedAt ?? 'current'}
+              <GwcLine gwc={r.gwc} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+function GwcLine({ gwc }: { gwc: GwcView }) {
+  if (gwc.get == null && gwc.want == null && gwc.capacity == null && !gwc.note) return null
+  const mark = (v: boolean | null) => (v == null ? '—' : v ? '✓' : '✗')
+  return (
+    <span className="ml-2 text-xs text-slate-500">
+      [G {mark(gwc.get)} · W {mark(gwc.want)} · C {mark(gwc.capacity)}]
+      {gwc.note ? <span className="italic"> “{gwc.note}”</span> : null}
+    </span>
   )
 }

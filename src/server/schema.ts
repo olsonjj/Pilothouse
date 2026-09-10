@@ -101,7 +101,10 @@ export const seats = sqliteTable(
 
 /**
  * Person-in-seat history (ticket 04). Rows are never deleted on reassignment —
- * `endedAt` marks the end (NULL = current). GWC columns land with ticket 09.
+ * `endedAt` marks the end (NULL = current). GWC columns (ticket 09) ride on
+ * the assignment: ratings belong to the person-in-seat, so history rows keep
+ * theirs after ending. Nullable 0/1 ints validated at the seam (no DB CHECK —
+ * ALTER TABLE ADD COLUMN CHECKs would desync drizzle-kit snapshots).
  */
 export const seatAssignments = sqliteTable('seat_assignments', {
   ...mutableFields,
@@ -115,6 +118,11 @@ export const seatAssignments = sqliteTable('seat_assignments', {
   startedAt: text('started_at').notNull(),
   /** Date the assignment ended; NULL = currently active. */
   endedAt: text('ended_at'),
+  /** GWC (ticket 09): null = unrated. */
+  gwcGet: integer('gwc_get'),
+  gwcWant: integer('gwc_want'),
+  gwcCapacity: integer('gwc_capacity'),
+  gwcNote: text('gwc_note'),
 })
 
 /**

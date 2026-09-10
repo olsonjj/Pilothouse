@@ -10,8 +10,10 @@ import {
   listSeats,
   getSeat,
   getPersonAssignments,
+  setGwc,
   type SeatInput,
   type AssignmentInput,
+  type GwcInput,
 } from '../server/seats'
 
 /** Thin cookie-layer wrappers around src/server/seats.ts. */
@@ -97,4 +99,24 @@ export const endAssignmentFn = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const db = await getDb()
     return endAssignment(db, getCookie(SESSION_COOKIE), data.assignmentId ?? 0, data.endDate)
+  })
+export const setGwcFn = createServerFn({ method: 'POST' })
+  .validator((d: unknown) =>
+    d as {
+      assignmentId?: number
+      get?: boolean | null
+      want?: boolean | null
+      capacity?: boolean | null
+      note?: string | null
+    },
+  )
+  .handler(async ({ data }) => {
+    const db = await getDb()
+    const input: GwcInput = {
+      get: data.get ?? null,
+      want: data.want ?? null,
+      capacity: data.capacity ?? null,
+      note: data.note ?? null,
+    }
+    return setGwc(db, getCookie(SESSION_COOKIE), data.assignmentId ?? 0, input)
   })

@@ -2,6 +2,8 @@ import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { getCurrentUserFn, signOutFn } from '../functions/auth'
 import { listPeopleFn } from '../functions/people'
+import { setGwcFn } from '../functions/seats'
+import type { GwcView } from '../server/seats'
 import {
   listSeatsFn,
   getSeatFn,
@@ -10,7 +12,7 @@ import {
   createAssignmentFn,
   endAssignmentFn,
 } from '../functions/seats'
-import type { SeatWithOccupants, AssignmentRow } from '../server/seats'
+import type { SeatWithOccupants, AssignmentRow, GwcInput } from "../server/seats"
 
 export const Route = createFileRoute('/chart')({
   validateSearch: (search: Record<string, unknown>) => {
@@ -208,6 +210,19 @@ function ChartPage() {
     await refresh()
   }
 
+  async function handleSetGwc(assignmentId: number, input: GwcInput): Promise<boolean> {
+    setBusy(true)
+    setFormError(null)
+    const result = await setGwcFn({ data: { assignmentId, ...input } })
+    setBusy(false)
+    if (!result.ok) {
+      setFormError(errorText(result.error))
+      return false
+    }
+    await refresh()
+    return true
+  }
+
   return (
     <main className="mx-auto max-w-4xl p-8">
       <header className="flex items-center justify-between">
@@ -327,6 +342,7 @@ function ChartPage() {
               isAdmin={isAdmin}
               busy={busy}
               onEnd={handleEnd}
+              onSetGwc={handleSetGwc}
               onEdit={() => openEdit(detail)}
               onAssign={() => {
                 setFormError(null)
@@ -496,6 +512,7 @@ function SeatDetail(props: {
   isAdmin: boolean
   busy: boolean
   onEnd: (assignmentId: number) => void
+  onSetGwc: (assignmentId: number, input: GwcInput) => Promise<boolean>
   onEdit: () => void
   onAssign: () => void
 }) {
@@ -534,11 +551,16 @@ function SeatDetail(props: {
       </ol>
 
       <h3 className="mt-4 text-sm font-medium text-slate-700">Current occupants</h3>
-      <p className="mt-1 text-sm text-slate-600">
-        {seat.occupants.length === 0
-          ? 'Empty seat.'
-          : seat.occupants.map((o) => `${o.personName} (since ${o.startedAt})`).join(' · ')}
-      </p>
+      {seat.occupants.length === 0 && <p className="mt-1 text-sm text-slate-600">Empty seat.</p>}
+      {seat.occupants.map((o) => (
+        <OccupantGwc
+          key={o.assignmentId}
+          occupant={o}
+          isAdmin={props.isAdmin}
+          busy={props.busy}
+          onSetGwc={props.onSetGwc}
+        />
+      ))}
 
       <h3 className="mt-4 text-sm font-medium text-slate-700">Assignment history</h3>
       <ul className="mt-1 space-y-1 text-sm text-slate-600">
@@ -547,6 +569,7 @@ function SeatDetail(props: {
           <li key={h.id} className="flex items-center justify-between">
             <span>
               {h.personName} — {h.startedAt} → {h.endedAt ?? 'current'}
+              <GwcSummary gwc={h.gwc} />
             </span>
             {props.isAdmin && h.endedAt == null && (
               <button
@@ -560,6 +583,107 @@ function SeatDetail(props: {
           </li>
         ))}
       </ul>
+    </div>
+  )
+}
+/** Compact read-only GWC line: "G ✓ W — C ✗" style; hidden when unrated. */
+function GwcSummary({ gwc }: { gwc: GwcView }) {
+  if (gwc.get == null && gwc.want == null && gwc.capacity == null && !gwc.note) return null
+  const mark = (v: boolean | null) => (v == null ? '—' : v ? '✓' : '✗')
+  return (
+    <span className="ml-2 text-xs text-slate-500">
+      [G {mark(gwc.get)} · W {mark(gwc.want)} · C {mark(gwc.capacity)}]
+      {gwc.note ? <span className="italic"> “{gwc.note}”</span> : null}
+    </span>
+  )
+}
+
+/** Occupant row with read-only GWC for members, inline editor for admins. */
+function OccupantGwc(props: {
+  occupant: { assignmentId: number; personName: string; startedAt: string; gwc: GwcView }
+  isAdmin: boolean
+  busy: boolean
+  onSetGwc: (assignmentId: number, input: GwcInput) => Promise<boolean>
+}) {
+  const { occupant: o } = props
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState<GwcInput>({
+    get: o.gwc.get,
+    want: o.gwc.want,
+    capacity: o.gwc.capacity,
+    note: o.gwc.note,
+  })
+
+  function openEditor() {
+    setDraft({ get: o.gwc.get, want: o.gwc.want, capacity: o.gwc.capacity, note: o.gwc.note })
+    setEditing(true)
+  }
+
+  async function save() {
+    const ok = await props.onSetGwc(o.assignmentId, draft)
+    if (ok) setEditing(false)
+  }
+
+  return (
+    <div className="mt-1 rounded border border-slate-200 p-2 text-sm">
+      <div className="flex items-center justify-between">
+        <span>
+          {o.personName} <span className="text-slate-400">(since {o.startedAt})</span>
+          {!editing && <GwcSummary gwc={o.gwc} />}
+        </span>
+        {props.isAdmin && !editing && (
+          <button
+            onClick={openEditor}
+            className="rounded border border-slate-300 px-2 py-0.5 text-xs hover:bg-slate-100"
+          >
+            GWC
+          </button>
+        )}
+      </div>
+      {editing && (
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          {(['get', 'want', 'capacity'] as const).map((k) => (
+            <label key={k} className="flex items-center gap-1 text-xs">
+              <span className="uppercase text-slate-500">{k}</span>
+              <select
+                value={draft[k] == null ? '' : draft[k] ? 'yes' : 'no'}
+                disabled={props.busy}
+                onChange={(e) =>
+                  setDraft({
+                    ...draft,
+                    [k]: e.target.value === '' ? null : e.target.value === 'yes',
+                  })
+                }
+                className="rounded border border-slate-300 px-1.5 py-0.5"
+              >
+                <option value="">—</option>
+                <option value="yes">✓</option>
+                <option value="no">✗</option>
+              </select>
+            </label>
+          ))}
+          <input
+            value={draft.note ?? ''}
+            disabled={props.busy}
+            placeholder="note (optional)"
+            onChange={(e) => setDraft({ ...draft, note: e.target.value })}
+            className="flex-1 rounded border border-slate-300 px-2 py-0.5 text-xs"
+          />
+          <button
+            onClick={save}
+            disabled={props.busy}
+            className="rounded bg-blue-600 px-2 py-0.5 text-xs text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            Save GWC
+          </button>
+          <button
+            onClick={() => setEditing(false)}
+            className="rounded border border-slate-300 px-2 py-0.5 text-xs hover:bg-slate-100"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
     </div>
   )
 }
