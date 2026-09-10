@@ -28,6 +28,9 @@ decision in `overview.md` and the specs — no open questions remain.
   derives from it).
 - **No cascading deletes** on historical data. Deleting is limited to open
   meetings and true mistakes; archives are immutable.
+- **Join constraint (driver):** `node:sqlite` object rows collapse duplicate
+  output column names, so every join select must SQL-alias columns uniquely
+  (pattern in `listPeople`); documented in the driver adapter comment.
 
 ## Core / shared tables
 
@@ -37,9 +40,10 @@ decision in `overview.md` and the specs — no open questions remain.
 | id | int pk | |
 | email | text unique | login identity |
 | password_hash | text | email+password auth (overview) |
+| name | text | denormalized fallback display name; once `person_id` is set, `people.full_name` is the source of truth (ticket 02) |
 | role | text CHECK('admin','member') | app role, separate from seats |
 | person_id | int FK→people, nullable | usually 1:1; nullable until linked |
-| created_at | text | |
+| created_at / updated_at | text | |
 
 Sessions: `sessions` (id = random token, user_id FK, expires_at). Standard.
 
@@ -47,11 +51,14 @@ Sessions: `sessions` (id = random token, user_id FK, expires_at). Standard.
 | column | type | notes |
 | --- | --- | --- |
 | id | int pk | |
-| full_name | text | |
+| full_name | text | source of truth for a person's display name |
 | email | text nullable | partial UNIQUE where not null |
-| user_id | int FK→users, nullable | a person may not have a login |
-| start_date | text nullable | |
+| start_date | text nullable | date (YYYY-MM-DD) |
 | created_at / updated_at | text | |
+
+**Delta from spec (ticket 02):** the login link lives only on `users.person_id`
+(one direction). The earlier `people.user_id` column was dropped as redundant —
+a person's login is derivable by joining `users` on `person_id`.
 
 ### seats
 | column | type | notes |

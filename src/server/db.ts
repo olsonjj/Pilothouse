@@ -23,6 +23,12 @@ type ProxyCallback = (query: string, params: any[], method: 'run' | 'all' | 'val
  * so we convert node:sqlite's object rows via the statement's column list.
  * For 'get' with no result we return `rows: undefined`, which Drizzle maps
  * to undefined (typed as any[] upstream, hence the cast).
+ *
+ * CONSTRAINT for join queries: node:sqlite returns object rows keyed by
+ * column name, so duplicate output column names (e.g. "id" from two joined
+ * tables) collapse into one key and positional mapping misaligns. Any join
+ * select must use SQL aliases to keep output column names unique — see
+ * listPeople in src/server/people.ts for the pattern.
  */
 function makeCallback(sqlite: DatabaseSync): ProxyCallback {
   const callback = async (

@@ -6,8 +6,8 @@
 
 **Status:** ready-for-agent
 
-- [ ] Admin can create, edit, and list people (name, optional email, optional start date)
-- [ ] A person can be linked to a user account; unlinked people are allowed
-- [ ] Person emails are unique when present
-- [ ] Members can view but not edit people
-- [ ] Tests through the server-function seam cover CRUD and permission denial
+- [x] Admin can create, edit, and list people (name, optional email, optional start date)
+- [x] A person can be linked to a user account; unlinked people are allowed
+- [x] Person emails are unique when present
+- [x] Members can view but not edit people
+- [x] Tests through the server-function seam cover CRUD and permission denial

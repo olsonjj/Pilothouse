@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { getCurrentUserFn, signOutFn } from '../functions/auth'
 
 export const Route = createFileRoute('/')({
@@ -29,6 +29,11 @@ function Home() {
           </span>
         </p>
         <p className="mt-1 text-sm text-slate-500">{user.email}</p>
+        <nav className="mt-6 flex gap-4 text-sm">
+          <Link to="/people" className="text-blue-600 hover:underline">
+            People
+          </Link>
+        </nav>
         <button
           onClick={handleSignOut}
           className="mt-6 rounded border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100"

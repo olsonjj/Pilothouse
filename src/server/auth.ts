@@ -1,6 +1,6 @@
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto'
 import type { Db } from './db'
-import { users, sessions, type User } from './schema'
+import { users, sessions, people, type User } from './schema'
 import { eq, lt, sql } from 'drizzle-orm'
 
 export const SESSION_COOKIE = 'openeos_session'
@@ -36,8 +36,23 @@ export type RoleCheckResult =
   | { ok: true; user: PublicUser }
   | { ok: false; error: 'unauthenticated' | 'forbidden' }
 
-function toPublic(user: User): PublicUser {
-  return { id: user.id, email: user.email, name: user.name, role: user.role }
+/**
+ * Display name resolution (ticket 02 decision): when the account is linked to
+ * a person, people.full_name is the source of truth; users.name is only a
+ * fallback for not-yet-linked accounts (e.g. the seeded owner).
+ */
+function toPublic(user: User, personName?: string | null): PublicUser {
+  return { id: user.id, email: user.email, name: personName ?? user.name, role: user.role }
+}
+
+async function linkedPersonName(db: Db, user: User): Promise<string | null> {
+  if (!user.personId) return null
+  const row = await db
+    .select({ fullName: people.fullName })
+    .from(people)
+    .where(eq(people.id, user.personId))
+    .get()
+  return row?.fullName ?? null
 }
 
 export async function createSession(
@@ -62,22 +77,23 @@ export async function signIn(db: Db, email: string, password: string): Promise<S
     return { ok: false, error: 'invalid_credentials' }
   }
   const sessionToken = await createSession(db, user.id)
-  return { ok: true, sessionToken, user: toPublic(user) }
+  return { ok: true, sessionToken, user: toPublic(user, await linkedPersonName(db, user)) }
 }
 
 export async function getCurrentUser(db: Db, token: string | undefined): Promise<CurrentUserResult> {
   if (!token) return { ok: false, error: 'unauthenticated' }
   const row = await db
-    .select({ user: users, expiresAt: sessions.expiresAt })
+    .select({ user: users, personName: people.fullName, expiresAt: sessions.expiresAt })
     .from(sessions)
     .innerJoin(users, eq(sessions.userId, users.id))
+    .leftJoin(people, eq(users.personId, people.id))
     .where(eq(sessions.token, token))
     .get()
   if (!row) return { ok: false, error: 'unauthenticated' }
   if (row.expiresAt <= new Date().toISOString()) {
     return { ok: false, error: 'unauthenticated' }
   }
-  return { ok: true, user: toPublic(row.user) }
+  return { ok: true, user: toPublic(row.user, row.personName) }
 }
 
 /** Access-control gate for admin-only actions; server functions call this. */

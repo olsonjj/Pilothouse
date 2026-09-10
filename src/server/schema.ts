@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, check } from 'drizzle-orm/sqlite-core'
+import { sqliteTable, text, integer, check, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import { sql } from 'drizzle-orm'
 
 /**
@@ -24,6 +24,22 @@ export function nowIso(): string {
   return new Date().toISOString()
 }
 
+/** Login link lives on users.person_id (one direction only); people are the source of truth for names. */
+export const people = sqliteTable(
+  'people',
+  {
+    ...mutableFields,
+    fullName: text('full_name').notNull(),
+    email: text('email'),
+    /** Date only (YYYY-MM-DD) — time-of-day is meaningless here. */
+    startDate: text('start_date'),
+  },
+  (t) => [
+    // Partial unique: emails are unique when present; unlinked/null allowed.
+    uniqueIndex('people_email_unique_idx').on(t.email).where(sql`${t.email} IS NOT NULL`),
+  ],
+)
+
 export const users = sqliteTable(
   'users',
   {
@@ -31,10 +47,12 @@ export const users = sqliteTable(
     email: text('email').notNull().unique(),
     /** scrypt hash in `salt:hash` hex form (node:crypto scrypt) */
     passwordHash: text('password_hash').notNull(),
+    /** Denormalized fallback display name; once person_id is set, people.full_name wins. */
     name: text('name').notNull(),
     role: text('role', { enum: ['admin', 'member'] })
       .notNull()
       .default('member'),
+    personId: integer('person_id').references(() => people.id),
   },
   (t) => [check('users_role_check', sql`${t.role} IN ('admin', 'member')`)],
 )
@@ -51,4 +69,5 @@ export const sessions = sqliteTable('sessions', {
 
 export type User = typeof users.$inferSelect
 export type Session = typeof sessions.$inferSelect
+export type Person = typeof people.$inferSelect
 export type Role = 'admin' | 'member'
