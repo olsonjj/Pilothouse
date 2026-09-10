@@ -6,8 +6,8 @@
 
 **Status:** ready-for-agent
 
-- [ ] Admin creates/edits/reorders/deactivates core values
-- [ ] Value IDs are stable across V/TO edits (edits never delete rows referenced by scores)
-- [ ] Core values display on the V/TO read view
-- [ ] Members view; only admins edit
-- [ ] Seam tests cover edit and deactivation flows
+- [x] Admin creates/edits/reorders/deactivates core values
+- [x] Value IDs are stable across V/TO edits (edits never delete rows referenced by scores)
+- [x] Core values display on the V/TO read view
+- [x] Members view; only admins edit
+- [x] Seam tests cover edit and deactivation flows

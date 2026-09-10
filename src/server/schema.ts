@@ -165,6 +165,33 @@ export const vto = sqliteTable('vto', {
 ],
 )
 
+/**
+ * Core values (ticket 07): first-class rows with STABLE IDs — the People
+ * Analyzer (ticket 10) scores against core_values.id, so rows are never
+ * deleted; deactivation flips `active` to 0 and they disappear from the
+ * default (active-only) list while keeping their row and ID forever.
+ */
+export const coreValues = sqliteTable(
+  'core_values',
+  {
+    ...mutableFields,
+    name: text('name').notNull(),
+    description: text('description'),
+    /** Display order; managed via explicit reorder (0-based, contiguous). */
+    sortOrder: integer('sort_order').notNull().default(0),
+    /** 0/1: inactive values keep their ID (scores in ticket 10 reference them). */
+    active: integer('active').notNull().default(1),
+  },
+  (t) => [
+    check('core_values_active_check', sql`${t.active} IN (0, 1)`),
+    check('core_values_sort_order_check', sql`${t.sortOrder} >= 0`),
+    // Case-insensitive name uniqueness (COLLATE NOCASE) across ALL rows —
+    // active and inactive — so a deactivated "Integrity" can't be shadowed by
+    // a new "integrity" that would resurrect confusion. Documented decision.
+    uniqueIndex('core_values_name_unique_idx').on(sql`${t.name} COLLATE NOCASE`),
+  ],
+)
+
 export type User = typeof users.$inferSelect
 export type Session = typeof sessions.$inferSelect
 export type Quarter = typeof quarters.$inferSelect
@@ -173,6 +200,7 @@ export type Seat = typeof seats.$inferSelect
 export type SeatAssignment = typeof seatAssignments.$inferSelect
 export type Vto = typeof vto.$inferSelect
 export type VtoVersion = typeof vtoVersions.$inferSelect
+export type CoreValue = typeof coreValues.$inferSelect
 export type Role = 'admin' | 'member'
 
 /**

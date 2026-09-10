@@ -112,6 +112,12 @@ First-class rows (stable IDs) — the People Analyzer scores against them, so th
 live outside version snapshots. Only admins edit; changing the list is expected
 to happen rarely.
 
+Ticket 07 decisions: rows are **never deleted** (deactivation flips `active`);
+name uniqueness is **case-insensitive** (`COLLATE NOCASE` unique index) across
+all rows, active and inactive; the default list is **active-only** (read view
+and future scorers consume it — admins fetch inactive rows explicitly);
+reordering assigns contiguous `sort_order` 0..n-1 from a complete ID list.
+
 ### vto_versions
 One row per save (snapshot model, spec: "editing creates a new version").
 Scalar columns for: core focus ("why" + "what"), 10-year target (+ optional

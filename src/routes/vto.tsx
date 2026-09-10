@@ -7,19 +7,33 @@ import {
   listVtoVersionsFn,
   restoreVtoVersionFn,
 } from '../functions/vto'
+import {
+  listCoreValuesFn,
+  createCoreValueFn,
+  updateCoreValueFn,
+  reorderCoreValuesFn,
+} from '../functions/coreValues'
 import type { VtoVersionSummary } from '../server/vto'
 import type { VtoView } from '../server/vto'
+import type { CoreValue } from '../server/schema'
 
 export const Route = createFileRoute('/vto')({
   loader: async () => {
     const [vto, me] = await Promise.all([getVtoFn(), getCurrentUserFn()])
+    // Core values: everyone reads the active list (read view); admins also
+    // fetch the full list (incl. inactive) for the management panel.
+    const activeValues = await listCoreValuesFn()
+    const values = activeValues.ok ? activeValues.value : []
     // Version history is admin-only; members just get the live read view.
     let versions: VtoVersionSummary[] = []
+    let allValues: CoreValue[] = values
     if (me.ok && me.user.role === 'admin') {
+      const full = await listCoreValuesFn({ data: { includeInactive: true } })
+      if (full.ok) allValues = full.value
       const history = await listVtoVersionsFn()
       if (history.ok) versions = history.value
     }
-    return { vto: vto.ok ? vto.value : null, me: me.ok ? me.user : null, versions }
+    return { vto: vto.ok ? vto.value : null, me: me.ok ? me.user : null, versions, values, allValues }
   },
   component: VtoPage,
 })
@@ -237,6 +251,17 @@ function VtoPage() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [versions, setVersions] = useState<VtoVersionSummary[]>(data.versions ?? [])
+  const [values, setValues] = useState<CoreValue[]>(data.values ?? [])
+  const [allValues, setAllValues] = useState<CoreValue[]>(data.allValues ?? [])
+
+  async function refreshValues() {
+    const active = await listCoreValuesFn()
+    if (active.ok) setValues(active.value)
+    if (isAdmin) {
+      const full = await listCoreValuesFn({ data: { includeInactive: true } })
+      if (full.ok) setAllValues(full.value)
+    }
+  }
 
   async function refreshVersions() {
     const result = await listVtoVersionsFn()
@@ -301,7 +326,7 @@ function VtoPage() {
             Sign out
           </button>
         </header>
-        <ReadView view={view} />
+        <ReadView view={view} values={values} />
       </main>
     )
   }
@@ -323,7 +348,7 @@ function VtoPage() {
           </div>
         </header>
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-        <ReadView view={view} />
+        <ReadView view={view} values={values} />
         <div className="mt-6">
           <button
             onClick={() => {
@@ -336,6 +361,7 @@ function VtoPage() {
           </button>
         </div>
         <VersionHistory versions={versions} busy={busy} onRestore={handleRestore} />
+        <CoreValuesPanel allValues={allValues} busy={busy} onChanged={refreshValues} />
       </main>
     )
   }
@@ -497,7 +523,7 @@ function VtoPage() {
   )
 }
 
-function ReadView(props: { view: VtoView }) {
+function ReadView(props: { view: VtoView; values: CoreValue[] }) {
   const v = props.view
   return (
     <div>
@@ -511,9 +537,20 @@ function ReadView(props: { view: VtoView }) {
       </div>
       <PageHeading title="Page 1 — Vision" />
       <QuestionBlock title="1 · Core Values">
-        <p className="text-sm text-slate-500">
-          Managed as their own list (arrives with the People Analyzer work).
-        </p>
+        {props.values.length === 0 ? (
+          <p className="text-sm text-slate-500">No core values set yet.</p>
+        ) : (
+          <ol className="space-y-1 text-sm text-slate-700">
+            {props.values.map((value) => (
+              <li key={value.id}>
+                <span className="font-medium">{value.name}</span>
+                {value.description ? (
+                  <span className="text-slate-600"> — {value.description}</span>
+                ) : null}
+              </li>
+            ))}
+          </ol>
+        )}
       </QuestionBlock>
       <QuestionBlock title="2 · Core Focus">
         <div className="space-y-1 text-sm text-slate-700">
@@ -603,6 +640,218 @@ function ReadView(props: { view: VtoView }) {
   )
 }
 /** Admin-only version history (ticket 06): newest first, restore per entry. */
+/**
+ * Admin-only core values management (ticket 07). Rows are never deleted —
+ * deactivate flips active off; reactivate brings them back. Reorder sends the
+ * complete ordered ID list (including inactive rows).
+ */
+function CoreValuesPanel(props: {
+  allValues: CoreValue[]
+  busy: boolean
+  onChanged: () => Promise<void>
+}) {
+  const [error, setError] = useState<string | null>(null)
+  const [adding, setAdding] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [newDescription, setNewDescription] = useState('')
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editDescription, setEditDescription] = useState('')
+
+  const ERROR_TEXT: Record<string, string> = {
+    forbidden: 'Only admins can manage core values.',
+    name_required: 'Name is required.',
+    name_taken: 'A core value with that name already exists (case-insensitive).',
+    not_found: 'That core value no longer exists — refresh.',
+    invalid_order: 'Reorder failed — refresh and try again.',
+    unauthenticated: 'Please sign in.',
+  }
+
+  async function run(action: () => Promise<{ ok: boolean; error?: string }>) {
+    setError(null)
+    const result = await action()
+    if (!result.ok) {
+      setError(ERROR_TEXT[result.error ?? ''] ?? 'Something went wrong.')
+      return
+    }
+    await props.onChanged()
+  }
+
+  function move(index: number, delta: number) {
+    const next = [...props.allValues]
+    const target = index + delta
+    if (target < 0 || target >= next.length) return
+    ;[next[index], next[target]] = [next[target], next[index]]
+    run(() => reorderCoreValuesFn({ data: { orderedIds: next.map((v) => v.id) } }))
+  }
+
+  return (
+    <section className="mt-8 rounded border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-center justify-between">
+        <h2 className="font-medium">Core values</h2>
+        <button
+          onClick={() => setAdding(!adding)}
+          className="rounded bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-700"
+        >
+          {adding ? 'Close' : '+ Add value'}
+        </button>
+      </div>
+      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {adding && (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            run(async () => {
+              const result = await createCoreValueFn({
+                data: { name: newName, description: newDescription },
+              })
+              if (result.ok) {
+                setNewName('')
+                setNewDescription('')
+                setAdding(false)
+              }
+              return result
+            })
+          }}
+          className="mt-3 flex gap-2"
+        >
+          <input
+            required
+            placeholder="Name"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            className="w-40 rounded border border-slate-300 px-2 py-1 text-sm"
+          />
+          <input
+            placeholder="Description (optional)"
+            value={newDescription}
+            onChange={(e) => setNewDescription(e.target.value)}
+            className="w-full rounded border border-slate-300 px-2 py-1 text-sm"
+          />
+          <button
+            type="submit"
+            disabled={props.busy}
+            className="rounded bg-blue-600 px-3 py-1 text-xs text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            Add
+          </button>
+        </form>
+      )}
+      <ul className="mt-3 space-y-1">
+        {props.allValues.map((value, i) => (
+          <li
+            key={value.id}
+            className="flex items-center gap-2 rounded border border-slate-100 px-2 py-1 text-sm"
+          >
+            <span className="flex gap-0.5">
+              <button
+                disabled={i === 0 || props.busy}
+                onClick={() => move(i, -1)}
+                className="rounded border border-slate-300 px-1.5 py-0.5 text-xs disabled:opacity-30"
+                title="Move up"
+              >
+                ↑
+              </button>
+              <button
+                disabled={i === props.allValues.length - 1 || props.busy}
+                onClick={() => move(i, 1)}
+                className="rounded border border-slate-300 px-1.5 py-0.5 text-xs disabled:opacity-30"
+                title="Move down"
+              >
+                ↓
+              </button>
+            </span>
+            {editingId === value.id ? (
+              <span className="flex flex-1 items-center gap-2">
+                <input
+                  value={editName}
+                  className="w-40 rounded border border-slate-300 px-2 py-1 text-sm"
+                />
+                <input
+                  value={editDescription}
+                  className="w-full rounded border border-slate-300 px-2 py-1 text-sm"
+                />
+                <button
+                  onClick={() =>
+                    run(async () => {
+                      const result = await updateCoreValueFn({
+                        data: { id: value.id, name: editName, description: editDescription },
+                      })
+                      if (result.ok) setEditingId(null)
+                      return result
+                    })
+                  }
+                  className="rounded bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => setEditingId(null)}
+                  className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100"
+                >
+                  Cancel
+                </button>
+              </span>
+            ) : (
+              <span className="flex flex-1 items-center gap-2">
+                <span className={value.active ? 'font-medium' : 'font-medium text-slate-400'}>
+                  {value.name}
+                </span>
+                {value.description ? (
+                  <span className="text-slate-600"> — {value.description}</span>
+                ) : null}
+                {!value.active && (
+                  <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] uppercase text-slate-500">
+                    inactive
+                  </span>
+                )}
+              </span>
+            )}
+            {editingId !== value.id && (
+              <span className="flex gap-1 text-xs">
+                <button
+                  onClick={() => {
+                    setEditingId(value.id)
+                    setEditName(value.name)
+                    setEditDescription(value.description ?? '')
+                  }}
+                  className="rounded border border-slate-300 px-2 py-0.5 hover:bg-slate-100"
+                >
+                  Edit
+                </button>
+                {value.active ? (
+                  <button
+                    onClick={() =>
+                      run(() =>
+                        updateCoreValueFn({ data: { id: value.id, active: false } }),
+                      )
+                    }
+                    className="rounded border border-slate-300 px-2 py-0.5 hover:bg-slate-100"
+                  >
+                    Deactivate
+                  </button>
+                ) : (
+                  <button
+                    onClick={() =>
+                      run(() => updateCoreValueFn({ data: { id: value.id, active: true } }))
+                    }
+                    className="rounded border border-slate-300 px-2 py-0.5 hover:bg-slate-100"
+                  >
+                    Reactivate
+                  </button>
+                )}
+              </span>
+            )}
+          </li>
+        ))}
+        {props.allValues.length === 0 && (
+          <li className="py-2 text-center text-sm text-slate-400">No core values yet.</li>
+        )}
+      </ul>
+    </section>
+  )
+}
+
 function VersionHistory(props: {
   versions: VtoVersionSummary[]
   busy: boolean
