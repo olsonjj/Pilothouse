@@ -54,16 +54,18 @@ async function nameTaken(db: Db, name: string, excludeId?: number): Promise<bool
 }
 
 /**
- * Signed-in readable list. `includeInactive` (admin panel) adds deactivated
- * values; the default (read view, future scorers) returns active only,
- * ordered by sort_order.
+ * Signed-in readable list. `includeInactive` is ADMIN-ONLY (the admin panel);
+ * the default (read view, future scorers) returns active only, ordered by
+ * sort_order — members requesting inactive rows get 'forbidden'.
  */
 export async function listCoreValues(
   db: Db,
   token: string | undefined,
   includeInactive = false,
 ): Promise<CoreValueResult<CoreValue[]>> {
-  const auth = await getCurrentUser(db, token)
+  const auth = includeInactive
+    ? await requireRole(db, token, 'admin')
+    : await getCurrentUser(db, token)
   if (!auth.ok) return auth
   const rows = await db
     .select()

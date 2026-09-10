@@ -165,4 +165,25 @@ describe('core values reorder', () => {
     const list = await listCoreValues(db, token)
     if (list.ok) assert.deepEqual(list.value.map((v) => v.name), ['A', 'B'])
   })
+
+  it('includeInactive list is admin-only; members get forbidden', async () => {
+    const { db } = await createTestDb()
+    const { token } = await signedInUser(db) // admin
+    const member = await signedInUser(db, 'member')
+    assert.equal((await createCoreValue(db, token, { name: 'X', description: null })).ok, true)
+    assert.equal((await updateCoreValue(db, token, 1, { name: 'X', description: null, active: false })).ok, true)
+
+    // Admin sees inactive rows explicitly; member denied entirely.
+    const adminList = await listCoreValues(db, token, true)
+    assert.equal(adminList.ok, true)
+    if (adminList.ok) assert.equal(adminList.value.length, 1)
+    assert.deepEqual(await listCoreValues(db, member.token, true), {
+      ok: false,
+      error: 'forbidden',
+    })
+    // Member's default list still works (active only).
+    const memberDefault = await listCoreValues(db, member.token)
+    assert.equal(memberDefault.ok, true)
+    if (memberDefault.ok) assert.deepEqual(memberDefault.value, [])
+  })
 })

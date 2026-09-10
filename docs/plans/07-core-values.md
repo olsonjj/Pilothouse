@@ -4,7 +4,7 @@
 
 **Blocked by:** 05: V/TO view & edit.
 
-**Status:** ready-for-agent
+**Status:** done (reviewer sign-off; P0 edit-input fix e3d0ea7 + includeInactive admin gating applied)
 
 - [x] Admin creates/edits/reorders/deactivates core values
 - [x] Value IDs are stable across V/TO edits (edits never delete rows referenced by scores)
