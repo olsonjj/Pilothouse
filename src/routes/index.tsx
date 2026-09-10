@@ -45,6 +45,9 @@ function Home() {
           <Link to="/chart" search={{ seat: null }} className="text-blue-600 hover:underline">
             Chart
           </Link>
+          <Link to="/vto" className="text-blue-600 hover:underline">
+            V/TO
+          </Link>
         </nav>
         <button
           onClick={handleSignOut}

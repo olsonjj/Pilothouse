@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ChartRouteImport } from './routes/chart'
 import { Route as PeopleRouteImport } from './routes/people'
 import { Route as SigninRouteImport } from './routes/signin'
+import { Route as VtoRouteImport } from './routes/vto'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -34,18 +35,25 @@ const SigninRoute = SigninRouteImport.update({
   path: '/signin',
   getParentRoute: () => rootRouteImport,
 } as any)
+const VtoRoute = VtoRouteImport.update({
+  id: '/vto',
+  path: '/vto',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/chart': typeof ChartRoute
   '/people': typeof PeopleRoute
   '/signin': typeof SigninRoute
+  '/vto': typeof VtoRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/chart': typeof ChartRoute
   '/people': typeof PeopleRoute
   '/signin': typeof SigninRoute
+  '/vto': typeof VtoRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -53,13 +61,14 @@ export interface FileRoutesById {
   '/chart': typeof ChartRoute
   '/people': typeof PeopleRoute
   '/signin': typeof SigninRoute
+  '/vto': typeof VtoRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/chart' | '/people' | '/signin'
+  fullPaths: '/' | '/chart' | '/people' | '/signin' | '/vto'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/chart' | '/people' | '/signin'
-  id: '__root__' | '/' | '/chart' | '/people' | '/signin'
+  to: '/' | '/chart' | '/people' | '/signin' | '/vto'
+  id: '__root__' | '/' | '/chart' | '/people' | '/signin' | '/vto'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -67,6 +76,7 @@ export interface RootRouteChildren {
   ChartRoute: typeof ChartRoute
   PeopleRoute: typeof PeopleRoute
   SigninRoute: typeof SigninRoute
+  VtoRoute: typeof VtoRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -99,6 +109,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SigninRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/vto': {
+      id: '/vto'
+      path: '/vto'
+      fullPath: '/vto'
+      preLoaderRoute: typeof VtoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -107,6 +124,7 @@ const rootRouteChildren: RootRouteChildren = {
   ChartRoute: ChartRoute,
   PeopleRoute: PeopleRoute,
   SigninRoute: SigninRoute,
+  VtoRoute: VtoRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

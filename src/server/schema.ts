@@ -117,10 +117,59 @@ export const seatAssignments = sqliteTable('seat_assignments', {
   endedAt: text('ended_at'),
 })
 
+/**
+ * V/TO (ticket 05): the single LIVE version of the Vision/Traction Organizer —
+ * exactly one row (id 1), upserted on save. Ticket 06 turns this into the
+ * `vto_versions` snapshot model (data-model.md); the column shape here mirrors
+ * that table minus versioning fields (published_at, created_by), so the
+ * migration is a copy-row-into-new-versions, not a reshape. List-shaped fields
+ * are JSON text arrays. Core values are NOT here — first-class rows in ticket
+ * 07. Financial figures are plain non-negative integers (whole dollars).
+ */
+export const vto = sqliteTable('vto', {
+  ...mutableFields,
+  /** Question 2: why we exist (required). */
+  coreFocusWhy: text('core_focus_why'),
+  /** Question 2: what we do — the tagline (required). */
+  coreFocusWhat: text('core_focus_what'),
+  /** Question 3: the big measurable goal. */
+  tenYearTarget: text('ten_year_target'),
+  /** Optional target date (YYYY-MM-DD). */
+  tenYearTargetDate: text('ten_year_target_date'),
+  /** Question 4 sub-fields (target market / proven process / guarantee as text; uniques as JSON list). */
+  marketingTargetMarket: text('marketing_target_market'),
+  /** JSON string array — exactly the three uniques (EOS prescribes three). */
+  marketingThreeUniques: text('marketing_three_uniques').notNull().default(sql`'[]'`),
+  marketingProvenProcess: text('marketing_proven_process'),
+  marketingGuarantee: text('marketing_guarantee'),
+  /** Question 5: 3-Year Picture (date + whole-dollar figures + "looks like" items). */
+  threeYearDate: text('three_year_date'),
+  threeYearRevenue: integer('three_year_revenue'),
+  threeYearProfit: integer('three_year_profit'),
+  threeYearItems: text('three_year_items').notNull().default(sql`'[]'`),
+  /** Question 6: 1-Year Plan (label/year + figures + items + priorities). */
+  oneYearLabel: text('one_year_label'),
+  oneYearRevenue: integer('one_year_revenue'),
+  oneYearProfit: integer('one_year_profit'),
+  oneYearItems: text('one_year_items').notNull().default(sql`'[]'`),
+  oneYearPriorities: text('one_year_priorities').notNull().default(sql`'[]'`),
+},
+(t) => [
+  check(
+    'vto_money_checks',
+    sql`(${t.threeYearRevenue} IS NULL OR (${t.threeYearRevenue} >= 0 AND ${t.threeYearRevenue} = CAST(${t.threeYearRevenue} AS INTEGER)))
+      AND (${t.threeYearProfit} IS NULL OR (${t.threeYearProfit} >= 0 AND ${t.threeYearProfit} = CAST(${t.threeYearProfit} AS INTEGER)))
+      AND (${t.oneYearRevenue} IS NULL OR (${t.oneYearRevenue} >= 0 AND ${t.oneYearRevenue} = CAST(${t.oneYearRevenue} AS INTEGER)))
+      AND (${t.oneYearProfit} IS NULL OR (${t.oneYearProfit} >= 0 AND ${t.oneYearProfit} = CAST(${t.oneYearProfit} AS INTEGER)))`,
+  ),
+],
+)
+
 export type User = typeof users.$inferSelect
 export type Session = typeof sessions.$inferSelect
 export type Quarter = typeof quarters.$inferSelect
 export type Person = typeof people.$inferSelect
 export type Seat = typeof seats.$inferSelect
 export type SeatAssignment = typeof seatAssignments.$inferSelect
+export type Vto = typeof vto.$inferSelect
 export type Role = 'admin' | 'member'
