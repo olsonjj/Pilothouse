@@ -13,9 +13,10 @@ import {
 import type { SeatWithOccupants, AssignmentRow } from '../server/seats'
 
 export const Route = createFileRoute('/chart')({
-  validateSearch: (search: Record<string, unknown>) => ({
-    seat: search.seat ? Number(search.seat) : (null as number | null),
-  }),
+  validateSearch: (search: Record<string, unknown>) => {
+    const n = search.seat ? Number(search.seat) : NaN
+    return { seat: Number.isFinite(n) ? (n as number | null) : (null as number | null) }
+  },
   loader: async () => {
     const [me, seats, people] = await Promise.all([
       getCurrentUserFn(),
@@ -110,6 +111,13 @@ function ChartPage() {
   async function refresh() {
     const result = await listSeatsFn()
     if (result.ok) setDataSeats(result.value)
+    // Re-fetch the open seat detail too: navigating to the same search params
+    // doesn't re-run the loader, so detail would otherwise go stale after a
+    // mutation (assign/end).
+    if (selectedSeatId != null) {
+      const seatResult = await getSeatFn({ data: { seatId: selectedSeatId } })
+      setDetail(seatResult.ok ? seatResult.value : null)
+    }
     await navigate({ to: '/chart', search: { seat: selectedSeatId }, replace: true })
   }
 
@@ -420,9 +428,14 @@ function SeatNode(props: {
   onEdit: (seat: SeatWithOccupants) => void
   onAssign: (seatId: number) => void
   onAddChild: (parentSeatId: number) => void
+  /** Guard against corrupted parent chains (direct DB tampering): seats already rendered. */
+  seen?: Set<number>
 }) {
   const { seat } = props
-  const children = props.allSeats.filter((s) => s.parentSeatId === seat.id)
+  const seen = props.seen ?? new Set([seat.id])
+  const children = props.allSeats.filter(
+    (s) => s.parentSeatId === seat.id && !seen.has(s.id),
+  )
   const empty = seat.occupants.length === 0
   return (
     <li className="mt-2">
@@ -465,7 +478,12 @@ function SeatNode(props: {
       {children.length > 0 && (
         <div className="ml-6 border-l border-slate-300 pl-4">
           {children.map((child) => (
-            <SeatNode key={child.id} {...props} seat={child} />
+            <SeatNode
+              key={child.id}
+              {...props}
+              seat={child}
+              seen={new Set([...seen, child.id])}
+            />
           ))}
         </div>
       )}
