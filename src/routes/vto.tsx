@@ -765,10 +765,12 @@ function CoreValuesPanel(props: {
               <span className="flex flex-1 items-center gap-2">
                 <input
                   value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
                   className="w-40 rounded border border-slate-300 px-2 py-1 text-sm"
                 />
                 <input
                   value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
                   className="w-full rounded border border-slate-300 px-2 py-1 text-sm"
                 />
                 <button
