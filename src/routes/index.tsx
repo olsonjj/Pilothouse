@@ -42,6 +42,9 @@ function Home() {
           <Link to="/people" className="text-blue-600 hover:underline">
             People
           </Link>
+          <Link to="/chart" search={{ seat: null }} className="text-blue-600 hover:underline">
+            Chart
+          </Link>
         </nav>
         <button
           onClick={handleSignOut}

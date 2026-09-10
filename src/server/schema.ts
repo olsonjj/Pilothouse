@@ -82,8 +82,45 @@ export const quarters = sqliteTable(
   (t) => [check('quarters_label_check', sql`${t.label} GLOB '[0-9][0-9][0-9][0-9] Q[1-4]'`)],
 )
 
+/** Seats are the nodes of the Accountability Chart (ticket 04). */
+export const seats = sqliteTable(
+  'seats',
+  {
+    ...mutableFields,
+    name: text('name').notNull(),
+    description: text('description'),
+    /** Ordered responsibility bullets as a JSON text array (data-model.md). */
+    responsibilities: text('responsibilities').notNull().default(sql`'[]'`),
+    /** Self-referencing FK; NULL = top seat. */
+    parentSeatId: integer('parent_seat_id'),
+    /** Ordering among siblings. */
+    sortOrder: integer('sort_order').notNull().default(0),
+  },
+  (t) => [check('seats_sort_order_check', sql`${t.sortOrder} >= 0`)],
+)
+
+/**
+ * Person-in-seat history (ticket 04). Rows are never deleted on reassignment —
+ * `endedAt` marks the end (NULL = current). GWC columns land with ticket 09.
+ */
+export const seatAssignments = sqliteTable('seat_assignments', {
+  ...mutableFields,
+  personId: integer('person_id')
+    .notNull()
+    .references(() => people.id),
+  seatId: integer('seat_id')
+    .notNull()
+    .references(() => seats.id),
+  /** Date (YYYY-MM-DD) the person took the seat. */
+  startedAt: text('started_at').notNull(),
+  /** Date the assignment ended; NULL = currently active. */
+  endedAt: text('ended_at'),
+})
+
 export type User = typeof users.$inferSelect
 export type Session = typeof sessions.$inferSelect
 export type Quarter = typeof quarters.$inferSelect
 export type Person = typeof people.$inferSelect
+export type Seat = typeof seats.$inferSelect
+export type SeatAssignment = typeof seatAssignments.$inferSelect
 export type Role = 'admin' | 'member'
