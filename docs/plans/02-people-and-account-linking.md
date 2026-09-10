@@ -4,7 +4,7 @@
 
 **Blocked by:** 01: Scaffold, auth & test seam.
 
-**Status:** ready-for-agent
+**Status:** done (reviewer sign-off; see git log for the feat commit)
 
 - [x] Admin can create, edit, and list people (name, optional email, optional start date)
 - [x] A person can be linked to a user account; unlinked people are allowed

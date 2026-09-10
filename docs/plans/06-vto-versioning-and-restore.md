@@ -4,7 +4,7 @@
 
 **Blocked by:** 05: V/TO view & edit.
 
-**Status:** ready-for-agent
+**Status:** done (reviewer sign-off; see git log for the feat commit)
 
 - [x] Each save produces a new version with author and timestamp; a "published as of" date shows on the read view
 - [x] Version history is listable; any version restorable
@@ -12,7 +12,8 @@
 - [x] No field-level diffs — whole-snapshot versions
 - [x] Seam tests: edit → new version; restore → new version with old content
 
-**Status:** complete (ticket 06). Deltas documented in data-model.md: live `vto`
+**Status:** done (reviewer sign-off; see git log for the feat commit).
+Implementation notes — deltas documented in data-model.md: live `vto`
 row kept as-is (upsert-only, id 1); publishedAs-of = newest snapshot's
 `published_at` (fallback: live row's `updated_at`); pre-existing live rows are
 backfilled into the first version by an idempotent init step (author = first

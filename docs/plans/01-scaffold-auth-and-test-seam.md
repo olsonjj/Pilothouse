@@ -4,14 +4,14 @@
 
 **Blocked by:** None (can start immediately).
 
-**Status:** ready-for-agent
+**Status:** done (reviewer sign-off; see git log for the feat commit)
 
-- [ ] Sign in/out works; sessions persist across visits; bad credentials rejected
-- [ ] Roles (`admin`/`member`) enforced in server functions, not the UI only
-- [ ] Owner admin account seeded on first run
-- [ ] Scheduled job writes a SQLite backup snapshot file
-- [ ] Test suite exercises behavior through server functions against a temp SQLite DB (the single seam), runnable locally
-- [ ] All DB access lives behind server functions; no client DB access
+- [x] Sign in/out works; sessions persist across visits; bad credentials rejected
+- [x] Roles (`admin`/`member`) enforced in server functions, not the UI only
+- [x] Owner admin account seeded on first run
+- [x] Scheduled job writes a SQLite backup snapshot file
+- [x] Test suite exercises behavior through server functions against a temp SQLite DB (the single seam), runnable locally
+- [x] All DB access lives behind server functions; no client DB access
 
 ## Implementation notes (completed 2026-09-10)
 

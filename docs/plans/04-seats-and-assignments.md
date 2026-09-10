@@ -4,11 +4,11 @@
 
 **Blocked by:** 02: People & account linking.
 
-**Status:** ready-for-agent
+**Status:** done (reviewer sign-off; see git log for the feat commit)
 
-- [ ] Admin creates/edits seats with ordered responsibility bullets and a parent seat (or top seat)
-- [ ] Assignments have start/end dates; current assignment = open-ended
-- [ ] App-enforced caps: ≤2 active seats per person, one active occupant per seat (violation rejected)
-- [ ] Assignment history survives seat moves (ended_at, not deletion)
-- [ ] Members view; only admins edit
-- [ ] Seam tests cover the caps, reassignment, and history
+- [x] Admin creates/edits seats with ordered responsibility bullets and a parent seat (or top seat)
+- [x] Assignments have start/end dates; current assignment = open-ended
+- [x] App-enforced caps: ≤2 active seats per person, one active occupant per seat (violation rejected)
+- [x] Assignment history survives seat moves (ended_at, not deletion)
+- [x] Members view; only admins edit
+- [x] Seam tests cover the caps, reassignment, and history
