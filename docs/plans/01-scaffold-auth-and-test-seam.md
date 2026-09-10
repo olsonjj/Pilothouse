@@ -12,3 +12,19 @@
 - [ ] Scheduled job writes a SQLite backup snapshot file
 - [ ] Test suite exercises behavior through server functions against a temp SQLite DB (the single seam), runnable locally
 - [ ] All DB access lives behind server functions; no client DB access
+
+## Implementation notes (completed 2026-09-10)
+
+- DB driver: Node's built-in `node:sqlite` via Drizzle's `sqlite-proxy` adapter
+  instead of better-sqlite3. better-sqlite3's native binding segfaults inside
+  vite's dev module runner on this machine (verified: plain node, plain forks,
+  workers, and tsx all fine; vite-node/vitest/vite dev all crash; other napi
+  modules like @parcel/watcher load fine under the runner). node:sqlite is
+  built into the binary — no dlopen, no crash — and keeps Drizzle + SQLite.
+- Test runner: Node's built-in `node --test` with a tsx loader instead of
+  vitest (vitest's worker processes crashed identically on this machine).
+- Runtime pinned to Node 24 LTS (volta in package.json; pnpm-spawned processes
+  otherwise resolved Node 22.13.1, which lacks some node:sqlite APIs).
+- HTTP-layer behaviors verified live: unauthenticated / redirects (307) to
+  /signin, sign-in page renders, session cookie renders the signed-in home,
+  bad cookie rejected, `pnpm backup` writes snapshots.

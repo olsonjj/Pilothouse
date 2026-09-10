@@ -1,0 +1,41 @@
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { getCurrentUserFn, signOutFn } from '../functions/auth'
+
+export const Route = createFileRoute('/')({
+  // Root guard already redirected unauthenticated visitors; loader refreshes the user.
+  loader: () => getCurrentUserFn(),
+  component: Home,
+})
+
+function Home() {
+  const navigate = useNavigate()
+  const data = Route.useLoaderData()
+  const user = data.ok ? data.user : null
+  if (!user) return null
+
+  async function handleSignOut() {
+    await signOutFn()
+    await navigate({ to: '/signin' })
+  }
+
+  return (
+    <main className="mx-auto max-w-xl p-8">
+      <div className="rounded border border-slate-200 bg-white p-6 shadow-sm">
+        <h1 className="text-xl font-semibold">OpenEOS</h1>
+        <p className="mt-4">
+          Signed in as <strong>{user.name}</strong>{' '}
+          <span className="rounded bg-slate-100 px-2 py-0.5 text-sm text-slate-700">
+            {user.role}
+          </span>
+        </p>
+        <p className="mt-1 text-sm text-slate-500">{user.email}</p>
+        <button
+          onClick={handleSignOut}
+          className="mt-6 rounded border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100"
+        >
+          Sign out
+        </button>
+      </div>
+    </main>
+  )
+}

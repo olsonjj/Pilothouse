@@ -35,7 +35,9 @@ entry, issue capture) are done by the owning person themselves.
 ## Stack (decided)
 
 - **Framework:** TanStack Start (SSR + server functions; all DB access server-side).
-- **Database:** SQLite, local file, server-side only.
+- **Database:** SQLite, local file, server-side only. Drizzle ORM via Node's
+  built-in `node:sqlite` (sqlite-proxy driver; no native modules — chosen
+  over better-sqlite3, which segfaults inside vite's dev module runner).
 - **Styling:** Tailwind CSS.
 - **Auth:** simple email + password with sessions stored in SQLite. No external
   identity provider.

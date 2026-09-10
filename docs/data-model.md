@@ -6,8 +6,9 @@ decision in `overview.md` and the specs — no open questions remain.
 ## Conventions
 
 - **SQLite.** Server-side only, accessed through server functions + ORM
-  (Drizzle planned). Schema stays ORM-portable so a later cloud-DB swap is
-  contained (see overview stack note).
+  (Drizzle). Schema stays ORM-portable so a later cloud-DB swap is
+  contained (see overview stack note). Driver: Node's built-in
+  `node:sqlite` via Drizzle's sqlite-proxy adapter (no native deps).
 - **IDs:** `INTEGER PRIMARY KEY` (autoincrement).
 - **Timestamps:** `TEXT` ISO-8601 UTC.
 - **Base fields (every table):** `id INTEGER PRIMARY KEY`, `created_at TEXT`.
