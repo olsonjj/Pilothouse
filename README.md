@@ -28,7 +28,7 @@ development only** — change it before exposing the app beyond localhost.
 | --- | --- |
 | `pnpm dev` | Dev server (http://localhost:3000) |
 | `pnpm build` | Production build |
-| `pnpm test` | Integration tests (vitest, temp SQLite per run) |
+| `pnpm test` | Integration tests (node --test + tsx, temp SQLite per run) |
 | `pnpm typecheck` | `tsc --noEmit` |
 | `pnpm backup` | Write a manual SQLite snapshot (`VACUUM INTO`) |
 | `pnpm exec drizzle-kit generate` | Regenerate migrations after schema changes |
