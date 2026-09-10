@@ -284,4 +284,15 @@ describe('vto version history (ticket 06)', () => {
     const again = await listVtoVersions(db, token)
     if (again.ok) assert.equal(again.value.length, 1)
   })
+
+  it('backfill with an empty vto row is a no-op (no version created)', async () => {
+    const { db } = await createTestDb()
+    const { token } = await signedInUser(db)
+    // No vto row has ever been saved: delete the nothing that exists.
+    await db.delete(vto)
+    await backfillVtoFirstVersion(db)
+    const history = await listVtoVersions(db, token)
+    assert.equal(history.ok, true)
+    if (history.ok) assert.equal(history.value.length, 0)
+  })
 })
