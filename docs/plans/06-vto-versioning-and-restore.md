@@ -6,8 +6,16 @@
 
 **Status:** ready-for-agent
 
-- [ ] Each save produces a new version with author and timestamp; a "published as of" date shows on the read view
-- [ ] Version history is listable; any version restorable
-- [ ] Restore creates a new version (history is append-only)
-- [ ] No field-level diffs — whole-snapshot versions
-- [ ] Seam tests: edit → new version; restore → new version with old content
+- [x] Each save produces a new version with author and timestamp; a "published as of" date shows on the read view
+- [x] Version history is listable; any version restorable
+- [x] Restore creates a new version (history is append-only)
+- [x] No field-level diffs — whole-snapshot versions
+- [x] Seam tests: edit → new version; restore → new version with old content
+
+**Status:** complete (ticket 06). Deltas documented in data-model.md: live `vto`
+row kept as-is (upsert-only, id 1); publishedAs-of = newest snapshot's
+`published_at` (fallback: live row's `updated_at`); pre-existing live rows are
+backfilled into the first version by an idempotent init step (author = first
+user) instead of in-migration SQL, so it is testable at the seam. Notes for
+later tickets: ticket 07 (core values) is untouched by this model; ticket 10
+(People Analyzer) reads core values only — no V/TO coupling.

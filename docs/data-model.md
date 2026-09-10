@@ -121,6 +121,11 @@ date), marketing strategy (target market, proven process, guarantee — text),
 `three_uniques`, `three_year_items`, `one_year_items`, `one_year_priorities`.
 Plus `published_at`, `created_by`, `created_at`. Current = newest by
 `published_at`/`id`. Restore = copy row into a new version. No field-level diffs.
+Status (ticket 06): implemented. The live `vto` row still exists (id 1,
+upsert-only); every save writes it AND appends a `vto_versions` snapshot. The
+V/TO read view shows "published as of" = newest snapshot's `published_at`. An
+idempotent init-time backfill copies a pre-existing live row into the first
+version if no version exists yet.
 
 ## Rocks tables
 

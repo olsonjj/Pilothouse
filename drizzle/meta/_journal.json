@@ -36,6 +36,13 @@
       "when": 1789082840113,
       "tag": "0004_add_vto",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1789083166619,
+      "tag": "0005_add_vto_versions",
+      "breakpoints": true
     }
   ]
 }

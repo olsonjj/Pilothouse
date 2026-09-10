@@ -5,6 +5,7 @@ import { sql } from 'drizzle-orm'
 import * as schema from './schema'
 import { seedOwner } from './seed'
 import { ensureCurrentYearQuarters } from './quarters'
+import { backfillVtoFirstVersion } from './vto'
 import { scheduleBackups } from './backup'
 import path from 'node:path'
 import fs from 'node:fs'
@@ -102,6 +103,9 @@ export function getDb(): Promise<Db> {
       // Idempotent quarter seed (current + next calendar year); cheap enough
       // to run on every init, so new years roll over without manual steps.
       await ensureCurrentYearQuarters(created.db)
+      // Idempotent V/TO version backfill (ticket 06): copies a pre-ticket-06
+      // live vto row into the first version, if no version exists yet.
+      await backfillVtoFirstVersion(created.db)
       // Scheduled snapshot job; disabled during tests.
       if (!process.env.OPENEOS_DISABLE_BACKUP) {
         scheduleBackups(created.sqlite, DB_FILE)

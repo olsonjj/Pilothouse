@@ -1,6 +1,13 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { getVto, updateVto, type VtoInput } from '#/server/vto'
+import {
+  getVto,
+  updateVto,
+  listVtoVersions,
+  restoreVtoVersion,
+  backfillVtoFirstVersion,
+  type VtoInput,
+} from '#/server/vto'
 import { vto } from '#/server/schema'
 import { createTestDb, signedInUser, owner } from './helpers'
 import { signIn } from '#/server/auth'
@@ -166,5 +173,115 @@ describe('vto update', () => {
     const result = await getVto(db, token)
     assert.equal(result.ok, true)
     if (result.ok) assert.deepEqual(result.value.marketingThreeUniques, [])
+  })
+})
+describe('vto version history (ticket 06)', () => {
+  it('each save creates a new version with author and published_at; publishedAt tracks the newest', async () => {
+    const { db } = await createTestDb()
+    const { token, user } = await signedInUser(db)
+
+    const first = await updateVto(db, token, {
+      ...FULL_INPUT,
+      tenYearTarget: 'Version one',
+    })
+    assert.equal(first.ok, true)
+    const second = await updateVto(db, token, {
+      ...FULL_INPUT,
+      tenYearTarget: 'Version two',
+    })
+    assert.equal(second.ok, true)
+
+    const history = await listVtoVersions(db, token)
+    assert.equal(history.ok, true)
+    if (!history.ok) throw new Error('history failed')
+    assert.equal(history.value.length, 2)
+    // Newest first; both authored by the saving admin.
+    for (const entry of history.value) assert.equal(entry.authorEmail, user.email)
+
+    // publishedAs-of = newest snapshot's published_at.
+    const read = await getVto(db, token)
+    assert.equal(read.ok, true)
+    if (read.ok) assert.equal(read.value.publishedAt, history.value[0].publishedAt)
+  })
+
+  it('restore copies old content into the live row, appends a new version, and keeps history append-only', async () => {
+    const { db } = await createTestDb()
+    const { token } = await signedInUser(db)
+
+    // v1 = "Version one", v2 = "Version two".
+    const v1 = await updateVto(db, token, { ...FULL_INPUT, tenYearTarget: 'Version one' })
+    const v2 = await updateVto(db, token, { ...FULL_INPUT, tenYearTarget: 'Version two' })
+    assert.equal(v1.ok && v2.ok, true)
+    const historyBefore = await listVtoVersions(db, token)
+    if (!historyBefore.ok) throw new Error('history failed')
+    assert.equal(historyBefore.value.length, 2)
+    const oldestId = historyBefore.value[1].id
+
+    // Restore v1 (currently the oldest).
+    const restored = await restoreVtoVersion(db, token, oldestId)
+    assert.equal(restored.ok, true)
+    if (restored.ok) assert.equal(restored.value.tenYearTarget, 'Version one')
+
+    // Live row reflects the restored content.
+    const read = await getVto(db, token)
+    assert.equal(read.ok, true)
+    if (read.ok) assert.equal(read.value.tenYearTarget, 'Version one')
+
+    // History grew by one (append-only); originals intact, newest = the restore.
+    const historyAfter = await listVtoVersions(db, token)
+    assert.equal(historyAfter.ok, true)
+    if (!historyAfter.ok) throw new Error('history failed')
+    assert.equal(historyAfter.value.length, 3)
+    assert.equal(historyAfter.value[2].id, oldestId, 'original version still present')
+    assert.notEqual(historyAfter.value[0].id, oldestId, 'newest row is the new version')
+  })
+
+  it('restore of an unknown version is not_found; members and unauthenticated denied everywhere', async () => {
+    const { db } = await createTestDb()
+    const { token, user } = await signedInUser(db)
+    const member = await signedInUser(db, 'member')
+    assert.deepEqual(await updateVto(db, token, FULL_INPUT).then(() => true), true)
+
+    assert.deepEqual(await restoreVtoVersion(db, token, 999), { ok: false, error: 'not_found' })
+    assert.deepEqual(await listVtoVersions(db, member.token), { ok: false, error: 'forbidden' })
+    assert.deepEqual(await restoreVtoVersion(db, member.token, 1), { ok: false, error: 'forbidden' })
+    assert.deepEqual(await listVtoVersions(db, undefined), { ok: false, error: 'unauthenticated' })
+    assert.deepEqual(await restoreVtoVersion(db, undefined, 1), {
+      ok: false,
+      error: 'unauthenticated',
+    })
+    assert.equal(user.role, 'admin')
+  })
+
+  it('backfill copies a pre-existing vto row into the first version (idempotent)', async () => {
+    const { db, sqlite } = await createTestDb()
+    const { token } = await signedInUser(db)
+    // Simulate a pre-ticket-06 DB: write the live row without any version.
+    sqlite.exec(
+      `INSERT INTO vto (id, updated_at, core_focus_why, core_focus_what, marketing_three_uniques)
+       VALUES (1, '2025-01-15T10:00:00Z', 'Legacy why', 'Legacy what', '[]')`,
+    )
+    const before = await listVtoVersions(db, token)
+    assert.equal(before.ok, true)
+    if (before.ok) assert.equal(before.value.length, 0)
+
+    await backfillVtoFirstVersion(db)
+    const after = await listVtoVersions(db, token)
+    assert.equal(after.ok, true)
+    if (!after.ok) throw new Error('history failed')
+    assert.equal(after.value.length, 1)
+    assert.equal(after.value[0].publishedAt, '2025-01-15T10:00:00Z')
+
+    const read = await getVto(db, token)
+    assert.equal(read.ok, true)
+    if (read.ok) {
+      assert.equal(read.value.coreFocusWhy, 'Legacy why')
+      assert.equal(read.value.publishedAt, '2025-01-15T10:00:00Z')
+    }
+
+    // Idempotent: running again must not duplicate.
+    await backfillVtoFirstVersion(db)
+    const again = await listVtoVersions(db, token)
+    if (again.ok) assert.equal(again.value.length, 1)
   })
 })

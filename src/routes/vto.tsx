@@ -1,18 +1,30 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { getCurrentUserFn, signOutFn } from '../functions/auth'
-import { getVtoFn, updateVtoFn } from '../functions/vto'
+import {
+  getVtoFn,
+  updateVtoFn,
+  listVtoVersionsFn,
+  restoreVtoVersionFn,
+} from '../functions/vto'
+import type { VtoVersionSummary } from '../server/vto'
 import type { VtoView } from '../server/vto'
 
 export const Route = createFileRoute('/vto')({
   loader: async () => {
     const [vto, me] = await Promise.all([getVtoFn(), getCurrentUserFn()])
-    return { vto: vto.ok ? vto.value : null, me: me.ok ? me.user : null }
+    // Version history is admin-only; members just get the live read view.
+    let versions: VtoVersionSummary[] = []
+    if (me.ok && me.user.role === 'admin') {
+      const history = await listVtoVersionsFn()
+      if (history.ok) versions = history.value
+    }
+    return { vto: vto.ok ? vto.value : null, me: me.ok ? me.user : null, versions }
   },
   component: VtoPage,
 })
 
-type VtoForm = Omit<VtoView, 'exists' | 'updatedAt'>
+type VtoForm = Omit<VtoView, 'exists' | 'updatedAt' | 'publishedAt'>
 
 const EMPTY_FORM: VtoForm = {
   coreFocusWhy: '',
@@ -35,7 +47,7 @@ const EMPTY_FORM: VtoForm = {
 }
 
 function toForm(view: VtoView): VtoForm {
-  const { exists: _exists, updatedAt: _updatedAt, ...form } = view
+  const { exists: _exists, updatedAt: _updatedAt, publishedAt: _publishedAt, ...form } = view
   return form
 }
 
@@ -224,6 +236,12 @@ function VtoPage() {
   const [editing, setEditing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [versions, setVersions] = useState<VtoVersionSummary[]>(data.versions ?? [])
+
+  async function refreshVersions() {
+    const result = await listVtoVersionsFn()
+    if (result.ok) setVersions(result.value)
+  }
 
   async function handleSignOut() {
     await signOutFn()
@@ -243,10 +261,28 @@ function VtoPage() {
     setView(result.value)
     setDraft(toForm(result.value))
     setEditing(false)
+    refreshVersions()
   }
 
   function set<K extends keyof VtoForm>(key: K, value: VtoForm[K]) {
     setDraft((d) => ({ ...d, [key]: value }))
+  }
+
+  async function handleRestore(versionId: number) {
+    if (!confirm('Restore this version? It becomes the published V/TO (and a new version is recorded).'))
+      return
+    setBusy(true)
+    setError(null)
+    const result = await restoreVtoVersionFn({ data: { versionId } })
+    setBusy(false)
+    if (!result.ok) {
+      setError(result.error === 'not_found' ? 'That version no longer exists.' : 'Something went wrong.')
+      return
+    }
+    setView(result.value)
+    setDraft(toForm(result.value))
+    setEditing(false)
+    refreshVersions()
   }
 
   if (!view) return <p className="p-8 text-sm text-slate-500">Loading…</p>
@@ -299,6 +335,7 @@ function VtoPage() {
             Edit V/TO
           </button>
         </div>
+        <VersionHistory versions={versions} busy={busy} onRestore={handleRestore} />
       </main>
     )
   }
@@ -467,7 +504,9 @@ function ReadView(props: { view: VtoView }) {
       <div className="mt-4 flex items-baseline justify-between">
         <h1 className="text-xl font-semibold">Vision/Traction Organizer</h1>
         <span className="text-xs text-slate-400">
-          {v.exists ? `as of ${v.updatedAt?.slice(0, 10)}` : 'not yet written'}
+          {v.exists
+            ? `published as of ${(v.publishedAt ?? v.updatedAt)?.slice(0, 10) ?? '—'}`
+            : 'not yet written'}
         </span>
       </div>
       <PageHeading title="Page 1 — Vision" />
@@ -561,5 +600,51 @@ function ReadView(props: { view: VtoView }) {
         </p>
       </QuestionBlock>
     </div>
+  )
+}
+/** Admin-only version history (ticket 06): newest first, restore per entry. */
+function VersionHistory(props: {
+  versions: VtoVersionSummary[]
+  busy: boolean
+  onRestore: (versionId: number) => void
+}) {
+  return (
+    <section className="mt-8">
+      <h2 className="text-sm font-medium text-slate-500">Version history</h2>
+      {props.versions.length === 0 ? (
+        <p className="mt-2 text-sm text-slate-400">No versions yet — save the V/TO once.</p>
+      ) : (
+        <ul className="mt-2 space-y-1">
+          {props.versions.map((v, i) => (
+            <li
+              key={v.id}
+              className="flex items-center justify-between rounded border border-slate-200 bg-white px-3 py-2 text-sm"
+            >
+              <span>
+                <span className="font-medium">#{props.versions.length - i}</span>{' '}
+                <span className="text-slate-600">
+                  {v.publishedAt.slice(0, 19).replace('T', ' ')}
+                </span>{' '}
+                <span className="text-slate-400">by {v.authorEmail}</span>
+                {i === 0 && (
+                  <span className="ml-2 rounded bg-emerald-100 px-1.5 py-0.5 text-xs text-emerald-700">
+                    current
+                  </span>
+                )}
+              </span>
+              {i !== 0 && (
+                <button
+                  disabled={props.busy}
+                  onClick={() => props.onRestore(v.id)}
+                  className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100 disabled:opacity-50"
+                >
+                  Restore
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   )
 }

@@ -119,10 +119,10 @@ export const seatAssignments = sqliteTable('seat_assignments', {
 
 /**
  * V/TO (ticket 05): the single LIVE version of the Vision/Traction Organizer —
- * exactly one row (id 1), upserted on save. Ticket 06 turns this into the
- * `vto_versions` snapshot model (data-model.md); the column shape here mirrors
- * that table minus versioning fields (published_at, created_by), so the
- * migration is a copy-row-into-new-versions, not a reshape. List-shaped fields
+ * exactly one row (id 1), upserted on save. Every save also snapshots into
+ * `vto_versions` (ticket 06); restoring copies a version back here AND appends
+ * a new version (history is append-only). The column shape here mirrors that
+ * table minus versioning fields (published_at, created_by). List-shaped fields
  * are JSON text arrays. Core values are NOT here — first-class rows in ticket
  * 07. Financial figures are plain non-negative integers (whole dollars).
  */
@@ -172,4 +172,51 @@ export type Person = typeof people.$inferSelect
 export type Seat = typeof seats.$inferSelect
 export type SeatAssignment = typeof seatAssignments.$inferSelect
 export type Vto = typeof vto.$inferSelect
+export type VtoVersion = typeof vtoVersions.$inferSelect
 export type Role = 'admin' | 'member'
+
+/**
+ * V/TO version history (ticket 06): one immutable snapshot row per save.
+ * Content columns mirror the live `vto` row (no id/created_at/updated_at of
+ * their own meaning); plus published_at (snapshot time) and created_by (author
+ * user). Immutable per data-model.md — baseFields only, no updated_at.
+ * Current = newest by published_at, tie-broken by id. Restore = copy into the
+ * live row + insert a NEW version row (never delete/overwrite).
+ */
+export const vtoVersions = sqliteTable('vto_versions', {
+  ...baseFields,
+  /** ISO timestamp the snapshot was published (== save time; restore time for restored snapshots). */
+  publishedAt: text('published_at').notNull(),
+  /** Author of the save (or restore) that produced this snapshot. */
+  createdBy: integer('created_by')
+    .notNull()
+    .references(() => users.id),
+  // Content columns mirror the live `vto` row's columns exactly.
+  coreFocusWhy: text('core_focus_why'),
+  coreFocusWhat: text('core_focus_what'),
+  tenYearTarget: text('ten_year_target'),
+  tenYearTargetDate: text('ten_year_target_date'),
+  marketingTargetMarket: text('marketing_target_market'),
+  marketingThreeUniques: text('marketing_three_uniques').notNull().default(sql`'[]'`),
+  marketingProvenProcess: text('marketing_proven_process'),
+  marketingGuarantee: text('marketing_guarantee'),
+  threeYearDate: text('three_year_date'),
+  threeYearRevenue: integer('three_year_revenue'),
+  threeYearProfit: integer('three_year_profit'),
+  threeYearItems: text('three_year_items').notNull().default(sql`'[]'`),
+  oneYearLabel: text('one_year_label'),
+  oneYearRevenue: integer('one_year_revenue'),
+  oneYearProfit: integer('one_year_profit'),
+  oneYearItems: text('one_year_items').notNull().default(sql`'[]'`),
+  oneYearPriorities: text('one_year_priorities').notNull().default(sql`'[]'`),
+},
+(t) => [
+  check(
+    'vto_versions_money_checks',
+    sql`(${t.threeYearRevenue} IS NULL OR (${t.threeYearRevenue} >= 0 AND ${t.threeYearRevenue} = CAST(${t.threeYearRevenue} AS INTEGER)))
+      AND (${t.threeYearProfit} IS NULL OR (${t.threeYearProfit} >= 0 AND ${t.threeYearProfit} = CAST(${t.threeYearProfit} AS INTEGER)))
+      AND (${t.oneYearRevenue} IS NULL OR (${t.oneYearRevenue} >= 0 AND ${t.oneYearRevenue} = CAST(${t.oneYearRevenue} AS INTEGER)))
+      AND (${t.oneYearProfit} IS NULL OR (${t.oneYearProfit} >= 0 AND ${t.oneYearProfit} = CAST(${t.oneYearProfit} AS INTEGER)))`,
+  ),
+],
+)
