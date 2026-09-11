@@ -258,6 +258,7 @@ describe('To-dos: team view by week + completion rates (seam, ticket 12)', () =>
     const { token } = await signedInUser(db)
     const alice = await personFor(db, token, 'Alice')
     const bob = await personFor(db, token, 'Bob')
+    const carol = await personFor(db, token, 'Carol')
 
     // asOf = Wed 2026-03-25. Current week starts Mon 2026-03-23; window =
     // [2026-02-23, 2026-03-23) = the four fully-elapsed weeks.
@@ -288,6 +289,16 @@ describe('To-dos: team view by week + completion rates (seam, ticket 12)', () =>
     // Out of window: due in current week (open) and before the window.
     await seed('current-week', alice.id, '2026-03-24', 'none', 6)
     await seed('before-window', alice.id, '2026-02-15', 'done', 7)
+    // BOUNDARY PINS (ticket-12 review): a ±1-day window bug must flip rates.
+    // Lower bound: done due the day BEFORE windowStart → excluded. A
+    // windowStart−1 bug would include it (Alice 3/4=75, team 4/5=80).
+    await seed('before-window-edge', alice.id, '2026-02-22', 'done', 8)
+    // Current-week leak: open due Monday of the current week → excluded. An
+    // off-by-one upper-bound bug would count it (Alice 2/4=50, team 3/5=60).
+    await seed('current-week-monday', alice.id, '2026-03-23', 'none', 9)
+    // Upper-bound inclusion: done due the LAST window day (2026-03-22) → in.
+    // Excluding it would zero Carol and flip the team rate back to 3/4=75.
+    await seed('last-window-day', carol.id, '2026-03-22', 'done', 10)
 
     const result = await completionRates(db, token, asOf)
     assert.equal(result.ok, true)
@@ -305,9 +316,16 @@ describe('To-dos: team view by week + completion rates (seam, ticket 12)', () =>
     assert.ok(bobRate, 'bob missing')
     assert.equal(bobRate.rate, 100)
 
-    assert.equal(result.value.team.done, 3)
-    assert.equal(result.value.team.counted, 4)
-    assert.equal(result.value.team.rate, 75)
+    // Carol's only window to-do is due the last window day — pins inclusion.
+    const carolRate = result.value.people.find((p) => p.personName === 'Carol')
+    assert.ok(carolRate, 'carol missing (last-window-day row excluded?)')
+    assert.equal(carolRate.done, 1)
+    assert.equal(carolRate.counted, 1)
+    assert.equal(carolRate.rate, 100)
+
+    assert.equal(result.value.team.done, 4)
+    assert.equal(result.value.team.counted, 5)
+    assert.equal(result.value.team.rate, 80)
   })
 
   it('completion rates: empty window yields null rate, not NaN', async () => {
