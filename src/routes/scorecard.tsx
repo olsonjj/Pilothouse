@@ -9,18 +9,21 @@ import {
   updateMetricFn,
   listGridFn,
   setEntryFn,
+  metricTrendFn,
+  onTrackRollupFn,
 } from '../functions/metrics'
-import type { MetricWithOwner, MetricGrid } from '../server/metrics'
+import type { MetricWithOwner, MetricGrid, MetricTrend, OnTrackRollup } from '../server/metrics'
 
 export const Route = createFileRoute('/scorecard')({
   loader: async () => {
     // listAllMetricsFn (with retired rows) is admin-only; members get the
     // active-only public list via the fallback.
-    const [me, people, allMetrics, grid] = await Promise.all([
+    const [me, people, allMetrics, grid, rollup] = await Promise.all([
       getCurrentUserFn(),
       listPeopleFn(),
       listAllMetricsFn(),
       listGridFn(),
+      onTrackRollupFn(),
     ])
     const isAdmin = me.ok && me.user.role === 'admin'
     const list = allMetrics.ok
@@ -32,6 +35,7 @@ export const Route = createFileRoute('/scorecard')({
       people: people.ok ? people.value : [],
       list,
       grid: grid.ok ? grid.value : null,
+      rollup,
     }
   },
   component: ScorecardPage,
@@ -90,6 +94,9 @@ function ScorecardPage() {
 
   const [metrics, setMetrics] = useState<MetricWithOwner[]>(data.list)
   const [grid, setGrid] = useState<MetricGrid | null>(data.grid)
+  const [rollup, setRollup] = useState<OnTrackRollup | null>(data.rollup.ok ? data.rollup.value : null)
+  const [trend, setTrend] = useState<MetricTrend | null>(null)
+  const [trendOpenFor, setTrendOpenFor] = useState<number | null>(null)
   const [form, setForm] = useState<MetricFormState | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -99,6 +106,30 @@ function ScorecardPage() {
     if (result.ok) setMetrics(result.value)
     const gridResult = await listGridFn()
     if (gridResult.ok) setGrid(gridResult.value)
+    const rollupResult = await onTrackRollupFn()
+    if (rollupResult.ok) setRollup(rollupResult.value)
+    // Keep an open trend panel fresh across entry edits.
+    if (trendOpenFor != null) {
+      const trendResult = await metricTrendFn({ data: { metricId: trendOpenFor } })
+      setTrend(trendResult.ok ? trendResult.value : null)
+    }
+  }
+
+  async function toggleTrend(metricId: number) {
+    if (trendOpenFor === metricId) {
+      setTrendOpenFor(null)
+      setTrend(null)
+      return
+    }
+    setTrendOpenFor(metricId)
+    setFormError(null)
+    const result = await metricTrendFn({ data: { metricId } })
+    if (!result.ok) {
+      setFormError(errorText(result.error))
+      setTrendOpenFor(null)
+      return
+    }
+    setTrend(result.value)
   }
 
   async function handleEntrySave(metricId: number, monday: string, raw: string) {
@@ -227,6 +258,12 @@ function ScorecardPage() {
         />
       )}
 
+      {trendOpenFor != null && trend && trend.metric.id === trendOpenFor && (
+        <TrendPanel trend={trend} onClose={() => { setTrendOpenFor(null); setTrend(null) }} />
+      )}
+
+      {rollup && <RollupTable rollup={rollup} />}
+
       {formError && <p className="mt-2 text-sm text-red-600">{formError}</p>}
 
       {form && isAdmin && (
@@ -328,6 +365,7 @@ function ScorecardPage() {
             <th className="px-4 py-2 font-medium">Metric</th>
             <th className="px-4 py-2 font-medium">Owner</th>
             <th className="px-4 py-2 font-medium">Weekly target</th>
+            <th className="px-4 py-2 font-medium">Trend</th>
             {isAdmin && <th className="px-4 py-2 font-medium">Status</th>}
             {isAdmin && <th className="px-4 py-2" />}
           </tr>
@@ -335,7 +373,7 @@ function ScorecardPage() {
         <tbody>
           {metrics.length === 0 && (
             <tr>
-              <td colSpan={isAdmin ? 5 : 3} className="px-4 py-6 text-center text-slate-400">
+              <td colSpan={isAdmin ? 6 : 4} className="px-4 py-6 text-center text-slate-400">
                 No metrics yet.
               </td>
             </tr>
@@ -354,6 +392,14 @@ function ScorecardPage() {
               </td>
               <td className="px-4 py-2 text-slate-600">{m.ownerName}</td>
               <td className="px-4 py-2 text-slate-600">{targetDisplay(m)}</td>
+              <td className="px-4 py-2">
+                <button
+                  onClick={() => toggleTrend(m.id)}
+                  className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100"
+                >
+                  {trendOpenFor === m.id ? 'Hide trend' : 'Trend'}
+                </button>
+              </td>
               {isAdmin && (
                 <td className="px-4 py-2">
                   <button
@@ -484,6 +530,145 @@ function WeeklyGrid(props: {
           })}
         </tbody>
       </table>
+    </div>
+  )
+}
+
+/**
+ * Per-metric 8–12 week trend (ticket 15): hand-rolled flex bars — no chart
+ * library. Bar height is proportional to `actual` within [min,max] of this
+ * metric's window entries; green/red per server-derived pass; gray when the
+ * week has no entry. Responsive: bars wrap via flex-wrap on narrow screens.
+ */
+function TrendPanel(props: { trend: MetricTrend; onClose: () => void }) {
+  const { trend } = props
+  const actuals = trend.points.filter((p) => p.actual != null).map((p) => p.actual!)
+  const min = actuals.length > 0 ? Math.min(...actuals) : 0
+  const max = actuals.length > 0 ? Math.max(...actuals) : 1
+  const span = max - min || 1 // flat series → mid-height bars
+  return (
+    <div className="mt-4 rounded border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-center justify-between">
+        <h2 className="font-medium">
+          Trend — {trend.metric.name}
+          {trend.metric.unit ? ` (${trend.metric.unit})` : ''}
+          {trend.metric.active === 0 && <span className="ml-2 text-xs text-slate-400">(retired)</span>}
+        </h2>
+        <button
+          onClick={props.onClose}
+          className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100"
+        >
+          Close
+        </button>
+      </div>
+      <div className="mt-4 flex h-32 flex-wrap items-end gap-1">
+        {trend.points.map((p) => {
+          const pct = p.actual == null ? 0 : 20 + ((p.actual - min) / span) * 80
+          return (
+            <div key={p.week} className="flex w-10 flex-col items-center justify-end">
+              <div
+                className={
+                  'w-full rounded-t ' +
+                  (p.pass == null
+                    ? 'bg-slate-200'
+                    : p.pass
+                      ? 'bg-green-500'
+                      : 'bg-red-500')
+                }
+                style={{ height: `${pct}%` }}
+                title={p.actual == null ? `${p.label}: no entry` : `${p.label}: ${p.actual}`}
+              />
+              <span className="mt-1 text-[10px] text-slate-500">
+                {p.label.replace('Week of ', '').replace(' ', '\u00a0')}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+      <p className="mt-2 text-xs text-slate-500">
+        Bars colored by target pass/fail (server-derived); gray = no entry that week.
+      </p>
+    </div>
+  )
+}
+
+function rateDisplay(rate: number | null): string {
+  return rate == null ? '—' : `${rate.toFixed(1)}%`
+}
+
+/**
+ * Trailing-quarter on-track % rollup (ticket 15): per metric, per owner, and
+ * team. Weeks without entries are excluded from both sides (missing number
+ * ≠ miss); null rate renders "—".
+ */
+function RollupTable(props: { rollup: OnTrackRollup }) {
+  const { rollup } = props
+  return (
+    <div className="mt-4 rounded border border-slate-200 bg-white shadow-sm">
+      <h2 className="border-b border-slate-200 px-4 py-3 font-medium">
+        On-track % — trailing 12 weeks ({rollup.windowStart} … before {rollup.windowEnd})
+      </h2>
+      <div className="flex flex-wrap">
+        <table className="w-full min-w-72 flex-1 text-sm">
+          <thead>
+            <tr className="border-b border-slate-200 text-left text-slate-500">
+              <th className="px-4 py-2 font-medium">Metric</th>
+              <th className="px-4 py-2 font-medium">Owner</th>
+              <th className="px-4 py-2 font-medium">On track</th>
+              <th className="px-4 py-2 font-medium">%</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rollup.metrics.map((m) => (
+              <tr key={m.metricId} className="border-b border-slate-100 last:border-0">
+                <td className="px-4 py-2 font-medium">{m.metricName}</td>
+                <td className="px-4 py-2 text-slate-600">{m.ownerName}</td>
+                <td className="px-4 py-2 text-slate-600">
+                  {m.counted === 0 ? '—' : `${m.done}/${m.counted}`}
+                </td>
+                <td className="px-4 py-2 font-medium">{rateDisplay(m.rate)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <table className="w-full min-w-64 border-l border-slate-100 text-sm">
+          <thead>
+            <tr className="border-b border-slate-200 text-left text-slate-500">
+              <th className="px-4 py-2 font-medium">Owner rollup</th>
+              <th className="px-4 py-2 font-medium">%</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rollup.owners.length === 0 && (
+              <tr>
+                <td colSpan={2} className="px-4 py-6 text-center text-slate-400">
+                  No window entries yet.
+                </td>
+              </tr>
+            )}
+            {rollup.owners.map((o) => (
+              <tr key={o.ownerPersonId} className="border-b border-slate-100 last:border-0">
+                <td className="px-4 py-2">
+                  {o.ownerName}{' '}
+                  <span className="text-xs text-slate-500">
+                    ({o.done}/{o.counted})
+                  </span>
+                </td>
+                <td className="px-4 py-2 font-medium">{rateDisplay(o.rate)}</td>
+              </tr>
+            ))}
+            <tr className="bg-slate-50 font-medium">
+              <td className="px-4 py-2">
+                Team{' '}
+                <span className="text-xs text-slate-500">
+                  ({rollup.team.done}/{rollup.team.counted})
+                </span>
+              </td>
+              <td className="px-4 py-2">{rateDisplay(rollup.team.rate)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

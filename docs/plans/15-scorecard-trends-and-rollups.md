@@ -4,9 +4,9 @@
 
 **Blocked by:** 14: Scorecard: weekly grid.
 
-**Status:** ready-for-agent
+**Status:** done (review pending)
 
-- [ ] Trend view shows the last 8–12 weeks per metric as colored bars
-- [ ] Trailing-quarter on-track % per metric and per owner
-- [ ] Pure percentage/date math unit-tested directly where boundary-heavy
-- [ ] Renders acceptably on narrow screens (responsive)
+- [x] Trend view shows the last 8–12 weeks per metric as colored bars
+- [x] Trailing-quarter on-track % per metric and per owner
+- [x] Pure percentage/date math unit-tested directly where boundary-heavy
+- [x] Renders acceptably on narrow screens (responsive)

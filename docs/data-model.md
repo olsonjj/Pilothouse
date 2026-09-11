@@ -207,6 +207,18 @@ target capture is read-then-write without a transaction (proxy driver has
 no verified transaction wrapper); single-process SQLite makes the race
 vanishingly unlikely and self-healing on the next overwrite.
 
+Ticket 15 (trend + rollups, derived on read — NO rollup tables): the
+per-metric trend is the last 12 weeks ending with the current week; trend
+pass values derive at read time (retired metrics still trend). Rollup
+formula: a metric's "on-track %" = pass-entries ÷ ALL window entries for
+that metric; weeks WITHOUT entries are excluded from both sides (a missing
+number is not a miss — only reported weeks are judged); a metric with no
+window entries gets a null rate (rendered "—"). The rollup window is the 12
+most recent weeks INCLUDING the current week (entries land during their
+week) — documented delta vs ticket 12's to-do rate, which uses
+fully-elapsed weeks only (different discipline, different window). Owner
+and team rates aggregate only metrics that have window entries.
+
 ## Issues tables
 
 ### issues

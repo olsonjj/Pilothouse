@@ -2,7 +2,16 @@ import { createServerFn } from '@tanstack/react-start'
 import { getCookie } from '@tanstack/react-start/server'
 import { getDb } from '../server/db'
 import { SESSION_COOKIE } from '../server/auth'
-import { createMetric, updateMetric, listMetrics, listEntriesForGrid, setEntry, type MetricInput } from '../server/metrics'
+import {
+  createMetric,
+  updateMetric,
+  listMetrics,
+  listEntriesForGrid,
+  setEntry,
+  metricTrend,
+  onTrackRollup,
+  type MetricInput,
+} from '../server/metrics'
 
 /** Thin cookie-layer wrappers around src/server/metrics.ts. */
 
@@ -48,6 +57,18 @@ export const updateMetricFn = createServerFn({ method: 'POST' })
 export const listGridFn = createServerFn({ method: 'GET' }).handler(async () => {
   const db = await getDb()
   return listEntriesForGrid(db, getCookie(SESSION_COOKIE))
+})
+
+export const metricTrendFn = createServerFn({ method: 'GET' })
+  .validator((d: unknown) => d as { metricId?: number })
+  .handler(async ({ data }) => {
+    const db = await getDb()
+    return metricTrend(db, getCookie(SESSION_COOKIE), data.metricId ?? 0)
+  })
+
+export const onTrackRollupFn = createServerFn({ method: 'GET' }).handler(async () => {
+  const db = await getDb()
+  return onTrackRollup(db, getCookie(SESSION_COOKIE))
 })
 
 export const setEntryFn = createServerFn({ method: 'POST' })

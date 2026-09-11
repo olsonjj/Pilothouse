@@ -7,6 +7,9 @@ import {
   setEntry,
   listEntriesForGrid,
   listEntriesForMetric,
+  metricTrend,
+  onTrackRollup,
+  onTrackRate,
 } from '../src/server/metrics'
 import { createPerson, linkUserToPerson } from '../src/server/people'
 import { metrics } from '../src/server/schema'
@@ -417,5 +420,166 @@ describe('Scorecard weekly entries + grid (seam, ticket 14)', () => {
       error: 'not_found',
     })
     assert.deepEqual(await listEntriesForMetric(db, token, 999), { ok: false, error: 'not_found' })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Ticket 15: trend series + trailing-quarter on-track rollups.
+// ---------------------------------------------------------------------------
+
+describe('onTrackRate (pure)', () => {
+  it('one-decimal percent, null when nothing counted', () => {
+    assert.equal(onTrackRate(2, 3), 66.7)
+    assert.equal(onTrackRate(1, 6), 16.7)
+    assert.equal(onTrackRate(0, 0), null)
+    assert.equal(onTrackRate(5, 0), null)
+    assert.equal(onTrackRate(3, 4), 75)
+  })
+})
+
+describe('metricTrend (seam, ticket 15)', () => {
+  it('series: 12 weeks oldest→newest, nulls for missing weeks, labels formatted', async () => {
+    const { db } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const owner = await personFor(db, token, 'Owner')
+    const m = await createMetric(db, token, { ...VALID, ownerPersonId: owner.id, target: 10 })
+    if (!m.ok) throw new Error('fixture failed')
+    // asOf Wed 2026-03-25 → window is 12 weeks ending Mon 2026-03-23,
+    // first point = Mon 2026-01-05.
+    await setEntry(db, token, m.value.id, '2026-01-08', 12) // Wed of first week
+    await setEntry(db, token, m.value.id, '2026-03-25', 11) // current week
+    const result = await metricTrend(db, token, m.value.id, 12, '2026-03-25')
+    assert.equal(result.ok, true)
+    if (!result.ok) throw new Error('trend failed')
+    assert.equal(result.value.points.length, 12)
+    assert.equal(result.value.points[0]!.week, '2026-01-05')
+    assert.equal(result.value.points[0]!.label, 'Week of Jan 5')
+    assert.equal(result.value.points[0]!.actual, 12)
+    assert.equal(result.value.points[0]!.pass, true)
+    assert.equal(result.value.points[1]!.actual, null)
+    assert.equal(result.value.points[1]!.pass, null)
+    const last = result.value.points[11]!
+    assert.equal(last.week, '2026-03-23')
+    assert.equal(last.actual, 11)
+    assert.equal(last.pass, true)
+    assert.equal(result.value.metric.name, VALID.name)
+  })
+
+  it('retired metrics still trend; member views other metrics; unauth denied', async () => {
+    const { db } = await createTestDb()
+    const { token, user } = await signedInUser(db)
+    const member = await signedInUser(db, 'member')
+    const owner = await personFor(db, token, 'Owner')
+    const m = await createMetric(db, token, { ...VALID, ownerPersonId: owner.id })
+    if (!m.ok) throw new Error('fixture failed')
+    await setEntry(db, token, m.value.id, '2026-03-25', 12)
+    // Retire; trend must still work.
+    assert.equal(
+      (await updateMetric(db, token, m.value.id, { ...VALID, ownerPersonId: owner.id, active: false }))
+        .ok,
+      true,
+    )
+    const retired = await metricTrend(db, token, m.value.id, 8, '2026-03-25')
+    assert.equal(retired.ok, true)
+    if (retired.ok) {
+      assert.equal(retired.value.metric.active, 0)
+      assert.equal(retired.value.points.length, 8)
+      assert.equal(retired.value.points[7]!.actual, 12)
+    }
+    // Member (not the owner) can view anyone's trend — everyone-view rule.
+    const asMember = await metricTrend(db, member.token, m.value.id, 4, '2026-03-25')
+    assert.equal(asMember.ok, true)
+    if (asMember.ok) assert.equal(asMember.value.points[3]!.actual, 12)
+    assert.deepEqual(await metricTrend(db, undefined, m.value.id), { ok: false, error: 'unauthenticated' })
+    void user
+  })
+
+  it('direction flip re-renders trend pass values (read-time derivation)', async () => {
+    const { db } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const owner = await personFor(db, token, 'Owner')
+    // lte metric, target 10: actual 4 passes.
+    const m = await createMetric(db, token, { ...VALID, ownerPersonId: owner.id, target: 10, direction: 'lte' })
+    if (!m.ok) throw new Error('fixture failed')
+    await setEntry(db, token, m.value.id, '2026-03-25', 4)
+    const before = await metricTrend(db, token, m.value.id, 4, '2026-03-25')
+    if (!before.ok) throw new Error('trend failed')
+    assert.equal(before.value.points[3]!.pass, true)
+    // Flip to gte: same entry now fails (ticket-14 doc note: current definition in force).
+    assert.equal(
+      (await updateMetric(db, token, m.value.id, { ...VALID, ownerPersonId: owner.id, target: 10, direction: 'gte' }))
+        .ok,
+      true,
+    )
+    const after = await metricTrend(db, token, m.value.id, 4, '2026-03-25')
+    if (!after.ok) throw new Error('trend failed')
+    assert.equal(after.value.points[3]!.pass, false)
+  })
+})
+
+describe('onTrackRollup (seam, ticket 15)', () => {
+  it('boundary-pinned rates: window edges exact, empty metrics null, per-owner + team aggregates', async () => {
+    const { db } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const owner1 = await personFor(db, token, 'Owner One')
+    const owner2 = await personFor(db, token, 'Owner Two')
+    // asOf Wed 2026-03-25 → currentMonday 2026-03-23; 12-week window:
+    // windowStart 2026-01-05 (inclusive), windowEnd 2026-03-30 (exclusive).
+    const a = await createMetric(db, token, { ...VALID, name: 'A', ownerPersonId: owner1.id, target: 10 })
+    const c = await createMetric(db, token, { ...VALID, name: 'C', ownerPersonId: owner1.id, target: 5, direction: 'lte' })
+    const b = await createMetric(db, token, { ...VALID, name: 'B', ownerPersonId: owner2.id, target: 1 })
+    if (!a.ok || !c.ok || !b.ok) throw new Error('fixture failed')
+    const A = a.value.id
+    const C = c.value.id
+
+    // A: pass @ windowStart edge (INCLUDED), fail @ week before window (EXCLUDED),
+    // pass @ current week (INCLUDED — entries land during their week),
+    // fail mid-window, fail after windowEnd (EXCLUDED). → 2/3 = 66.7%
+    await setEntry(db, token, A, '2026-01-05', 12)
+    await setEntry(db, token, A, '2025-12-29', 5)
+    await setEntry(db, token, A, '2026-03-25', 11)
+    await setEntry(db, token, A, '2026-02-18', 4)
+    await setEntry(db, token, A, '2026-04-01', 5)
+    // C: 1 pass, 1 fail → 1/2 = 50%
+    await setEntry(db, token, C, '2026-03-11', 4)
+    await setEntry(db, token, C, '2026-01-14', 6)
+    // B: NO entries → null rate ("—"), owner2 absent from owner rollup.
+    void b
+
+    const result = await onTrackRollup(db, token, 12, '2026-03-25')
+    assert.equal(result.ok, true)
+    if (!result.ok) throw new Error('rollup failed')
+    assert.equal(result.value.windowStart, '2026-01-05')
+    assert.equal(result.value.windowEnd, '2026-03-30')
+
+    const aRow = result.value.metrics.find((r) => r.metricId === A)
+    assert.ok(aRow)
+    assert.equal(aRow.done, 2)
+    assert.equal(aRow.counted, 3)
+    assert.equal(aRow.rate, 66.7)
+    const cRow = result.value.metrics.find((r) => r.metricId === C)
+    assert.ok(cRow)
+    assert.equal(cRow.rate, 50)
+    const bRow = result.value.metrics.find((r) => r.metricName === 'B')
+    assert.ok(bRow)
+    assert.equal(bRow.done, 0)
+    assert.equal(bRow.counted, 0)
+    assert.equal(bRow.rate, null)
+
+    const owner1Row = result.value.owners.find((o) => o.ownerName === 'Owner One')
+    assert.ok(owner1Row)
+    assert.equal(owner1Row.done, 3)
+    assert.equal(owner1Row.counted, 5)
+    assert.equal(owner1Row.rate, 60)
+    // Owner2 has no window entries → no owner row (empty metrics excluded).
+    assert.equal(result.value.owners.find((o) => o.ownerName === 'Owner Two'), undefined)
+    assert.equal(result.value.team.done, 3)
+    assert.equal(result.value.team.counted, 5)
+    assert.equal(result.value.team.rate, 60)
+  })
+
+  it('unauthenticated callers are denied', async () => {
+    const { db } = await createTestDb()
+    assert.deepEqual(await onTrackRollup(db, undefined), { ok: false, error: 'unauthenticated' })
   })
 })
