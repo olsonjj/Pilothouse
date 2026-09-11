@@ -25,7 +25,7 @@ function Home() {
   return (
     <main className="mx-auto max-w-xl p-8">
       <div className="rounded border border-slate-200 bg-white p-6 shadow-sm">
-        <h1 className="text-xl font-semibold">Boardroom</h1>
+        <h1 className="text-xl font-semibold">Pilothouse</h1>
         <p className="mt-4">
           Signed in as <strong>{user.name}</strong>{' '}
           <span className="rounded bg-slate-100 px-2 py-0.5 text-sm text-slate-700">

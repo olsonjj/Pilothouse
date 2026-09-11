@@ -1,11 +1,11 @@
-# Boardroom
+# Pilothouse
 
 An open-source companion app for small companies running a leadership operating
 system: an org chart with right-fit assessments, a versioned company vision
 page, quarterly goals, a weekly metrics scorecard, an issues list, and a
 facilitated weekly leadership meeting with a shared live view.
 
-Boardroom is an open-source tool inspired by the operating system described in
+Pilothouse is an open-source tool inspired by the operating system described in
 Gino Wickman's book *Traction*. It is not affiliated with, endorsed by, or
 licensed by EOS Worldwide.
 
@@ -27,12 +27,12 @@ pnpm dev            # dev server (see port note below)
 
 - Dev port: the dev script binds port 3000 (`pnpm dev`); if it's taken, run
   `node_modules/.bin/vite dev --port 3250` directly.
-- On first run the app migrates the SQLite database (`data/boardroom.db`),
+- On first run the app migrates the SQLite database (`data/Pilothouse.db`),
   seeds an owner admin, and seeds EOS-style quarters for the current and next
   year.
-- **Seed credentials (DEV-ONLY default):** `owner@boardroom.local` /
-  `boardroom-owner-dev`. Override before first run with
-  `BOARDROOM_OWNER_PASSWORD=<your password>` — never ship an instance with the
+- **Seed credentials (DEV-ONLY default):** `owner@Pilothouse.local` /
+  `Pilothouse-owner-dev`. Override before first run with
+  `PILOTHOUSE_OWNER_PASSWORD=<your password>` — never ship an instance with the
   default.
 - Then sign in, create your people on the People page, link logins, and add
   your second account via the Users page (admin).
@@ -48,14 +48,14 @@ pnpm dev            # dev server (see port note below)
 | `pnpm backup` | One-off SQLite snapshot into `data/backups/` |
 
 The app also snapshots the database on server start and on an interval
-(`BOARDROOM_BACKUP_INTERVAL_HOURS`, default 6).
+(`PILOTHOUSE_BACKUP_INTERVAL_HOURS`, default 6).
 
 ## Environment variables
 
-- `BOARDROOM_DB_PATH` — SQLite file location (default `data/boardroom.db`)
-- `BOARDROOM_OWNER_PASSWORD` — first-run owner password (dev default otherwise)
-- `BOARDROOM_DISABLE_BACKUP` — set in tests to disable the snapshot job
-- `BOARDROOM_BACKUP_INTERVAL_HOURS` — snapshot cadence
+- `PILOTHOUSE_DB_PATH` — SQLite file location (default `data/Pilothouse.db`)
+- `PILOTHOUSE_OWNER_PASSWORD` — first-run owner password (dev default otherwise)
+- `PILOTHOUSE_DISABLE_BACKUP` — set in tests to disable the snapshot job
+- `PILOTHOUSE_BACKUP_INTERVAL_HOURS` — snapshot cadence
 
 ## Docs
 

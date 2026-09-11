@@ -1,6 +1,6 @@
-# 27: Rename to Boardroom — de-brand for public release
+# 27: Rename to Pilothouse — de-brand for public release
 
-**What to build:** Rebrand the app from OpenEOS to **Boardroom** and replace
+**What to build:** Rebrand the app from OpenEOS to **Pilothouse** and replace
 EOS-branded user-facing terminology with neutral names, so the repo can be
 published publicly. Product name, nav labels, page headings, route paths, and
 README are in scope. **DB table/column names and internal identifiers are NOT**
@@ -13,10 +13,10 @@ with or endorsed by EOS Worldwide").
 
 **Status:** done (review pending)
 
-- [x] Product renamed Boardroom everywhere user-facing: package.json name,
+- [x] Product renamed Pilothouse everywhere user-facing: package.json name,
       page titles, sign-in/home headings, cookie name
-      (`openeos_session` → `boardroom_session`), DB filename
-      (`data/openeos.db` → `data/boardroom.db`, file MOVED so existing data
+      (`openeos_session` → `pilothouse_session`), DB filename
+      (`data/openeos.db` → `data/pilothouse.db`, file MOVED so existing data
       survives; code constant + docs updated)
 - [x] Nav + headings: Scorecard → **Data** (`/scorecard` → `/data`); V/TO →
       **Company** (`/vto` → `/company`); Level 10 Meeting / L10 → **Weekly
@@ -31,7 +31,7 @@ with or endorsed by EOS Worldwide").
       warning text), derived issue titles ("Rock off track: …" → "Goal off
       track: …"); internal identifiers (`rocks` table, `RockError`,
       `carried_over_from_rock_id`, state keys) unchanged — documented
-- [x] Seed email domain → `owner@boardroom.local` for FRESH installs only
+- [x] Seed email domain → `owner@pilothouse.local` for FRESH installs only
       (existing rows untouched; README notes the dev seed credentials)
 - [x] README rewritten for public: what it is, setup, the seed credentials,
       MIT LICENSE file added, disclaimer added; QA plan updated to new names

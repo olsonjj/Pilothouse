@@ -29,13 +29,13 @@ export function scheduleBackups(
 ): void {
   const intervalHours =
     opts?.intervalHours ??
-    (Number(process.env.BOARDROOM_BACKUP_INTERVAL_HOURS) || DEFAULT_INTERVAL_HOURS)
+    (Number(process.env.PILOTHOUSE_BACKUP_INTERVAL_HOURS) || DEFAULT_INTERVAL_HOURS)
   backupNow(sqlite, dbFile) // snapshot at server start too
   const timer = setInterval(() => {
     try {
       backupNow(sqlite, dbFile)
     } catch (err) {
-      console.error('[boardroom] scheduled backup failed:', err)
+      console.error('[Pilothouse] scheduled backup failed:', err)
     }
   }, intervalHours * 60 * 60 * 1000)
   timer.unref()

@@ -1,6 +1,6 @@
-# Boardroom — QA Testing Plan
+# Pilothouse — QA Testing Plan
 
-*Manual test plan for reviewing all Boardroom functionality. Sections 0–1 verified by John, 2026-09-11. Covers every module
+*Manual test plan for reviewing all Pilothouse functionality. Sections 0–1 verified by John, 2026-09-11. Covers every module
 (= every ticket 01–25), cross-module flows, and the permission matrix. Work
 top to bottom; each case has steps and the expected result.*
 
@@ -8,13 +8,13 @@ top to bottom; each case has steps and the expected result.*
 
 - [x] Start the app: `pnpm dev` (serves at http://localhost:3250; port 3000 is
       taken by the dev default script — use `node_modules/.bin/vite dev --port 3250`).
-- [x] Sign in as the owner: `owner@boardroom.local` / `boardroom-owner-dev`.
+- [x] Sign in as the owner: `owner@Pilothouse.local` / `Pilothouse-owner-dev`.
 - [x] **Create a second (member) account** — there is deliberately no signup UI
       (accounts come from the seed; adding a creation UI was never a ticket).
       Run this, then restart the dev server so it seeds nothing weird:
 
       ```sql
-      -- sqlite3 data/boardroom.db
+      -- sqlite3 data/Pilothouse.db
       INSERT INTO users (email, password_hash, name, role, created_at, updated_at)
       VALUES ('member@openeos.local',
         '<copy the owner's password_hash value and reuse it — same password>',

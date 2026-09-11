@@ -27,7 +27,7 @@ function SignIn() {
   return (
     <main className="flex min-h-screen items-center justify-center">
       <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4 p-8">
-        <h1 className="text-2xl font-semibold">Boardroom</h1>
+        <h1 className="text-2xl font-semibold">Pilothouse</h1>
         <div>
           <label htmlFor="email" className="block text-sm font-medium text-slate-700">
             Email

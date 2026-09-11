@@ -12,7 +12,7 @@ import fs from 'node:fs'
 
 export type Db = SqliteRemoteDatabase<typeof schema>
 
-const DB_FILE = process.env.BOARDROOM_DB_PATH ?? path.resolve('data/boardroom.db')
+const DB_FILE = process.env.PILOTHOUSE_DB_PATH ?? path.resolve('data/Pilothouse.db')
 const MIGRATIONS_FOLDER = path.resolve('drizzle')
 
 type Row = Record<string, unknown>
@@ -59,7 +59,7 @@ function makeCallback(sqlite: DatabaseSync): ProxyCallback {
     try {
       return await callback(query, params, method)
     } catch (err) {
-      console.error(`[boardroom db] query failed: ${query}`, err)
+      console.error(`[Pilothouse db] query failed: ${query}`, err)
       throw err
     }
   }) as ProxyCallback
@@ -107,7 +107,7 @@ export function getDb(): Promise<Db> {
       // live vto row into the first version, if no version exists yet.
       await backfillVtoFirstVersion(created.db)
       // Scheduled snapshot job; disabled during tests.
-      if (!process.env.BOARDROOM_DISABLE_BACKUP) {
+      if (!process.env.PILOTHOUSE_DISABLE_BACKUP) {
         scheduleBackups(created.sqlite, DB_FILE)
       }
       return created.db

@@ -2,23 +2,23 @@ import type { Db } from './db'
 import { users } from './schema'
 import { hashPassword } from './auth'
 
-export const OWNER_EMAIL = 'owner@boardroom.local'
-export const DEFAULT_OWNER_PASSWORD = 'boardroom-owner-dev'
+export const OWNER_EMAIL = 'owner@pilothouse.local'
+export const DEFAULT_OWNER_PASSWORD = 'pilothouse-owner-dev'
 
 /**
  * On first run, create the owner admin account. Password comes from
- * BOARDROOM_OWNER_PASSWORD if set; otherwise a documented dev-only default is
+ * PILOTHOUSE_OWNER_PASSWORD if set; otherwise a documented dev-only default is
  * used (safe because the database is local-only, but change it for anything
  * exposed beyond localhost).
  */
 export async function seedOwner(db: Db): Promise<void> {
   const existing = await db.select({ id: users.id }).from(users).get()
   if (existing) return
-  const password = process.env.BOARDROOM_OWNER_PASSWORD ?? DEFAULT_OWNER_PASSWORD
-  if (!process.env.BOARDROOM_OWNER_PASSWORD) {
+  const password = process.env.PILOTHOUSE_OWNER_PASSWORD ?? DEFAULT_OWNER_PASSWORD
+  if (!process.env.PILOTHOUSE_OWNER_PASSWORD) {
     console.log(
-      `[boardroom] Seeded owner admin ${OWNER_EMAIL} with the default dev password ` +
-        `(set BOARDROOM_OWNER_PASSWORD to override — see README).`,
+      `[Pilothouse] Seeded owner admin ${OWNER_EMAIL} with the default dev password ` +
+        `(set PILOTHOUSE_OWNER_PASSWORD to override — see README).`,
     )
   }
   await db.insert(users).values({

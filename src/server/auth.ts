@@ -3,7 +3,7 @@ import type { Db } from './db'
 import { users, sessions, people, type User } from './schema'
 import { eq, lt, sql } from 'drizzle-orm'
 
-export const SESSION_COOKIE = 'boardroom_session'
+export const SESSION_COOKIE = 'Pilothouse_session'
 export const SESSION_TTL_DAYS = 30
 
 const SCRYPT_KEYLEN = 64
