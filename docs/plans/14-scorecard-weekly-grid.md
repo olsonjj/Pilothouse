@@ -4,7 +4,7 @@
 
 **Blocked by:** 13: Scorecard: metric definitions, 03: Quarters & week utility.
 
-**Status:** done (review pending)
+**Status:** done (reviewer sign-off; direction-flip doc note + entry error mappings applied)
 
 - [x] Metric owner or admin enters one number per metric per week; re-entering overwrites
 - [x] Traffic light derives from direction-aware comparison — never hand-set

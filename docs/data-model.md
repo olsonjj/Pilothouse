@@ -198,7 +198,9 @@ entry_by FK→users, created_at, updated_at` (ticket 14 naming: `actual`/`entry_
 update). `UNIQUE(metric_id, week)` — weekly overwrite. Re-entry overwrites
 `actual` AND re-captures `target_at_entry` from the current target (the
 history basis is "the target in force when the number was last written";
-a re-target changes how past weeks render — decided). Week inputs accept
+a re-target changes how past weeks render — decided). A direction flip
+(gte↔lte) likewise re-renders all history under the new direction — same
+decided basis, current definition in force. Week inputs accept
 any day and normalize to that week's Monday via `weekStart`. Entry
 permissions: admin any metric, the metric's owner their own. TOCTOU note:
 target capture is read-then-write without a transaction (proxy driver has

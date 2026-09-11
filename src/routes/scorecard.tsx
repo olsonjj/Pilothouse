@@ -67,6 +67,10 @@ function errorText(error: string): string {
       return 'Target must be a finite number.'
     case 'invalid_direction':
       return 'Direction must be "higher is better" or "lower is better".'
+    case 'invalid_actual':
+      return 'Enter a finite number for the weekly value.'
+    case 'metric_inactive':
+      return 'That metric is retired — reactivate it to enter numbers.'
     case 'not_found':
       return 'That item no longer exists — refresh.'
     default:
