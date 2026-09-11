@@ -8,10 +8,10 @@ top to bottom; each case has steps and the expected result.*
 
 - [x] Start the app: `pnpm dev` (serves at http://localhost:3250; port 3000 is
       taken by the dev default script — use `node_modules/.bin/vite dev --port 3250`).
-- [x] Sign in as the owner. **On a fresh install:** `owner@pilothouse.local` /
-      `pilothouse-owner-dev`. **On the original dev instance (pre-rename DB):**
-      `owner@openeos.local` / `openeos-owner-dev` — the seed rename only affects
-      fresh databases; existing account rows keep their original email.
+- [x] Sign in as the owner: `owner@pilothouse.local` /
+      `pilothouse-owner-dev` on fresh installs. On the original dev instance
+      (pre-rename DB) the email is `owner@openeos.local` but the password has
+      been reset to the same documented `pilothouse-owner-dev`.
 - [x] **Create a second (member) account** — there is deliberately no signup UI
       (accounts come from the seed; adding a creation UI was never a ticket).
       Run this, then restart the dev server so it seeds nothing weird:
