@@ -3,6 +3,11 @@ import { useEffect, useState } from 'react'
 import { getCurrentUserFn, signOutFn } from '../functions/auth'
 import { listQuartersFn } from '../functions/quarters'
 import {
+  listUnresolvedForCarryFn,
+  carryLongTermIssueFn,
+  carryUnresolvedLongTermIssuesFn,
+} from '../functions/issues'
+import {
   listIssuesFn,
   addIssueFn,
   updateIssueFn,
@@ -41,6 +46,16 @@ function errorText(error: string): string {
       return 'That issue no longer exists — refresh.'
     case 'already_resolved':
       return 'That issue is already resolved.'
+    case 'not_red':
+      return 'That scorecard cell is not red — only misses become issues.'
+    case 'todo_not_missed':
+      return 'That to-do is completed — not a miss.'
+    case 'quarter_not_ended':
+      return 'That quarter has not ended yet — carry-or-drop happens after it ends.'
+    case 'quarter_read_only':
+      return 'You cannot carry issues into a past quarter.'
+    case 'forbidden':
+      return 'Only admins can carry or bulk-carry issues.'
     default:
       return 'Something went wrong.'
   }
@@ -54,6 +69,7 @@ function IssuesPage() {
   const navigate = useNavigate()
   const data = Route.useLoaderData()
 
+  const isAdmin = data.me?.role === 'admin'
   const [tab, setTab] = useState<'long_term' | 'short_term'>('long_term')
   const [open, setOpen] = useState<IssueView[]>([])
   const [resolved, setResolved] = useState<IssueView[]>([])
@@ -111,7 +127,22 @@ function IssuesPage() {
     })
   }
 
-  function IssueRow(props: { issue: IssueView }) {
+  function originLabel(origin: string): string | null {
+  switch (origin) {
+    case 'from_rock':
+      return 'from rock'
+    case 'from_scorecard':
+      return 'from scorecard'
+    case 'from_todo':
+      return 'from to-do'
+    case 'from_meeting':
+      return 'from meeting'
+    default:
+      return null
+  }
+}
+
+function IssueRow(props: { issue: IssueView }) {
     const issue = props.issue
     const resolvedRow = issue.status !== 'open'
     return (
@@ -126,6 +157,11 @@ function IssuesPage() {
             <span className={'font-medium' + (resolvedRow ? ' line-through' : '')}>
               {issue.title}
             </span>{' '}
+            {originLabel(issue.origin) && (
+              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">
+                {originLabel(issue.origin)}
+              </span>
+            )}{' '}
             <span className="text-xs text-slate-400">
               · {ageLabel(issue.ageWeeks)}
               {issue.addedByName ? ` · added by ${issue.addedByName}` : ''}
@@ -282,6 +318,8 @@ function IssuesPage() {
         )}
       </section>
 
+      {isAdmin && <CarryPanel quarters={data.quarters} />}
+
       <section className="mt-8">
         <button
           onClick={() => setShowResolved(!showResolved)}
@@ -300,5 +338,156 @@ function IssuesPage() {
         )}
       </section>
     </main>
+  )
+}
+/** Origin types shown with a badge; manual issues get none. */
+type QuarterOption = { id: number; label: string; startDate: string; endDate: string }
+
+/**
+ * Quarter-end carry-or-drop prompt (admin only): pick an ENDED quarter, see
+ * its unresolved long-term issues, carry them (single or bulk) into a
+ * not-yet-ended quarter, or drop with a reason. The lists re-fetch on every
+ * action.
+ */
+function CarryPanel(props: { quarters: QuarterOption[] }) {
+  const [fromQuarterId, setFromQuarterId] = useState<string>('')
+  const [toQuarterId, setToQuarterId] = useState<string>('')
+  const [issues, setIssues] = useState<Array<{ id: number; title: string }> | null>(null)
+  const [message, setMessage] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const toOptions = props.quarters.filter(
+    (q) => q.endDate >= new Date().toISOString().slice(0, 10),
+  )
+
+  async function review() {
+    setError(null)
+    setMessage(null)
+    if (!fromQuarterId) return
+    const result = await listUnresolvedForCarryFn({ data: { fromQuarterId: Number(fromQuarterId) } })
+    if (result.ok) setIssues(result.value.map((i) => ({ id: i.id, title: i.title })))
+    else setError(errorText(result.error))
+  }
+
+  async function act(action: () => Promise<{ ok: boolean; error?: string }>) {
+    setBusy(true)
+    setError(null)
+    const result = await action()
+    setBusy(false)
+    if (!result.ok) {
+      setError(errorText(result.error ?? ''))
+      return
+    }
+    await review()
+  }
+
+  return (
+    <section className="mt-8 rounded border border-slate-200 bg-white p-4 shadow-sm">
+      <h2 className="text-sm font-medium text-slate-700">Quarter-end carry-or-drop (admin)</h2>
+      <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+        <select
+          value={fromQuarterId}
+          onChange={(e) => {
+            setFromQuarterId(e.target.value)
+            setIssues(null)
+            setMessage(null)
+          }}
+          className="rounded border border-slate-300 px-2 py-1"
+        >
+          <option value="">Ended quarter…</option>
+          {props.quarters.map((q) => (
+            <option key={q.id} value={q.id}>
+              {q.label} (ends {q.endDate})
+            </option>
+          ))}
+        </select>
+        <button
+          onClick={review}
+          disabled={busy || !fromQuarterId}
+          className="rounded border border-slate-300 px-3 py-1 hover:bg-slate-100 disabled:opacity-50"
+        >
+          Review
+        </button>
+        <span aria-hidden>→</span>
+        <select
+          value={toQuarterId}
+          onChange={(e) => setToQuarterId(e.target.value)}
+          className="rounded border border-slate-300 px-2 py-1"
+        >
+          <option value="">Carry into…</option>
+          {toOptions.map((q) => (
+            <option key={q.id} value={q.id}>
+              {q.label}
+            </option>
+          ))}
+        </select>
+        <button
+          disabled={busy || !fromQuarterId || !toQuarterId || !issues || issues.length === 0}
+          onClick={() =>
+            act(async () => {
+              const result = await carryUnresolvedLongTermIssuesFn({
+                data: { fromQuarterId: Number(fromQuarterId), toQuarterId: Number(toQuarterId) },
+              })
+              if (result.ok) setMessage(`Carried ${result.value.carried} issue(s).`)
+              return result.ok ? { ok: true } : result
+            })
+          }
+          className="rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700 disabled:opacity-50"
+        >
+          Carry all
+        </button>
+      </div>
+      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {message && <p className="mt-2 text-sm text-emerald-700">{message}</p>}
+      {issues && (
+        <ul className="mt-3 space-y-2">
+          {issues.length === 0 && (
+            <li className="text-sm text-slate-400">Nothing unresolved in that quarter. 🎉</li>
+          )}
+          {issues.map((issue) => (
+            <li
+              key={issue.id}
+              className="flex items-center justify-between gap-2 rounded border border-slate-200 px-3 py-2 text-sm"
+            >
+              <span>{issue.title}</span>
+              <span className="flex shrink-0 gap-1 text-xs">
+                <button
+                  disabled={busy || !toQuarterId}
+                  onClick={() =>
+                    act(() =>
+                      carryLongTermIssueFn({
+                        data: { issueId: issue.id, toQuarterId: Number(toQuarterId) },
+                      }),
+                    )
+                  }
+                  className="rounded border border-blue-300 px-2 py-1 text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                >
+                  Carry
+                </button>
+                <button
+                  disabled={busy}
+                  onClick={() => {
+                    const note = window.prompt('Why is this being dropped? (required)')
+                    if (note && note.trim()) {
+                      act(() =>
+                        resolveIssueFn({
+                          data: { issueId: issue.id, outcome: 'dropped', note },
+                        }),
+                      )
+                    } else if (note !== null) {
+                      setError('A dropped issue needs a reason.')
+                    }
+                  }}
+                  className="rounded border border-slate-300 px-2 py-1 hover:bg-slate-100 disabled:opacity-50"
+                >
+                  Drop
+                </button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   )
 }

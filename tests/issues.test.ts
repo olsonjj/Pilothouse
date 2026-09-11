@@ -6,11 +6,30 @@ import {
   resolveIssue,
   listIssues,
   ageWeeksSince,
+  issueFromRock,
+  issueFromScorecardEntry,
+  issueFromTodo,
+  listUnresolvedForCarry,
+  carryLongTermIssue,
+  carryUnresolvedLongTermIssues,
 } from '../src/server/issues'
 import { getCurrentQuarter } from '../src/server/quarters'
 import { quarters } from '../src/server/schema'
 import { createTestDb, signedInUser } from './helpers'
 import { todayIso, weekStart } from '../src/server/week'
+import { createTodo, completeTodo } from '../src/server/todos'
+import { createPerson } from '../src/server/people'
+
+/** Test fixture: create a person and return the row. */
+async function personFor(
+  db: Parameters<typeof createTodo>[0],
+  token: string,
+  name: string,
+) {
+  const result = await createPerson(db, token, { fullName: name })
+  if (!result.ok) throw new Error('person fixture failed')
+  return result.value
+}
 
 /** Pins the week-aligned age math across month/year/leap boundaries. */
 describe('ageWeeksSince (pure regression guard — pinned literal cases)', () => {
@@ -312,5 +331,225 @@ describe('Issues: core lists (seam, ticket 16)', () => {
       error: 'unauthenticated',
     })
     assert.deepEqual(await listIssues(db, undefined), { ok: false, error: 'unauthenticated' })
+  })
+})
+// ================= Ticket 20: provenance + quarter-end carry =================
+
+import { createRock } from '../src/server/rocks'
+import { createMetric, setEntry } from '../src/server/metrics'
+import { DatabaseSync } from 'node:sqlite'
+
+describe('Ticket 20: issue provenance (seam)', () => {
+  it('issueFromRock: origin + source id + derived title persisted; unknown rock rejected; unauth denied; member allowed', async () => {
+    const { db } = await createTestDb()
+    const { token, user } = await signedInUser(db)
+    const member = await signedInUser(db, 'member')
+    const quarter = await getCurrentQuarter(db)
+    if (!quarter) throw new Error('no current quarter')
+    const rock = await createRock(db, token, { statement: 'Ship the L10 app', quarterId: quarter.id })
+    if (!rock.ok) throw new Error('fixture failed')
+
+    const result = await issueFromRock(db, token, rock.value.id)
+    assert.equal(result.ok, true)
+    if (result.ok) {
+      assert.equal(result.value.origin, 'from_rock')
+      assert.equal(result.value.originSourceId, rock.value.id)
+      assert.equal(result.value.title, 'Rock off track: Ship the L10 app')
+      assert.equal(result.value.classification, 'long_term')
+    }
+
+    // List view carries the origin for the badge.
+    const list = await listIssues(db, token, { classification: 'long_term' })
+    if (list.ok) assert.equal(list.value[0]?.origin, 'from_rock')
+
+    assert.deepEqual(await issueFromRock(db, token, 999), { ok: false, error: 'not_found' })
+    assert.deepEqual(await issueFromRock(db, undefined, rock.value.id), {
+      ok: false,
+      error: 'unauthenticated',
+    })
+    // Members push too (issues are team property).
+    assert.equal((await issueFromRock(db, member.token, rock.value.id)).ok, true)
+    // Duplicates allowed (EOS room may push twice — decided, documented).
+    assert.equal((await issueFromRock(db, token, rock.value.id)).ok, true)
+  })
+
+  it('issueFromScorecardEntry: red cell derives title + origin; green cell rejected as not_red', async () => {
+    const { db } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const person = await personFor(db, token, 'Alice')
+    const metric = await createMetric(db, token, {
+      name: 'Weekly closes',
+      ownerPersonId: person.id,
+      target: 10,
+      direction: 'gte',
+      unit: 'closes',
+    })
+    if (!metric.ok) throw new Error('fixture failed')
+    // Red: actual 5 vs target 10 (gte).
+    const red = await setEntry(db, token, metric.value.id, '2026-03-04', 5)
+    // Green: actual 12.
+    const green = await setEntry(db, token, metric.value.id, '2026-03-11', 12)
+    if (!red.ok || !green.ok) throw new Error('fixture failed')
+
+    const result = await issueFromScorecardEntry(db, token, red.value.id)
+    assert.equal(result.ok, true)
+    if (result.ok) {
+      assert.equal(result.value.origin, 'from_scorecard')
+      assert.equal(result.value.originSourceId, red.value.id)
+      assert.equal(
+        result.value.title,
+        'Red metric: Weekly closes — Week of Mar 2: 5 vs target 10',
+      )
+    }
+    assert.deepEqual(await issueFromScorecardEntry(db, token, green.value.id), {
+      ok: false,
+      error: 'not_red',
+    })
+    assert.deepEqual(await issueFromScorecardEntry(db, token, 999), {
+      ok: false,
+      error: 'not_found',
+    })
+    assert.deepEqual(await issueFromScorecardEntry(db, undefined, red.value.id), {
+      ok: false,
+      error: 'unauthenticated',
+    })
+  })
+
+  it('issueFromTodo: missed to-do pushes; completed to-do rejected as todo_not_missed', async () => {
+    const { db } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const person = await personFor(db, token, 'Bob')
+    const missed = await createTodo(db, token, { title: 'Call the bank', assigneePersonId: person.id })
+    const done = await createTodo(db, token, { title: 'Already done', assigneePersonId: person.id })
+    if (!missed.ok || !done.ok) throw new Error('fixture failed')
+    assert.equal((await completeTodo(db, token, done.value.id)).ok, true)
+
+    const result = await issueFromTodo(db, token, missed.value.id)
+    assert.equal(result.ok, true)
+    if (result.ok) {
+      assert.equal(result.value.origin, 'from_todo')
+      assert.equal(result.value.originSourceId, missed.value.id)
+      assert.equal(result.value.title, 'Missed to-do: Call the bank')
+    }
+    assert.deepEqual(await issueFromTodo(db, token, done.value.id), {
+      ok: false,
+      error: 'todo_not_missed',
+    })
+    assert.deepEqual(await issueFromTodo(db, token, 999), { ok: false, error: 'not_found' })
+    assert.deepEqual(await issueFromTodo(db, undefined, missed.value.id), {
+      ok: false,
+      error: 'unauthenticated',
+    })
+  })
+})
+
+describe('Ticket 20: quarter-end carry-or-drop (seam)', () => {
+  function seedQuarter(sqlite: DatabaseSync, label: string, endDate: string): number {
+    sqlite.exec(
+      `INSERT INTO quarters (label, start_date, end_date) VALUES ('${label}', date('${endDate}', '-3 months'), '${endDate}')`,
+    )
+    return (sqlite.prepare('SELECT id FROM quarters WHERE label = ?').get(label) as { id: number }).id
+  }
+
+  async function seedCarryFixture() {
+    const { db, sqlite } = await createTestDb()
+    const { token, user } = await signedInUser(db)
+    const today = todayIso()
+    // fromQuarter: ended yesterday. toQuarter: ends in ~9 months (not ended).
+    const fromId = seedQuarter(sqlite, '2099 Q1', new Date(Date.parse(today) - 86400000).toISOString().slice(0, 10))
+    const toId = seedQuarter(sqlite, '2099 Q3', new Date(Date.parse(today) + 270 * 86400000).toISOString().slice(0, 10))
+    const endsTodayId = seedQuarter(sqlite, '2099 Q2', today)
+    const issuesToMake = ['u1', 'u2', 'u3', 'r1', 'r2']
+    const ids: number[] = []
+    for (const title of issuesToMake) {
+      const r = await addIssue(db, token, { title, classification: 'long_term', quarterId: fromId })
+      if (!r.ok) throw new Error('fixture failed')
+      ids.push(r.value.id)
+    }
+    // Resolve the last two (solved + dropped).
+    assert.equal((await resolveIssue(db, token, ids[3], { outcome: 'solved', note: 'done' })).ok, true)
+    assert.equal((await resolveIssue(db, token, ids[4], { outcome: 'dropped', note: 'obsolete' })).ok, true)
+    return { db, sqlite, token, user, fromId, toId, endsTodayId, unresolved: ids.slice(0, 3), resolved: ids.slice(3) }
+  }
+
+  it('listUnresolvedForCarry: only unresolved long-term issues in the from-quarter; signed-in readable', async () => {
+    const f = await seedCarryFixture()
+    const result = await listUnresolvedForCarry(f.db, f.token, f.fromId)
+    assert.equal(result.ok, true)
+    if (result.ok) assert.deepEqual(result.value.map((i) => i.title), ['u1', 'u2', 'u3'])
+    const member = await signedInUser(f.db, 'member')
+    const memberView = await listUnresolvedForCarry(f.db, member.token, f.fromId)
+    assert.equal(memberView.ok, true)
+  })
+
+  it('carryUnresolvedLongTermIssues: carried=3 (resolved untouched), keep-row via quarter_id update', async () => {
+    const f = await seedCarryFixture()
+    const result = await carryUnresolvedLongTermIssues(f.db, f.token, f.fromId, f.toId)
+    assert.equal(result.ok, true)
+    if (result.ok) assert.equal(result.value.carried, 3)
+
+    // Carried rows keep their id (lean keep-row) and now point at toQuarter.
+    for (const id of f.unresolved) {
+      const row = f.sqlite.prepare('SELECT quarter_id FROM issues WHERE id = ?').get(id) as { quarter_id: number }
+      assert.equal(row.quarter_id, f.toId)
+    }
+    // Resolved rows stay in the from-quarter (history).
+    for (const id of f.resolved) {
+      const row = f.sqlite.prepare('SELECT quarter_id FROM issues WHERE id = ?').get(id) as { quarter_id: number }
+      assert.equal(row.quarter_id, f.fromId)
+    }
+    // Idempotent-ish: a second bulk carry carries nothing.
+    const again = await carryUnresolvedLongTermIssues(f.db, f.token, f.fromId, f.toId)
+    if (again.ok) assert.equal(again.value.carried, 0)
+  })
+
+  it('carry boundaries: member forbidden; unauth denied; source quarter ending today NOT carryable (strict <); target in past rejected', async () => {
+    const f = await seedCarryFixture()
+    const member = await signedInUser(f.db, 'member')
+    assert.deepEqual(await carryUnresolvedLongTermIssues(f.db, member.token, f.fromId, f.toId), {
+      ok: false,
+      error: 'forbidden',
+    })
+    assert.deepEqual(await carryUnresolvedLongTermIssues(f.db, undefined, f.fromId, f.toId), {
+      ok: false,
+      error: 'unauthenticated',
+    })
+    // From-quarter ending today is not ended (strict <) — pin the boundary.
+    assert.deepEqual(await carryUnresolvedLongTermIssues(f.db, f.token, f.endsTodayId, f.toId), {
+      ok: false,
+      error: 'quarter_not_ended',
+    })
+    // Target in the past is hidden history — rejected.
+    assert.deepEqual(await carryUnresolvedLongTermIssues(f.db, f.token, f.fromId, f.fromId), {
+      ok: false,
+      error: 'quarter_read_only',
+    })
+    assert.deepEqual(await carryUnresolvedLongTermIssues(f.db, f.token, f.fromId, 999), {
+      ok: false,
+      error: 'quarter_not_found',
+    })
+  })
+
+  it('carryLongTermIssue: single-issue carry follows the same rules; short-term rejected', async () => {
+    const f = await seedCarryFixture()
+    // Short-term issues have no quarter — not found for carry purposes.
+    const short = await addIssue(f.db, f.token, { title: 'short', classification: 'short_term' })
+    if (!short.ok) throw new Error('fixture failed')
+    assert.deepEqual(await carryLongTermIssue(f.db, f.token, short.value.id, f.toId), {
+      ok: false,
+      error: 'not_found',
+    })
+    const result = await carryLongTermIssue(f.db, f.token, f.unresolved[0], f.toId)
+    assert.equal(result.ok, true)
+    if (result.ok) assert.equal(result.value.quarterId, f.toId)
+    const member = await signedInUser(f.db, 'member')
+    assert.deepEqual(await carryLongTermIssue(f.db, member.token, f.unresolved[1], f.toId), {
+      ok: false,
+      error: 'forbidden',
+    })
+    assert.deepEqual(await carryLongTermIssue(f.db, f.token, f.resolved[0], f.toId), {
+      ok: false,
+      error: 'already_resolved',
+    })
   })
 })

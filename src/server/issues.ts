@@ -1,9 +1,21 @@
 import type { Db } from './db'
-import { issueResolutions, issues, people, quarters, users, type Issue } from './schema'
-import { getCurrentUser } from './auth'
+import {
+  issueResolutions,
+  issues,
+  metricEntries,
+  metrics,
+  people,
+  quarters,
+  rocks,
+  todos,
+  users,
+  type Issue,
+} from './schema'
+import { getCurrentUser, requireRole } from './auth'
 import { getCurrentQuarter } from './quarters'
-import { parseDate, todayIso, weekStart } from './week'
-import { asc, eq, inArray } from 'drizzle-orm'
+import { formatWeekLabel, parseDate, todayIso, weekStart } from './week'
+import { derivePass } from './metrics'
+import { and, asc, eq, inArray } from 'drizzle-orm'
 
 /**
  * Issues domain module (ticket 16): the team's long-term (quarter) and
@@ -45,6 +57,11 @@ export type IssueError =
   | 'note_required'
   | 'not_found'
   | 'already_resolved'
+  | 'not_red'
+  | 'todo_not_missed'
+  | 'quarter_not_ended'
+  | 'quarter_read_only'
+  | 'forbidden'
 
 export type IssueResult<T> = { ok: true; value: T } | { ok: false; error: IssueError }
 
@@ -368,4 +385,227 @@ export async function listIssues(
   // order is preserved.
   const result = filtered.sort((a, b) => (a.resolved === b.resolved ? 0 : a.resolved ? 1 : -1))
   return { ok: true, value: result }
+}
+// ================= Ticket 20: provenance + quarter-end carry =================
+
+/**
+ * Internal origin-setting creator (public addIssue keeps origin='manual').
+ * Origin issues are always long_term and land in the CURRENT quarter — the
+ * list where IDS works — regardless of the source row's own quarter (a rock
+ * or entry from any quarter can be pushed; decided ticket 20, documented).
+ * Duplicates are ALLOWED: the EOS room may push the same red cell twice and
+ * the team decides in the room (the L10's meeting_issues UNIQUE handles
+ * in-meeting dedup at ticket 23). Any signed-in user — issues are team
+ * property.
+ */
+async function createIssueWithOrigin(
+  db: Db,
+  token: string | undefined,
+  input: {
+    origin: 'from_rock' | 'from_scorecard' | 'from_todo'
+    originSourceId: number
+    title: string
+  },
+): Promise<IssueResult<Issue>> {
+  const auth = await getCurrentUser(db, token)
+  if (!auth.ok) return auth
+  const quarter = await resolveQuarterId(db, { classification: 'long_term' })
+  if (!quarter.ok) return quarter
+  const [issue] = await db
+    .insert(issues)
+    .values({
+      title: input.title,
+      classification: 'long_term',
+      quarterId: quarter.quarterId,
+      origin: input.origin,
+      originSourceId: input.originSourceId,
+      createdBy: auth.user.id,
+      sortOrder: 0,
+    })
+    .returning()
+  return { ok: true, value: issue! }
+}
+
+/**
+ * Push an off-track rock onto the long-term list. Any signed-in user; the
+ * rock must exist (its own status doesn't matter here — the room decides
+ * what's worth an issue; the L10's Rocks segment only offers the button on
+ * off-track/measuring rows). Title derives from the rock statement.
+ */
+export async function issueFromRock(
+  db: Db,
+  token: string | undefined,
+  rockId: number,
+): Promise<IssueResult<Issue>> {
+  const auth = await getCurrentUser(db, token)
+  if (!auth.ok) return auth
+  const rock = await db.select().from(rocks).where(eq(rocks.id, rockId)).get()
+  if (!rock) return { ok: false, error: 'not_found' }
+  return createIssueWithOrigin(db, token, {
+    origin: 'from_rock',
+    originSourceId: rock.id,
+    title: `Rock off track: ${rock.statement}`,
+  })
+}
+
+/**
+ * Push a red scorecard cell onto the long-term list. Red is verified with
+ * the metric's CURRENT direction against the entry's stored actual and
+ * target_at_entry (the same derivation the grid renders — metrics.derivePass,
+ * now exported). A green cell is rejected ('not_red'): pushing a passing
+ * number as an issue is a mistake, not a workflow.
+ */
+export async function issueFromScorecardEntry(
+  db: Db,
+  token: string | undefined,
+  entryId: number,
+): Promise<IssueResult<Issue>> {
+  const auth = await getCurrentUser(db, token)
+  if (!auth.ok) return auth
+  const entry = await db.select().from(metricEntries).where(eq(metricEntries.id, entryId)).get()
+  if (!entry) return { ok: false, error: 'not_found' }
+  const metric = await db.select().from(metrics).where(eq(metrics.id, entry.metricId)).get()
+  if (!metric) return { ok: false, error: 'not_found' }
+  const pass = derivePass(
+    metric.direction as 'gte' | 'lte',
+    entry.actual,
+    entry.targetAtEntry,
+  )
+  if (pass) return { ok: false, error: 'not_red' }
+  return createIssueWithOrigin(db, token, {
+    origin: 'from_scorecard',
+    originSourceId: entry.id,
+    title: `Red metric: ${metric.name} — ${formatWeekLabel(entry.week)}: ${entry.actual} vs target ${entry.targetAtEntry}`,
+  })
+}
+
+/**
+ * Push a missed to-do onto the long-term list. A completed to-do is NOT a
+ * miss ('todo_not_missed'); open (past due or not) and dropped to-dos are
+ * pushable — the room decides.
+ */
+export async function issueFromTodo(
+  db: Db,
+  token: string | undefined,
+  todoId: number,
+): Promise<IssueResult<Issue>> {
+  const auth = await getCurrentUser(db, token)
+  if (!auth.ok) return auth
+  const todo = await db.select().from(todos).where(eq(todos.id, todoId)).get()
+  if (!todo) return { ok: false, error: 'not_found' }
+  if (todo.status === 'done') return { ok: false, error: 'todo_not_missed' }
+  return createIssueWithOrigin(db, token, {
+    origin: 'from_todo',
+    originSourceId: todo.id,
+    title: `Missed to-do: ${todo.title}`,
+  })
+}
+
+/** An issue is unresolved when no write-once resolution row exists. */
+async function unresolvedIssueIds(db: Db, ids: number[]): Promise<Set<number>> {
+  if (ids.length === 0) return new Set()
+  const rows = await db
+    .select({ issueId: issueResolutions.issueId })
+    .from(issueResolutions)
+    .where(inArray(issueResolutions.issueId, ids))
+  const resolved = new Set(rows.map((r) => r.issueId))
+  return new Set(ids.filter((id) => !resolved.has(id)))
+}
+
+async function quarterById(db: Db, id: number) {
+  return db.select().from(quarters).where(eq(quarters.id, id)).get()
+}
+
+/**
+ * The carry-or-drop prompt's payload: unresolved long-term issues currently
+ * sitting in an ended quarter. Signed-in readable (the list is team
+ * property); the carry/drop ACTIONS are admin-gated below.
+ */
+export async function listUnresolvedForCarry(
+  db: Db,
+  token: string | undefined,
+  fromQuarterId: number,
+): Promise<IssueResult<Issue[]>> {
+  const auth = await getCurrentUser(db, token)
+  if (!auth.ok) return auth
+  const rows = await db
+    .select()
+    .from(issues)
+    .where(and(eq(issues.classification, 'long_term'), eq(issues.quarterId, fromQuarterId)))
+    .orderBy(asc(issues.createdAt), asc(issues.id))
+  const unresolved = await unresolvedIssueIds(db, rows.map((r) => r.id))
+  return { ok: true, value: rows.filter((r) => unresolved.has(r.id)) }
+}
+
+/**
+ * Carry ONE unresolved long-term issue into another quarter (the lean
+ * keep-row decision: same row, quarter_id updated — nothing is copied or
+ * closed). Admin-gated. The issue's CURRENT quarter must be ENDED (strict
+ * `<` on end_date, the single app-wide freeze boundary — a quarter ending
+ * today is not yet carryable); the target quarter must exist and must NOT
+ * be ended (carrying into history would hide the issue). Short-term issues
+ * age in place and are never carried.
+ */
+export async function carryLongTermIssue(
+  db: Db,
+  token: string | undefined,
+  issueId: number,
+  toQuarterId: number,
+): Promise<IssueResult<Issue>> {
+  const auth = await requireRole(db, token, 'admin')
+  if (!auth.ok) return auth
+  const issue = await db.select().from(issues).where(eq(issues.id, issueId)).get()
+  if (!issue || issue.classification !== 'long_term' || issue.quarterId == null) {
+    return { ok: false, error: 'not_found' }
+  }
+  const toQuarter = await quarterById(db, toQuarterId)
+  if (!toQuarter) return { ok: false, error: 'quarter_not_found' }
+  const fromQuarter = await quarterById(db, issue.quarterId)
+  if (!fromQuarter) return { ok: false, error: 'quarter_not_found' }
+  if (fromQuarter.endDate >= todayIso()) return { ok: false, error: 'quarter_not_ended' }
+  if (toQuarter.endDate < todayIso()) return { ok: false, error: 'quarter_read_only' }
+  const unresolved = await unresolvedIssueIds(db, [issue.id])
+  if (!unresolved.has(issue.id)) return { ok: false, error: 'already_resolved' }
+  const [updated] = await db
+    .update(issues)
+    .set({ quarterId: toQuarterId, updatedAt: new Date().toISOString() })
+    .where(eq(issues.id, issueId))
+    .returning()
+  return { ok: true, value: updated! }
+}
+
+/**
+ * Bulk carry: every unresolved long-term issue in an ENDED from-quarter
+ * moves to the target quarter (keep-row). Returns the count for the UI's
+ * "Carry all" toast; resolved issues are untouched (they are history).
+ * Admin-gated; same boundary rules as carryLongTermIssue.
+ */
+export async function carryUnresolvedLongTermIssues(
+  db: Db,
+  token: string | undefined,
+  fromQuarterId: number,
+  toQuarterId: number,
+): Promise<IssueResult<{ carried: number }>> {
+  const auth = await requireRole(db, token, 'admin')
+  if (!auth.ok) return auth
+  const fromQuarter = await quarterById(db, fromQuarterId)
+  if (!fromQuarter) return { ok: false, error: 'quarter_not_found' }
+  if (fromQuarter.endDate >= todayIso()) return { ok: false, error: 'quarter_not_ended' }
+  const toQuarter = await quarterById(db, toQuarterId)
+  if (!toQuarter) return { ok: false, error: 'quarter_not_found' }
+  if (toQuarter.endDate < todayIso()) return { ok: false, error: 'quarter_read_only' }
+  const rows = await db
+    .select()
+    .from(issues)
+    .where(and(eq(issues.classification, 'long_term'), eq(issues.quarterId, fromQuarterId)))
+  const unresolved = await unresolvedIssueIds(db, rows.map((r) => r.id))
+  const toCarry = rows.filter((r) => unresolved.has(r.id))
+  const now = new Date().toISOString()
+  for (const issue of toCarry) {
+    await db
+      .update(issues)
+      .set({ quarterId: toQuarterId, updatedAt: now })
+      .where(eq(issues.id, issue.id))
+  }
+  return { ok: true, value: { carried: toCarry.length } }
 }

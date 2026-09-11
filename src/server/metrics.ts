@@ -195,8 +195,9 @@ export type GridWeek = { monday: string; label: string }
 
 export type MetricGrid = { weeks: GridWeek[]; metrics: GridMetricRow[] }
 
-/** Direction-aware traffic light, pinned by tests (boundary inclusive). */
-function derivePass(direction: MetricDirection, actual: number, target: number): boolean {
+/** Direction-aware traffic light, pinned by tests (boundary inclusive). Exported for
+ * issue provenance (ticket 20) so the red-cell check is one spelling. */
+export function derivePass(direction: MetricDirection, actual: number, target: number): boolean {
   return direction === 'gte' ? actual >= target : actual <= target
 }
 

@@ -272,6 +272,17 @@ include retired metrics' in-window entries (history is judged, not hidden).
 | added_by / added_at | | |
 | sort_order | int | manual ordering |
 
+Ticket-20 provenance + carry decisions: origin issues are long_term in the
+CURRENT quarter (where IDS works), regardless of the source row's quarter;
+duplicates are allowed (the room may push the same red cell twice — the L10's
+meeting_issues UNIQUE handles in-meeting dedup at ticket 23); red-cell pushes
+verify pass via the metric's current direction (metrics.derivePass) and reject
+green cells ('not_red'); completed to-dos are not misses ('todo_not_missed').
+Quarter-end carry = the lean keep-row (quarter_id updated in place); the
+from-quarter must be ENDED (strict `<`, same freeze boundary — a quarter
+ending today is not yet carryable) and the target quarter must NOT be ended;
+bulk carry returns the count and leaves resolved rows as history.
+
 Status is derived: open until an `issue_resolutions` row exists.
 
 ### issue_resolutions

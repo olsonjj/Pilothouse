@@ -7,6 +7,12 @@ import {
   updateIssue,
   resolveIssue,
   listIssues,
+  issueFromRock,
+  issueFromScorecardEntry,
+  issueFromTodo,
+  listUnresolvedForCarry,
+  carryLongTermIssue,
+  carryUnresolvedLongTermIssues,
   type IssueInput,
   type ListIssuesInput,
 } from '../server/issues'
@@ -69,4 +75,52 @@ export const resolveIssueFn = createServerFn({ method: 'POST' })
       outcome: data.outcome as 'solved' | 'dropped',
       note: data.note ?? '',
     })
+  })
+// ================= Ticket 20: provenance + quarter-end carry =================
+
+export const issueFromRockFn = createServerFn({ method: 'POST' })
+  .validator((d: unknown) => d as { rockId?: number })
+  .handler(async ({ data }) => {
+    const db = await getDb()
+    return issueFromRock(db, getCookie(SESSION_COOKIE), data.rockId ?? 0)
+  })
+
+export const issueFromScorecardEntryFn = createServerFn({ method: 'POST' })
+  .validator((d: unknown) => d as { entryId?: number })
+  .handler(async ({ data }) => {
+    const db = await getDb()
+    return issueFromScorecardEntry(db, getCookie(SESSION_COOKIE), data.entryId ?? 0)
+  })
+
+export const issueFromTodoFn = createServerFn({ method: 'POST' })
+  .validator((d: unknown) => d as { todoId?: number })
+  .handler(async ({ data }) => {
+    const db = await getDb()
+    return issueFromTodo(db, getCookie(SESSION_COOKIE), data.todoId ?? 0)
+  })
+
+export const listUnresolvedForCarryFn = createServerFn({ method: 'GET' })
+  .validator((d: unknown) => d as { fromQuarterId?: number })
+  .handler(async ({ data }) => {
+    const db = await getDb()
+    return listUnresolvedForCarry(db, getCookie(SESSION_COOKIE), data?.fromQuarterId ?? 0)
+  })
+
+export const carryLongTermIssueFn = createServerFn({ method: 'POST' })
+  .validator((d: unknown) => d as { issueId?: number; toQuarterId?: number })
+  .handler(async ({ data }) => {
+    const db = await getDb()
+    return carryLongTermIssue(db, getCookie(SESSION_COOKIE), data.issueId ?? 0, data.toQuarterId ?? 0)
+  })
+
+export const carryUnresolvedLongTermIssuesFn = createServerFn({ method: 'POST' })
+  .validator((d: unknown) => d as { fromQuarterId?: number; toQuarterId?: number })
+  .handler(async ({ data }) => {
+    const db = await getDb()
+    return carryUnresolvedLongTermIssues(
+      db,
+      getCookie(SESSION_COOKIE),
+      data.fromQuarterId ?? 0,
+      data.toQuarterId ?? 0,
+    )
   })

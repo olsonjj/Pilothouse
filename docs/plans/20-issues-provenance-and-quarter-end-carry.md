@@ -4,10 +4,10 @@
 
 **Blocked by:** 16: Issues: core lists, 18: Rocks: weekly status, 14: Scorecard: weekly grid, 11: To-Dos: create & complete.
 
-**Status:** ready-for-agent
+**Status:** done (review pending)
 
-- [ ] Creating an issue from a rock/scorecard entry/to-do records origin and source ID
-- [ ] Origin is displayed on the issue
-- [ ] At quarter end, unresolved long-term issues prompt carry-or-drop; carry keeps the row and updates its quarter (never silent)
-- [ ] Short-term issues simply age in place
-- [ ] Seam tests cover each origin path and the quarter-end prompt logic
+- [x] Creating an issue from a rock/scorecard entry/to-do records origin and source ID
+- [x] Origin is displayed on the issue
+- [x] At quarter end, unresolved long-term issues prompt carry-or-drop; carry keeps the row and updates its quarter (never silent)
+- [x] Short-term issues simply age in place
+- [x] Seam tests cover each origin path and the quarter-end prompt logic
