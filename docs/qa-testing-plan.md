@@ -1,15 +1,15 @@
 # OpenEOS — QA Testing Plan
 
-*Manual test plan for reviewing all OpenEOS functionality. Covers every module
+*Manual test plan for reviewing all OpenEOS functionality. Sections 0–1 verified by John, 2026-09-11. Covers every module
 (= every ticket 01–25), cross-module flows, and the permission matrix. Work
 top to bottom; each case has steps and the expected result.*
 
 ## 0. Setup (once)
 
-- [ ] Start the app: `pnpm dev` (serves at http://localhost:3250; port 3000 is
+- [x] Start the app: `pnpm dev` (serves at http://localhost:3250; port 3000 is
       taken by the dev default script — use `node_modules/.bin/vite dev --port 3250`).
-- [ ] Sign in as the owner: `owner@openeos.local` / `openeos-owner-dev`.
-- [ ] **Create a second (member) account** — there is deliberately no signup UI
+- [x] Sign in as the owner: `owner@openeos.local` / `openeos-owner-dev`.
+- [x] **Create a second (member) account** — there is deliberately no signup UI
       (accounts come from the seed; adding a creation UI was never a ticket).
       Run this, then restart the dev server so it seeds nothing weird:
 
@@ -23,10 +23,10 @@ top to bottom; each case has steps and the expected result.*
 
       Sign out, sign in as `member@openeos.local` (same password as owner) to
       confirm it works, then sign back in as owner.
-- [ ] Optional but recommended: create a second person ("QA Member") and link
+- [x] Optional but recommended: create a second person ("QA Member") and link
       it to the member account (People page, admin) so permission tests below
       can distinguish "unlinked member" from "linked member".
-- [ ] Note: earlier QA data may already exist (items titled "QA validation…",
+- [x] Note: earlier QA data may already exist (items titled "QA validation…",
       "QA re-test…", 2 concluded meetings). Reuse or ignore it; nothing needs
       deleting (issues/rocks/meetings are permanent by design).
 
@@ -37,12 +37,12 @@ the expected result (include what you saw).
 
 ## 1. Accounts & access (ticket 01)
 
-- [ ] 1.1 Sign out → visiting `/` redirects to the sign-in page.
-- [ ] 1.2 Wrong password → "Invalid email or password" style error; no session.
-- [ ] 1.3 Sign in → home shows your name, email, role, and the current
+- [x] 1.1 Sign out → visiting `/` redirects to the sign-in page.
+- [x] 1.2 Wrong password → "Invalid email or password" style error; no session.
+- [x] 1.3 Sign in → home shows your name, email, role, and the current
       quarter/week header ("2026 Q4 · Week of …").
-- [ ] 1.4 Close the browser, reopen → still signed in (session persists).
-- [ ] 1.5 As **member**: home shows member role; no admin-only controls anywhere.
+- [x] 1.4 Close the browser, reopen → still signed in (session persists).
+- [x] 1.5 As **member**: home shows member role; no admin-only controls anywhere.
 
 ## 2. People & linking (ticket 02)
 
