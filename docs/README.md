@@ -13,6 +13,8 @@ for a single company (~10 people: owner + 9 employees).
 4. [`plans/01`…`25`](./plans/) — tickets as individual markdown files, numbered
    in dependency order (blockers first). Each declares its blockers; work the
    frontier (any ticket whose blockers are all done).
+5. [`qa-testing-plan.md`](./qa-testing-plan.md) — manual QA plan for reviewing
+   every module, including the two-account setup and permission matrix.
 5. Tool specs, in build order:
 
 ### Tier 1 — Core
