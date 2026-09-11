@@ -43,6 +43,7 @@ export type RockError =
   | 'quarter_read_only'
   | 'owner_not_found'
   | 'rock_not_found'
+  | 'quarter_not_ended'
 
 export type RockResult<T> =
   | { ok: true; value: T; warning?: 'over_rock_cap' }
@@ -543,4 +544,206 @@ export async function listLatestStatuses(
         h.statuses.length > 0 && h.statuses[h.statuses.length - 1].twoConsecutiveOffTrack,
     })),
   }
+}
+
+// ---------------------------------------------------------------------------
+// Quarter-end scoring + explicit carry-over (ticket 19)
+// ---------------------------------------------------------------------------
+
+export type CompletionRate = {
+  /** null = company rocks (owner NULL). */
+  personId: number | null
+  personName: string | null
+  completed: number
+  /** All rocks in the quarter for this owner — unscored counts as incomplete. */
+  total: number
+  /** One decimal, 0–100; null when the owner has no rocks. */
+  rate: number | null
+}
+
+export type QuarterCompletion = {
+  quarterId: number
+  /** Whether the quarter has ended (rates are meaningful only then). */
+  ended: boolean
+  people: CompletionRate[]
+  team: { completed: number; total: number; rate: number | null }
+}
+
+function rateOf(completed: number, total: number): number | null {
+  if (total === 0) return null
+  return Math.round((completed / total) * 1000) / 10
+}
+
+/**
+ * Quarter-end scoring (ticket 19). Admin marks a rock complete (1) or
+ * incomplete (0). Only rocks in an ENDED quarter (end_date < today, the same
+ * single freeze boundary as quarterWritable) are scorable — a quarter ending
+ * today is not yet scorable (pinned). Re-scoring is allowed for any ended
+ * quarter for now (documented delta: history freezes one quarter out is the
+ * recommended future tightening); each score (re)sets completed_at.
+ *
+ * Un-scored rocks in an ended quarter are "incomplete by omission": they
+ * count in the completion-rate denominator as not-done (documented).
+ */
+export async function scoreRock(
+  db: Db,
+  token: string | undefined,
+  rockId: number,
+  input: { completed: boolean },
+  today = todayIsoSafe(),
+): Promise<RockResult<Rock>> {
+  const auth = await getCurrentUser(db, token)
+  if (!auth.ok) return { ok: false, error: 'unauthenticated' }
+  if (auth.user.role !== 'admin') return { ok: false, error: 'forbidden' }
+
+  const rock = await db.select().from(rocks).where(eq(rocks.id, rockId)).get()
+  if (!rock) return { ok: false, error: 'rock_not_found' }
+
+  const quarter = await db
+    .select()
+    .from(quarters)
+    .where(eq(quarters.id, rock.quarterId))
+    .get()
+  if (!quarter) return { ok: false, error: 'quarter_not_found' }
+  if (quarter.endDate >= today) return { ok: false, error: 'quarter_not_ended' }
+
+  const [row] = await db
+    .update(rocks)
+    .set({
+      completed: input.completed ? 1 : 0,
+      completedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    })
+    .where(eq(rocks.id, rockId))
+    .returning()
+  return { ok: true, value: row! }
+}
+
+/**
+ * Completion percentages per person (+ company bucket) and team for one
+ * quarter. Denominator decision (documented in data-model.md): EVERY rock in
+ * the quarter counts — unscored rocks count as incomplete ("incomplete by
+ * omission"). Rate null only when there are no rocks at all.
+ */
+export async function completionRates(
+  db: Db,
+  token: string | undefined,
+  quarterId: number,
+  today = todayIsoSafe(),
+): Promise<RockResult<QuarterCompletion>> {
+  const auth = await getCurrentUser(db, token)
+  if (!auth.ok) return auth
+
+  const quarter = await db
+    .select()
+    .from(quarters)
+    .where(eq(quarters.id, quarterId))
+    .get()
+  if (!quarter) return { ok: false, error: 'quarter_not_found' }
+
+  // Aliased join columns: unique output names (node:sqlite proxy constraint).
+  const rows = await db
+    .select({
+      ownerPersonId: sql<number | null>`"rocks"."owner_person_id"`.as('r_owner'),
+      completed: sql<number | null>`"rocks"."completed"`.as('r_completed'),
+      ownerName: sql<string | null>`"people"."full_name"`.as('p_name'),
+    })
+    .from(rocks)
+    .leftJoin(people, eq(rocks.ownerPersonId, people.id))
+    .where(eq(rocks.quarterId, quarterId))
+    .orderBy(asc(sql`"rocks"."owner_person_id"`))
+
+  const ended = quarter.endDate < today
+  const buckets = new Map<
+    number | 'company',
+    { personId: number | null; personName: string | null; completed: number; total: number }
+  >()
+  for (const r of rows) {
+    const key = r.ownerPersonId == null ? 'company' : Number(r.ownerPersonId)
+    const bucket =
+      buckets.get(key) ??
+      {
+        personId: r.ownerPersonId == null ? null : Number(r.ownerPersonId),
+        personName: r.ownerPersonId == null ? null : (r.ownerName ?? null),
+        completed: 0,
+        total: 0,
+      }
+    bucket.total += 1
+    if (Number(r.completed) === 1) bucket.completed += 1
+    buckets.set(key, bucket)
+  }
+
+  const people_rates: CompletionRate[] = [...buckets.values()]
+    .map((b) => ({ ...b, rate: rateOf(b.completed, b.total) }))
+    .sort((a, b) => {
+      if (a.personId == null) return -1 // company first
+      if (b.personId == null) return 1
+      return a.personId - b.personId
+    })
+
+  const teamDone = people_rates.reduce((s, p) => s + p.completed, 0)
+  const teamTotal = people_rates.reduce((s, p) => s + p.total, 0)
+
+  return {
+    ok: true,
+    value: {
+      quarterId: Number(quarterId),
+      ended,
+      people: people_rates,
+      team: { completed: teamDone, total: teamTotal, rate: rateOf(teamDone, teamTotal) },
+    },
+  }
+}
+
+/**
+ * Explicit carry-over (ticket 19): a new rock in the target quarter copying
+ * statement/detail/owner/target/direction, with carried_over_from_rock_id =
+ * the source. The SOURCE ROCK IS NEVER MUTATED (frozen history). Rules:
+ * source quarter must be ended; target quarter must exist and be current or
+ * future (the same quarterWritable check); admins only.
+ */
+export async function carryOverRock(
+  db: Db,
+  token: string | undefined,
+  rockId: number,
+  targetQuarterId: number,
+  today = todayIsoSafe(),
+): Promise<RockResult<Rock>> {
+  const auth = await getCurrentUser(db, token)
+  if (!auth.ok) return { ok: false, error: 'unauthenticated' }
+  if (auth.user.role !== 'admin') return { ok: false, error: 'forbidden' }
+
+  const source = await db.select().from(rocks).where(eq(rocks.id, rockId)).get()
+  if (!source) return { ok: false, error: 'rock_not_found' }
+
+  const sourceQuarter = await db
+    .select()
+    .from(quarters)
+    .where(eq(quarters.id, source.quarterId))
+    .get()
+  if (!sourceQuarter) return { ok: false, error: 'quarter_not_found' }
+  if (sourceQuarter.endDate >= today) {
+    return { ok: false, error: 'quarter_not_ended' }
+  }
+
+  const writable = await quarterWritable(db, targetQuarterId, today)
+  if (!writable.ok) return writable
+
+  // Cap nudge mirrors createRock (checked after insert).
+  const [row] = await db
+    .insert(rocks)
+    .values({
+      statement: source.statement,
+      detail: source.detail,
+      ownerPersonId: source.ownerPersonId,
+      quarterId: targetQuarterId,
+      target: source.target,
+      direction: source.direction,
+      carriedOverFromRockId: source.id,
+      createdBy: auth.user.id,
+    })
+    .returning()
+
+  const warned = await capExceeded(db, targetQuarterId, source.ownerPersonId)
+  return warned ? { ok: true, value: row!, warning: 'over_rock_cap' } : { ok: true, value: row! }
 }

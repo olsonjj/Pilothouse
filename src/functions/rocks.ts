@@ -8,6 +8,9 @@ import {
   listRocks,
   setStatus,
   listStatusesForRocks,
+  scoreRock,
+  completionRates,
+  carryOverRock,
   type RockInput,
 } from '../server/rocks'
 
@@ -81,4 +84,27 @@ export const listStatusesFn = createServerFn({ method: 'GET' })
   .handler(async ({ data }) => {
     const db = await getDb()
     return listStatusesForRocks(db, getCookie(SESSION_COOKIE), data?.quarterId ?? 0)
+  })
+
+export const scoreRockFn = createServerFn({ method: 'POST' })
+  .validator((d: unknown) => d as { rockId?: number; completed?: boolean })
+  .handler(async ({ data }) => {
+    const db = await getDb()
+    return scoreRock(db, getCookie(SESSION_COOKIE), data.rockId ?? 0, {
+      completed: data.completed === true,
+    })
+  })
+
+export const completionRatesFn = createServerFn({ method: 'GET' })
+  .validator((d: unknown) => d as { quarterId?: number })
+  .handler(async ({ data }) => {
+    const db = await getDb()
+    return completionRates(db, getCookie(SESSION_COOKIE), data?.quarterId ?? 0)
+  })
+
+export const carryOverFn = createServerFn({ method: 'POST' })
+  .validator((d: unknown) => d as { rockId?: number; targetQuarterId?: number })
+  .handler(async ({ data }) => {
+    const db = await getDb()
+    return carryOverRock(db, getCookie(SESSION_COOKIE), data.rockId ?? 0, data.targetQuarterId ?? 0)
   })

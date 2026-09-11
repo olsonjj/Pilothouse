@@ -7,8 +7,13 @@ import {
   setStatus,
   listStatusesForRocks,
   listLatestStatuses,
+  scoreRock,
+  completionRates,
+  carryOverRock,
   ROCK_CAP,
 } from '../src/server/rocks'
+import { rocks } from '../src/server/schema'
+import { eq } from 'drizzle-orm'
 import { createPerson, linkUserToPerson } from '../src/server/people'
 import { createTestDb, signedInUser } from './helpers'
 import { todayIso } from '../src/server/week'
@@ -540,5 +545,252 @@ describe('Rock weekly statuses (seam, ticket 18)', () => {
     const after = await listLatestStatuses(db, token, flaggedRock.quarterId)
     if (!after.ok) throw new Error('after failed')
     assert.equal(after.value.find((h) => h.rockId === flaggedRock.id)?.twoConsecutiveOffTrack, false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Ticket 19: quarter-end scoring, completion rates, explicit carry-over
+// ---------------------------------------------------------------------------
+describe('Ticket 19: scoring, rates, carry-over (seam)', () => {
+  /** Rocks in ended quarters must be SQL-seeded (createRock requires a writable quarter). */
+  function seedRock(
+    sqlite: DatabaseSync,
+    quarterId: number,
+    statement: string,
+    ownerId: number | null,
+    opts: { target?: number; direction?: string } = {},
+  ): number {
+    const now = new Date().toISOString()
+    sqlite.exec(
+      `INSERT INTO rocks (statement, owner_person_id, quarter_id, target, direction, created_by, created_at, updated_at)
+       VALUES ('${statement.replace(/'/g, "''")}', ${ownerId ?? 'NULL'}, ${quarterId}, ${opts.target ?? 'NULL'}, ${opts.direction ? `'${opts.direction}'` : 'NULL'}, 1, '${now}', '${now}')`,
+    )
+    return (sqlite.prepare('SELECT id FROM rocks WHERE statement = ?').get(statement) as { id: number }).id
+  }
+
+  it('scoreRock: admin only; ended quarters only (quarter ending TODAY is not scorable); re-score overwrites', async () => {
+    const { db, sqlite } = await createTestDb()
+    const { token } = await signedInUser(db) // admin
+    const member = await signedInUser(db, 'member')
+    const alice = await personFor(db, token, 'Alice')
+    const today = todayIso()
+
+    // Ended quarter (ended yesterday).
+    sqlite.exec(
+      `INSERT INTO quarters (label, start_date, end_date) VALUES ('2025 Q3', '2025-07-01', date('${today}', '-1 day'))`,
+    )
+    const endedId = (sqlite.prepare("SELECT id FROM quarters WHERE label = '2025 Q3'").get() as { id: number }).id
+    // Quarter ending TODAY: writable but NOT yet scorable (strict boundary).
+    sqlite.exec(
+      `INSERT INTO quarters (label, start_date, end_date) VALUES ('2025 Q4', '2025-10-01', '${today}')`,
+    )
+    const endingTodayId = (sqlite.prepare("SELECT id FROM quarters WHERE label = '2025 Q4'").get() as { id: number }).id
+
+    const pastId = seedRock(sqlite, endedId, 'past rock', alice.id)
+    const currentId = seedRock(sqlite, endingTodayId, 'today rock', alice.id)
+
+    // Member forbidden; unauthenticated denied.
+    assert.deepEqual(await scoreRock(db, member.token, pastId, { completed: true }), {
+      ok: false,
+      error: 'forbidden',
+    })
+    assert.deepEqual(await scoreRock(db, undefined, pastId, { completed: true }), {
+      ok: false,
+      error: 'unauthenticated',
+    })
+
+    // A quarter ending today is NOT scorable (boundary pin — flips under <=).
+    assert.deepEqual(await scoreRock(db, token, currentId, { completed: true }), {
+      ok: false,
+      error: 'quarter_not_ended',
+    })
+
+    // Ended quarter scorable; re-scoring overwrites completed_at.
+    const first = await scoreRock(db, token, pastId, { completed: true })
+    assert.equal(first.ok, true)
+    if (first.ok) {
+      assert.equal(first.value.completed, 1)
+      // Re-score to incomplete (allowed for any ended quarter — documented).
+      // (completed_at is re-set on every score; two same-millisecond writes are
+      // indistinguishable, so pin the VALUE flip, not the timestamp.)
+      const second = await scoreRock(db, token, pastId, { completed: false })
+      assert.equal(second.ok, true)
+      if (second.ok) {
+        assert.equal(second.value.completed, 0)
+        assert.ok(second.value.completedAt != null)
+      }
+      // Re-score back for rate tests below.
+      assert.equal((await scoreRock(db, token, pastId, { completed: true })).ok, true)
+    }
+  })
+
+  it('completionRates: pinned literals — unscored counts as incomplete; company bucket; team aggregate', async () => {
+    const { db, sqlite } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const alice = await personFor(db, token, 'Alice')
+    const bob = await personFor(db, token, 'Bob')
+    const today = todayIso()
+
+    sqlite.exec(
+      `INSERT INTO quarters (label, start_date, end_date) VALUES ('2025 Q1', '2025-01-01', date('${today}', '-1 day'))`,
+    )
+    const qid = (sqlite.prepare("SELECT id FROM quarters WHERE label = '2025 Q1'").get() as { id: number }).id
+
+    function seed(title: string, ownerId: number | null, completed: boolean | null) {
+      const id = seedRock(sqlite, qid, title, ownerId)
+      if (completed !== null) {
+        return scoreRock(db, token, id, { completed })
+      }
+      return undefined
+    }
+
+    // Alice: 3 complete + 1 incomplete → 75%.
+    await seed('a1', alice.id, true)
+    await seed('a2', alice.id, true)
+    await seed('a3', alice.id, true)
+    await seed('a4', alice.id, false)
+    // Bob: 2 complete + 1 UNSCORED → 2/3 = 66.7% (unscored = incomplete by omission).
+    await seed('b1', bob.id, true)
+    await seed('b2', bob.id, true)
+    await seed('b3', bob.id, null)
+    // Company rock: 1/2 = 50%.
+    await seed('c1', null, true)
+    await seed('c2', null, false)
+
+    const result = await completionRates(db, token, qid)
+    assert.equal(result.ok, true)
+    if (!result.ok) throw new Error('rates failed')
+    assert.equal(result.value.ended, true)
+
+    const aliceRate = result.value.people.find((p) => p.personId === alice.id)
+    assert.ok(aliceRate)
+    assert.equal(aliceRate.completed, 3)
+    assert.equal(aliceRate.total, 4)
+    assert.equal(aliceRate.rate, 75)
+
+    const bobRate = result.value.people.find((p) => p.personId === bob.id)
+    assert.ok(bobRate)
+    assert.equal(bobRate.completed, 2)
+    assert.equal(bobRate.total, 3)
+    assert.equal(bobRate.rate, 66.7)
+
+    const company = result.value.people.find((p) => p.personId == null)
+    assert.ok(company)
+    assert.equal(company.personName, null)
+    assert.equal(company.completed, 1)
+    assert.equal(company.total, 2)
+    assert.equal(company.rate, 50)
+
+    assert.equal(result.value.team.completed, 6)
+    assert.equal(result.value.team.total, 9)
+    assert.equal(result.value.team.rate, 66.7)
+  })
+
+  it('completionRates: empty quarter → null rates; current quarter reports ended=false', async () => {
+    const { db, sqlite } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const today = todayIso()
+    // The seeded current quarter (from ensureCurrentYearQuarters) has NOT ended.
+    const currentId = (
+      sqlite.prepare("SELECT id FROM quarters WHERE end_date >= ? ORDER BY start_date LIMIT 1").get(today) as { id: number }
+    ).id
+    const alice = await personFor(db, token, 'Alice')
+    await createRock(db, token, { statement: 'current rock', ownerPersonId: alice.id, quarterId: currentId })
+
+    const result = await completionRates(db, token, currentId)
+    assert.equal(result.ok, true)
+    if (!result.ok) throw new Error('rates failed')
+    assert.equal(result.value.ended, false)
+    assert.equal(result.value.team.completed, 0)
+    assert.equal(result.value.team.total, 1)
+    assert.equal(result.value.team.rate, 0)
+
+    // A quarter with no rocks → null rate, not 0/NaN.
+    sqlite.exec(
+      `INSERT INTO quarters (label, start_date, end_date) VALUES ('2024 Q4', '2024-10-01', date('${today}', '-1 day'))`,
+    )
+    const emptyId = (sqlite.prepare("SELECT id FROM quarters WHERE label = '2024 Q4'").get() as { id: number }).id
+    const empty = await completionRates(db, token, emptyId)
+    assert.equal(empty.ok, true)
+    if (empty.ok) {
+      assert.equal(empty.value.team.total, 0)
+      assert.equal(empty.value.team.rate, null)
+    }
+  })
+
+  it('carryOver: copies fields, pins the link, never mutates the source; denies members/past targets/non-ended sources', async () => {
+    const { db, sqlite } = await createTestDb()
+    const { token } = await signedInUser(db) // admin
+    const member = await signedInUser(db, 'member')
+    const alice = await personFor(db, token, 'Alice')
+    const today = todayIso()
+
+    sqlite.exec(
+      `INSERT INTO quarters (label, start_date, end_date) VALUES ('2025 Q1', '2025-01-01', date('${today}', '-1 day'))`,
+    )
+    const endedId = (sqlite.prepare("SELECT id FROM quarters WHERE label = '2025 Q1'").get() as { id: number }).id
+    // Target = the seeded current quarter (end_date in the future).
+    const currentId = (
+      sqlite.prepare("SELECT id FROM quarters WHERE end_date > ? ORDER BY start_date LIMIT 1").get(today) as { id: number }
+    ).id
+
+    const sourceId = seedRock(sqlite, endedId, 'grow sales', alice.id, { target: 15, direction: 'gte' })
+    sqlite.exec("UPDATE rocks SET detail = 'from 10 to 15' WHERE id = " + sourceId)
+    // Score the source BEFORE carrying: the carry must NOT flip it.
+    assert.equal((await scoreRock(db, token, sourceId, { completed: false })).ok, true)
+
+    // Member forbidden; unauthenticated denied.
+    assert.deepEqual(await carryOverRock(db, member.token, sourceId, currentId), {
+      ok: false,
+      error: 'forbidden',
+    })
+    assert.deepEqual(await carryOverRock(db, undefined, sourceId, currentId), {
+      ok: false,
+      error: 'unauthenticated',
+    })
+    // Non-ended source (a rock in the current quarter) rejected.
+    const inCurrent = await createRock(db, token, { statement: 'live rock', ownerPersonId: alice.id, quarterId: currentId })
+    if (!inCurrent.ok) throw new Error('fixture failed')
+    assert.deepEqual(await carryOverRock(db, token, inCurrent.value.id, currentId), {
+      ok: false,
+      error: 'quarter_not_ended',
+    })
+    // Target in the past rejected.
+    assert.deepEqual(await carryOverRock(db, token, sourceId, endedId), {
+      ok: false,
+      error: 'quarter_read_only',
+    })
+
+    const carried = await carryOverRock(db, token, sourceId, currentId)
+    assert.equal(carried.ok, true)
+    if (!carried.ok) throw new Error('carry failed')
+    assert.equal(carried.value.carriedOverFromRockId, sourceId)
+    assert.equal(carried.value.statement, 'grow sales')
+    assert.equal(carried.value.detail, 'from 10 to 15')
+    assert.equal(carried.value.ownerPersonId, alice.id)
+    assert.equal(carried.value.target, 15)
+    assert.equal(carried.value.direction, 'gte')
+    assert.equal(carried.value.quarterId, currentId)
+    assert.equal(carried.value.completed, null) // fresh rock: unscored
+    assert.notEqual(carried.value.id, sourceId)
+
+    // Source untouched: statement/completed unchanged, still in the old quarter.
+    const after = await db.select().from(rocks).where(eq(rocks.id, sourceId)).get()
+    assert.ok(after)
+    assert.equal(after!.statement, 'grow sales')
+    assert.equal(after!.completed, 0)
+    assert.equal(after!.quarterId, endedId)
+    assert.equal(after!.carriedOverFromRockId, null)
+
+    // listRocks on the target quarter shows the carried rock with its origin.
+    const list = await listRocks(db, token, currentId)
+    assert.equal(list.ok, true)
+    if (list.ok) {
+      const shown = [...list.value.company, ...list.value.personal].find(
+        (r) => r.id === carried.value.id,
+      )
+      assert.ok(shown)
+      assert.equal(shown!.carriedOverFromRockId, sourceId)
+    }
   })
 })

@@ -196,6 +196,26 @@ sketched `updated_by`); writer column names stay one-spelling-per-concept.
 The 2-consecutive-off-track
 highlight is a query, not stored state.
 
+### Quarter-end scoring + carry-over (ticket 19)
+
+- **Scoring:** `scoreRock` (admin-only) sets `completed` 0/1 + `completed_at`.
+  Only rocks in an ENDED quarter (end_date < today — the same single freeze
+  boundary as all rock writes) are scorable; a quarter ending today is not yet
+  scorable (pinned). Re-scoring is allowed for any ended quarter for now —
+  documented delta: the data-model originally suggested freezing history one
+  quarter out; the lean v1 keeps re-scoring open.
+- **Completion-rate denominator (decided):** every rock in the quarter counts
+  — unscored rocks are "incomplete by omission" and sit in the denominator as
+  not-done. Rate = completed/total, one decimal, null only for zero rocks.
+  Buckets: per person, company rocks (owner NULL) as their own "Company" row,
+  plus the team aggregate.
+- **Carry-over:** `carryOverRock` (admin-only) creates a NEW rock in the
+  target quarter copying statement/detail/owner/target/direction with
+  `carried_over_from_rock_id` = source. Source rock is NEVER mutated. Source
+  quarter must be ended; target quarter must be current/future (the same
+  quarterWritable check). The UI's carry button targets the quarter after the
+  one being viewed.
+
 ## Scorecard tables
 
 ### metrics

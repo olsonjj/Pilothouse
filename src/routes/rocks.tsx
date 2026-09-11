@@ -1,10 +1,19 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { getCurrentUserFn, signOutFn } from '../functions/auth'
 import { listQuartersFn, getCurrentPeriodFn } from '../functions/quarters'
 import { listPeopleFn } from '../functions/people'
-import { listRocksFn, createRockFn, updateRockFn, setStatusFn, listStatusesFn } from '../functions/rocks'
-import type { RockWithOwner, RockList } from '../server/rocks'
+import {
+  listRocksFn,
+  createRockFn,
+  updateRockFn,
+  setStatusFn,
+  listStatusesFn,
+  scoreRockFn,
+  completionRatesFn,
+  carryOverFn,
+} from '../functions/rocks'
+import type { RockWithOwner, RockList, QuarterCompletion } from '../server/rocks'
 import type { RockStatusValue } from '../server/rocks'
 import { weekStart } from '../server/week'
 
@@ -100,6 +109,7 @@ function RocksPage() {
   const [editing, setEditing] = useState<RockFormState | null>(null)
   const [busy, setBusy] = useState(false)
   const [statusHistory, setStatusHistory] = useState(data.statusHistory)
+  const [completion, setCompletion] = useState<QuarterCompletion | null>(null)
 
   function openCreate(ownerPersonId: string) {
     setFormError(null)
@@ -130,6 +140,22 @@ function RocksPage() {
     const history = await listStatusesFn({ data: { quarterId: qid } })
     if (history.ok) setStatusHistory(history.value)
   }
+
+  // Completion rates load for whatever quarter is selected (meaningful when
+  // the quarter has ended; the response carries the `ended` flag).
+  useEffect(() => {
+    if (quarterId == null) {
+      setCompletion(null)
+      return
+    }
+    let cancelled = false
+    completionRatesFn({ data: { quarterId } }).then((result) => {
+      if (!cancelled) setCompletion(result.ok ? result.value : null)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [quarterId, rocks])
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
@@ -211,6 +237,43 @@ function RocksPage() {
     await refresh(quarterId)
   }
 
+  async function handleScore(rockId: number, completed: boolean) {
+    setBusy(true)
+    setFormError(null)
+    const result = await scoreRockFn({ data: { rockId, completed } })
+    setBusy(false)
+    if (!result.ok) {
+      setFormError(errorText(result.error))
+      return
+    }
+    await refresh(quarterId)
+  }
+
+  async function handleCarry(rockId: number) {
+    if (quarterId == null) return
+    // Target = the quarter AFTER the one being viewed ("carry over to next
+    // quarter"); the quarters list is label-ordered so this is deterministic.
+    const idx = data.quarters.findIndex((q) => q.id === quarterId)
+    const next = idx >= 0 && idx + 1 < data.quarters.length ? data.quarters[idx + 1] : null
+    if (!next) {
+      setFormError('No later quarter exists to carry into — seed it first.')
+      return
+    }
+    setBusy(true)
+    setFormError(null)
+    const result = await carryOverFn({ data: { rockId, targetQuarterId: next.id } })
+    setBusy(false)
+    if (!result.ok) {
+      setFormError(errorText(result.error))
+      return
+    }
+    if ('warning' in result && result.warning === 'over_rock_cap') {
+      setWarning(`Carried over into ${next.label} — that quarter now has more than 7 rocks for that owner.`)
+    } else {
+      setWarning(`Rock carried over into ${next.label} — the original is untouched history.`)
+    }
+  }
+
   const writable = quarterWritable(quarterId)
   const historyByRock = new Map(statusHistory.map((h) => [h.rockId, h]))
 
@@ -244,6 +307,26 @@ function RocksPage() {
       >
         <div>
           <span className="font-medium">{rock.statement}</span>
+          {rock.carriedOverFromRockId != null && (
+            <span
+              className="ml-2 rounded bg-purple-100 px-1.5 py-0.5 text-xs font-medium text-purple-700"
+              title={`carried over from rock #${rock.carriedOverFromRockId}`}
+            >
+              ↩ carried over
+            </span>
+          )}
+          {rock.completed != null && (
+            <span
+              className={
+                'ml-2 rounded px-1.5 py-0.5 text-xs font-medium ' +
+                (rock.completed === 1
+                  ? 'bg-green-100 text-green-700'
+                  : 'bg-slate-200 text-slate-600')
+              }
+            >
+              {rock.completed === 1 ? '✓ complete' : '✗ incomplete'}
+            </span>
+          )}
           {flagged && (
             <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700">
               off-track 2 weeks in a row
@@ -288,13 +371,51 @@ function RocksPage() {
               onSet={handleSetStatus}
             />
           )}
-          {canEdit(rock) && (
+          {canEdit(rock) && writable && (
             <button
               onClick={() => openEdit(rock)}
               className="rounded border border-slate-300 px-2 py-0.5 hover:bg-slate-100"
             >
               Edit
             </button>
+          )}
+          {isAdmin && !writable && (
+            <span className="flex items-center gap-1">
+              <button
+                disabled={busy}
+                onClick={() => handleScore(rock.id, true)}
+                className={
+                  'rounded border px-2 py-0.5 hover:bg-green-50 disabled:opacity-40 ' +
+                  (rock.completed === 1
+                    ? 'border-green-500 bg-green-100 font-medium'
+                    : 'border-slate-300')
+                }
+              >
+                ✓
+              </button>
+              <button
+                disabled={busy}
+                onClick={() => handleScore(rock.id, false)}
+                className={
+                  'rounded border px-2 py-0.5 hover:bg-slate-100 disabled:opacity-40 ' +
+                  (rock.completed === 0
+                    ? 'border-slate-500 bg-slate-200 font-medium'
+                    : 'border-slate-300')
+                }
+              >
+                ✗
+              </button>
+              {rock.completed !== 1 && (
+                <button
+                  disabled={busy}
+                  onClick={() => handleCarry(rock.id)}
+                  title="Copy into a future quarter as a new rock (original untouched)"
+                  className="rounded border border-purple-400 px-2 py-0.5 text-purple-700 hover:bg-purple-50 disabled:opacity-40"
+                >
+                  ↩ carry
+                </button>
+              )}
+            </span>
           )}
         </div>
       </li>
@@ -358,6 +479,34 @@ function RocksPage() {
         </p>
       )}
       {formError && <p className="mt-3 text-sm text-red-600">{formError}</p>}
+
+      {completion && completion.ended && completion.people.length > 0 && (
+        <div className="mt-3 rounded border border-slate-200 bg-white p-3 text-sm shadow-sm">
+          <span className="font-medium">Quarter completion</span>
+          <span className="ml-2 text-slate-500">
+            team {completion.team.completed}/{completion.team.total} = {completion.team.rate ?? '—'}%
+            <span className="text-slate-400"> (EOS norm ~80%)</span>
+          </span>
+          <ul className="mt-2 space-y-1">
+            {completion.people.map((p) => (
+              <li key={p.personId ?? 'company'} className="flex items-center gap-2">
+                <span className="w-28 shrink-0 text-slate-600">{p.personName ?? 'Company'}</span>
+                <span className="h-2 flex-1 rounded bg-slate-100">
+                  <span
+                    className={
+                      'block h-2 rounded ' + ((p.rate ?? 0) >= 80 ? 'bg-green-500' : 'bg-amber-400')
+                    }
+                    style={{ width: `${Math.min(100, p.rate ?? 0)}%` }}
+                  />
+                </span>
+                <span className="w-24 shrink-0 text-right text-slate-500">
+                  {p.completed}/{p.total} = {p.rate ?? '—'}%
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {editing && (
         <form

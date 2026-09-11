@@ -4,10 +4,10 @@
 
 **Blocked by:** 18: Rocks: weekly status.
 
-**Status:** ready-for-agent
+**Status:** done (review pending)
 
-- [ ] Admin scores every rock in the ending quarter complete/incomplete
-- [ ] Completion % computed per person and per team for the quarter
-- [ ] Carry-over is explicit: new rock in the next quarter links to the original; nothing silently extends
-- [ ] Concluded quarters are read-only (writes rejected at the seam)
-- [ ] Seam tests cover scoring, percentages, carry-over, and past-quarter write denial
+- [x] Admin scores every rock in the ending quarter complete/incomplete
+- [x] Completion % computed per person and per team for the quarter
+- [x] Carry-over is explicit: new rock in the next quarter links to the original; nothing silently extends
+- [x] Concluded quarters are read-only (writes rejected at the seam)
+- [x] Seam tests cover scoring, percentages, carry-over, and past-quarter write denial
