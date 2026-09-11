@@ -8,7 +8,7 @@ top to bottom; each case has steps and the expected result.*
 
 - [x] Start the app: `pnpm dev` (serves at http://localhost:3250; port 3000 is
       taken by the dev default script — use `node_modules/.bin/vite dev --port 3250`).
-- [x] Sign in as the owner: `owner@pilothouse.local` / `Pilothouse-owner-dev`.
+- [x] Sign in as the owner: `owner@pilothouse.local` / `pilothouse-owner-dev`.
 - [x] **Create a second (member) account** — there is deliberately no signup UI
       (accounts come from the seed; adding a creation UI was never a ticket).
       Run this, then restart the dev server so it seeds nothing weird:
