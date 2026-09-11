@@ -25,17 +25,17 @@ to current user-facing names is in [`data-model.md`](./data-model.md).
 
 | Spec | Tool |
 | --- | --- |
-| [`specs/accountability-chart.md`](./specs/accountability-chart.md) | Accountability Chart (seats, GWC, People Analyzer) |
-| [`specs/vto.md`](./specs/vto.md) | Vision/Traction Organizer (V/TO) |
-| [`specs/rocks.md`](./specs/rocks.md) | Rocks (quarterly priorities) |
-| [`specs/level-10-meeting.md`](./specs/level-10-meeting.md) | Level 10 Meeting (timed agenda, shared live view) |
+| [`specs/org-chart.md`](./specs/org-chart.md) | Org Chart (seats, Right Fit, Employee Assessment) |
+| [`specs/company.md`](./specs/company.md) | Company (vision, core values, multi-year plan) |
+| [`specs/goals.md`](./specs/goals.md) | Goals (quarterly priorities) |
+| [`specs/weekly-meeting.md`](./specs/weekly-meeting.md) | Weekly Meeting (timed agenda, shared live view) |
 
 ### Tier 2 — Next
 
 | Spec | Tool |
 | --- | --- |
-| [`specs/scorecard.md`](./specs/scorecard.md) | Scorecard (weekly metrics) |
-| [`specs/issues.md`](./specs/issues.md) | Issues Lists (long-term / short-term, IDS) |
+| [`specs/data.md`](./specs/data.md) | Data (weekly metrics) |
+| [`specs/issues.md`](./specs/issues.md) | Issues Lists (long-term / short-term) |
 | [`specs/todos.md`](./specs/todos.md) | To-Dos (7-day action items) |
 
 ## Shared vocabulary
@@ -46,6 +46,6 @@ to current user-facing names is in [`data-model.md`](./data-model.md).
 - **Team** — a group of seats that meets together. Initially there is one team
   (the whole company acting as its own leadership team). The data model supports
   multiple teams but the UI does not need to expose team management in v1.
-- **Quarter** — a 90-day EOS quarter. Rocks, Scorecard weeks, and meeting archives
+- **Quarter** — a 90-day operating quarter. Goals, Data weeks, and meeting archives
   are quarter-scoped.
-- **IDS** — Identify, Discuss, Solve; the EOS issue-solving method used in Level 10s.
+- **Issue solving** — identify, discuss, solve; the method used in the Weekly Meeting's Issues segment.
