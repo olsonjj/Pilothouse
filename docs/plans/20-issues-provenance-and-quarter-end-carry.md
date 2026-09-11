@@ -4,7 +4,7 @@
 
 **Blocked by:** 16: Issues: core lists, 18: Rocks: weekly status, 14: Scorecard: weekly grid, 11: To-Dos: create & complete.
 
-**Status:** done (review pending)
+**Status:** done (reviewer sign-off; typecheck fix 5df7fd9 + UI nesting tidy applied)
 
 - [x] Creating an issue from a rock/scorecard entry/to-do records origin and source ID
 - [x] Origin is displayed on the issue

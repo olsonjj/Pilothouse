@@ -128,21 +128,21 @@ function IssuesPage() {
   }
 
   function originLabel(origin: string): string | null {
-  switch (origin) {
-    case 'from_rock':
-      return 'from rock'
-    case 'from_scorecard':
-      return 'from scorecard'
-    case 'from_todo':
-      return 'from to-do'
-    case 'from_meeting':
-      return 'from meeting'
-    default:
-      return null
+    switch (origin) {
+      case 'from_rock':
+        return 'from rock'
+      case 'from_scorecard':
+        return 'from scorecard'
+      case 'from_todo':
+        return 'from to-do'
+      case 'from_meeting':
+        return 'from meeting'
+      default:
+        return null
+    }
   }
-}
 
-function IssueRow(props: { issue: IssueView }) {
+  const IssueRow = function IssueRow(props: { issue: IssueView }) {
     const issue = props.issue
     const resolvedRow = issue.status !== 'open'
     return (
@@ -340,7 +340,6 @@ function IssueRow(props: { issue: IssueView }) {
     </main>
   )
 }
-/** Origin types shown with a badge; manual issues get none. */
 type QuarterOption = { id: number; label: string; startDate: string; endDate: string }
 
 /**

@@ -453,7 +453,7 @@ describe('Ticket 20: quarter-end carry-or-drop (seam)', () => {
 
   async function seedCarryFixture() {
     const { db, sqlite } = await createTestDb()
-    const { token, user } = await signedInUser(db)
+    const { token } = await signedInUser(db)
     const today = todayIso()
     // fromQuarter: ended yesterday. toQuarter: ends in ~9 months (not ended).
     const fromId = seedQuarter(sqlite, '2099 Q1', new Date(Date.parse(today) - 86400000).toISOString().slice(0, 10))
