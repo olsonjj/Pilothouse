@@ -6,6 +6,8 @@ import {
   dropTodo,
   listMyTodos,
   listOpenTodos,
+  listTodosByWeek,
+  completionRates,
   dueDateFrom,
 } from '../src/server/todos'
 import { createPerson, linkUserToPerson } from '../src/server/people'
@@ -195,5 +197,128 @@ describe('To-dos: create & complete (seam, ticket 11)', () => {
     assert.deepEqual(await completeTodo(db, undefined, 1), { ok: false, error: 'unauthenticated' })
     assert.deepEqual(await dropTodo(db, undefined, 1, 'r'), { ok: false, error: 'unauthenticated' })
     assert.deepEqual(await listMyTodos(db, undefined), { ok: false, error: 'unauthenticated' })
+  })
+})
+describe('To-dos: team view by week + completion rates (seam, ticket 12)', () => {
+  it('unauthenticated callers are denied on the new endpoints', async () => {
+    const { db } = await createTestDb()
+    assert.equal((await listTodosByWeek(db, undefined)).ok, false)
+    assert.equal((await completionRates(db, undefined)).ok, false)
+  })
+
+  it('listTodosByWeek buckets to-dos by weekStart(due_date), chronological', async () => {
+    const { db, sqlite } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const alice = await personFor(db, token, 'Alice')
+    const t1 = await createTodo(db, token, { title: 'A', assigneePersonId: alice.id })
+    const t2 = await createTodo(db, token, { title: 'B', assigneePersonId: alice.id })
+    if (!t1.ok || !t2.ok) throw new Error('fixture failed')
+    // Re-anchor due dates into two distinct weeks (a Wednesday and the next
+    // week's Friday) via direct SQL — acceptable seam-level seeding.
+    sqlite.exec(`UPDATE todos SET due_date = '2026-03-04' WHERE id = ${t1.value.id}`) // Wed
+    sqlite.exec(`UPDATE todos SET due_date = '2026-03-13' WHERE id = ${t2.value.id}`) // Fri next week
+    const result = await listTodosByWeek(db, token)
+    assert.equal(result.ok, true)
+    if (!result.ok) throw new Error('listTodosByWeek failed')
+    assert.deepEqual(
+      result.value.map((b) => b.weekMonday),
+      ['2026-03-02', '2026-03-09'],
+    )
+    assert.equal(result.value[0].label, 'Week of Mar 2')
+    assert.deepEqual(result.value[0].todos.map((t) => t.title), ['A'])
+    assert.deepEqual(result.value[1].todos.map((t) => t.title), ['B'])
+  })
+
+  it('listOpenTodos puts overdue open to-dos first; ties break by id', async () => {
+    const { db, sqlite } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const alice = await personFor(db, token, 'Alice')
+    const today = todayIso()
+    const yesterday = new Date(Date.parse(today) - 86400000).toISOString().slice(0, 10)
+    const tomorrow = new Date(Date.parse(today) + 86400000).toISOString().slice(0, 10)
+    const t1 = await createTodo(db, token, { title: 'upcoming', assigneePersonId: alice.id })
+    const t2 = await createTodo(db, token, { title: 'overdue-1', assigneePersonId: alice.id })
+    const t3 = await createTodo(db, token, { title: 'overdue-2', assigneePersonId: alice.id })
+    if (!t1.ok || !t2.ok || !t3.ok) throw new Error('fixture failed')
+    sqlite.exec(`UPDATE todos SET due_date = '${tomorrow}' WHERE id = ${t1.value.id}`)
+    sqlite.exec(`UPDATE todos SET due_date = '${yesterday}' WHERE id = ${t2.value.id}`)
+    sqlite.exec(`UPDATE todos SET due_date = '${yesterday}' WHERE id = ${t3.value.id}`)
+    const result = await listOpenTodos(db, token)
+    assert.equal(result.ok, true)
+    if (!result.ok) throw new Error('listOpenTodos failed')
+    // Overdue block first, tie-broken by id; then upcoming.
+    assert.deepEqual(
+      result.value.map((t) => t.title),
+      ['overdue-1', 'overdue-2', 'upcoming'],
+    )
+  })
+
+  it('completion rates: pinned math — done/(done+open), dropped excluded, window = 4 elapsed weeks', async () => {
+    const { db, sqlite } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const alice = await personFor(db, token, 'Alice')
+    const bob = await personFor(db, token, 'Bob')
+
+    // asOf = Wed 2026-03-25. Current week starts Mon 2026-03-23; window =
+    // [2026-02-23, 2026-03-23) = the four fully-elapsed weeks.
+    const asOf = '2026-03-25'
+    async function seed(
+      title: string,
+      personId: number,
+      due: string,
+      action: 'none' | 'done' | 'drop',
+      id: number,
+    ) {
+      const created = await createTodo(db, token, { title, assigneePersonId: personId })
+      if (!created.ok) throw new Error('fixture failed')
+      sqlite.exec(`UPDATE todos SET due_date = '${due}' WHERE id = ${created.value.id}`)
+      if (action === 'done') assert.equal((await completeTodo(db, token, created.value.id)).ok, true)
+      if (action === 'drop') assert.equal((await dropTodo(db, token, created.value.id, 'obsolete')).ok, true)
+      void id
+    }
+
+    // Alice: 2 done + 1 open (past due, missed) in window → 2/3 = 66.7%.
+    await seed('a-done-1', alice.id, '2026-02-24', 'done', 1)
+    await seed('a-done-2', alice.id, '2026-03-09', 'done', 2)
+    await seed('a-missed', alice.id, '2026-03-05', 'none', 3)
+    // Bob: 1 done in window → 1/1 = 100%.
+    await seed('b-done', bob.id, '2026-03-16', 'done', 4)
+    // Dropped in window: EXCLUDED from both sides (honesty decision).
+    await seed('a-dropped', alice.id, '2026-02-26', 'drop', 5)
+    // Out of window: due in current week (open) and before the window.
+    await seed('current-week', alice.id, '2026-03-24', 'none', 6)
+    await seed('before-window', alice.id, '2026-02-15', 'done', 7)
+
+    const result = await completionRates(db, token, asOf)
+    assert.equal(result.ok, true)
+    if (!result.ok) throw new Error('completionRates failed')
+    assert.equal(result.value.windowStart, '2026-02-23')
+    assert.equal(result.value.windowEnd, '2026-03-23')
+
+    const aliceRate = result.value.people.find((p) => p.personName === 'Alice')
+    assert.ok(aliceRate, 'alice missing')
+    assert.equal(aliceRate.done, 2)
+    assert.equal(aliceRate.counted, 3)
+    assert.equal(aliceRate.rate, 66.7)
+
+    const bobRate = result.value.people.find((p) => p.personName === 'Bob')
+    assert.ok(bobRate, 'bob missing')
+    assert.equal(bobRate.rate, 100)
+
+    assert.equal(result.value.team.done, 3)
+    assert.equal(result.value.team.counted, 4)
+    assert.equal(result.value.team.rate, 75)
+  })
+
+  it('completion rates: empty window yields null rate, not NaN', async () => {
+    const { db } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const alice = await personFor(db, token, 'Alice')
+    assert.equal((await createTodo(db, token, { title: 'future', assigneePersonId: alice.id })).ok, true)
+    const result = await completionRates(db, token, todayIso())
+    assert.equal(result.ok, true)
+    if (!result.ok) throw new Error('completionRates failed')
+    assert.equal(result.value.team.counted, 0)
+    assert.equal(result.value.team.rate, null)
   })
 })

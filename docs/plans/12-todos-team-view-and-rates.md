@@ -4,10 +4,10 @@
 
 **Blocked by:** 11: To-Dos: create & complete, 03: Quarters & week utility.
 
-**Status:** ready-for-agent
+**Status:** done (review pending)
 
-- [ ] Team view groups to-dos by week ("Week of Mar 3" via the shared week helper)
-- [ ] Overdue open to-dos sort first
-- [ ] Completion rate = last 4 weeks, per person and team, computed from data (no rollup tables)
-- [ ] Dropped to-dos excluded appropriately with their reason visible
-- [ ] Seam tests verify rate math on seeded multi-week data
+- [x] Team view groups to-dos by week ("Week of Mar 3" via the shared week helper)
+- [x] Overdue open to-dos sort first
+- [x] Completion rate = last 4 weeks, per person and team, computed from data (no rollup tables)
+- [x] Dropped to-dos excluded appropriately with their reason visible
+- [x] Seam tests verify rate math on seeded multi-week data

@@ -237,6 +237,17 @@ re-attach to the new quarter as new rows or keep the row and re-point
 
 Completion rates derive from this table — no rollup tables (spec).
 
+**Completion-rate formula (ticket 12, implemented in the todos module):** the
+window is the 4 fully-elapsed weeks before the week containing "as of" (default
+Today), i.e. due dates in `[weekStart(asOf) − 28 days, weekStart(asOf) − 1 day]`
+— a week that hasn't ended cannot be scored. **Counted (denominator)** = to-dos
+due in the window with status done OR open (open-and-past-due = missed — that's
+the honesty). **Done (numerator)** = status done. **Dropped to-dos are excluded
+from both sides**: a to-do deliberately dropped with a reason was never going
+to be done, so it counts neither for nor against. rate = done ÷ counted × 100,
+one decimal, null when nothing counted; computed per person and team on every
+call. Team view weeks are derived via `weekStart(due_date)` (never stored).
+
 ## Level 10 Meeting tables
 
 ### meetings

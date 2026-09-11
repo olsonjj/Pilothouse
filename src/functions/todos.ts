@@ -8,6 +8,8 @@ import {
   dropTodo,
   listMyTodos,
   listOpenTodos,
+  listTodosByWeek,
+  completionRates,
   type TodoInput,
 } from '../server/todos'
 
@@ -47,3 +49,13 @@ export const dropTodoFn = createServerFn({ method: 'POST' })
     const db = await getDb()
     return dropTodo(db, getCookie(SESSION_COOKIE), data.todoId ?? 0, data.reason ?? '')
   })
+
+export const listTodosByWeekFn = createServerFn({ method: 'GET' }).handler(async () => {
+  const db = await getDb()
+  return listTodosByWeek(db, getCookie(SESSION_COOKIE))
+})
+
+export const completionRatesFn = createServerFn({ method: 'GET' }).handler(async () => {
+  const db = await getDb()
+  return completionRates(db, getCookie(SESSION_COOKIE))
+})

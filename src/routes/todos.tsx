@@ -5,11 +5,13 @@ import { listPeopleFn } from '../functions/people'
 import {
   listMyTodosFn,
   listOpenTodosFn,
+  listTodosByWeekFn,
+  completionRatesFn,
   createTodoFn,
   completeTodoFn,
   dropTodoFn,
 } from '../functions/todos'
-import type { TodoView } from '../server/todos'
+import type { TodoView, WeekBucket, CompletionRates } from '../server/todos'
 
 export const Route = createFileRoute('/todos')({
   loader: async () => {
@@ -36,6 +38,9 @@ function TodosPage() {
 
   const [mine, setMine] = useState<TodoView[]>([])
   const [open, setOpen] = useState<TodoView[]>([])
+  const [byWeek, setByWeek] = useState<WeekBucket[]>([])
+  const [rates, setRates] = useState<CompletionRates | null>(null)
+  const [showTeam, setShowTeam] = useState(false)
   const [title, setTitle] = useState('')
   const [assigneeId, setAssigneeId] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
@@ -47,6 +52,14 @@ function TodosPage() {
     const [mineResult, openResult] = await Promise.all([listMyTodosFn(), listOpenTodosFn()])
     if (mineResult.ok) setMine(mineResult.value)
     if (openResult.ok) setOpen(openResult.value)
+    if (showTeam) {
+      const [weekResult, ratesResult] = await Promise.all([
+        listTodosByWeekFn(),
+        completionRatesFn(),
+      ])
+      if (weekResult.ok) setByWeek(weekResult.value)
+      if (ratesResult.ok) setRates(ratesResult.value)
+    }
   }
 
   useEffect(() => {
@@ -200,7 +213,26 @@ function TodosPage() {
       </section>
 
       <section className="mt-6">
-        <h2 className="text-sm font-medium text-slate-700">All open (team)</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-medium text-slate-700">All open (team)</h2>
+          <button
+            onClick={async () => {
+              const next = !showTeam
+              setShowTeam(next)
+              if (next) {
+                const [weekResult, ratesResult] = await Promise.all([
+                  listTodosByWeekFn(),
+                  completionRatesFn(),
+                ])
+                if (weekResult.ok) setByWeek(weekResult.value)
+                if (ratesResult.ok) setRates(ratesResult.value)
+              }
+            }}
+            className="text-xs text-blue-600 hover:underline"
+          >
+            {showTeam ? 'Hide weekly view & rates' : 'Weekly view & rates'}
+          </button>
+        </div>
         {open.length === 0 ? (
           <p className="mt-2 text-sm text-slate-400">No open to-dos.</p>
         ) : (
@@ -211,6 +243,75 @@ function TodosPage() {
           </ul>
         )}
       </section>
+
+      {showTeam && (
+        <>
+          <section className="mt-8">
+            <h2 className="text-sm font-medium text-slate-700">Team by week</h2>
+            {byWeek.length === 0 ? (
+              <p className="mt-2 text-sm text-slate-400">Nothing yet.</p>
+            ) : (
+              byWeek.map((bucket) => (
+                <div key={bucket.weekMonday} className="mt-4">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    {bucket.label}
+                  </h3>
+                  <ul className="mt-2 space-y-2">
+                    {bucket.todos.map((todo) => (
+                      <TodoRow key={todo.id} todo={todo} />
+                    ))}
+                  </ul>
+                </div>
+              ))
+            )}
+            <p className="mt-2 text-xs text-slate-400">
+              Weeks are derived from due dates (Monday-start); dropped to-dos show their reason.
+            </p>
+          </section>
+
+          <section className="mt-8">
+            <h2 className="text-sm font-medium text-slate-700">Completion (last 4 full weeks)</h2>
+            {rates && (
+              <table className="mt-2 w-full rounded border border-slate-200 bg-white text-sm shadow-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
+                    <th className="px-3 py-2 font-medium">Person</th>
+                    <th className="px-3 py-2 font-medium">Done</th>
+                    <th className="px-3 py-2 font-medium">Counted</th>
+                    <th className="px-3 py-2 font-medium">Rate</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rates.people.map((p) => (
+                    <tr key={p.personId} className="border-b border-slate-100 last:border-0">
+                      <td className="px-3 py-2">{p.personName}</td>
+                      <td className="px-3 py-2 text-slate-600">{p.done}</td>
+                      <td className="px-3 py-2 text-slate-600">{p.counted}</td>
+                      <td className="px-3 py-2 text-slate-600">
+                        {p.rate == null ? '—' : `${p.rate}%`}
+                      </td>
+                    </tr>
+                  ))}
+                  <tr className="bg-slate-50 font-medium">
+                    <td className="px-3 py-2">Team</td>
+                    <td className="px-3 py-2">{rates.team.done}</td>
+                    <td className="px-3 py-2">{rates.team.counted}</td>
+                    <td className="px-3 py-2">
+                      {rates.team.rate == null ? '—' : `${rates.team.rate}%`}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            )}
+            {rates && (
+              <p className="mt-2 text-xs text-slate-400">
+                Window {rates.windowStart} – {rates.windowEnd} (the 4 fully-elapsed weeks before
+                this one). Dropped to-dos are excluded — the rate stays honest.
+              </p>
+            )}
+          </section>
+        </>
+      )}
     </main>
   )
 }
