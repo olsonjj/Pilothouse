@@ -194,7 +194,7 @@ function L10Page() {
       if (result.ok && result.value && result.value.id === open.id) {
         setOpen(result.value)
       }
-      // IDS queue rides the same poll (cheap aliased join).
+      // Issue queue rides the same poll (cheap aliased join).
       const queue = await listMeetingIssuesFn({ data: { meetingId: open.id } })
       if (queue.ok) setMeetingIssues(queue.value)
     }, 2500)

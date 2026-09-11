@@ -268,7 +268,7 @@ export async function setEntry(
 /**
  * Per-metric entry history (includes retired metrics' entries — history is
  * readable forever). Signed-in users only; no extra permission (everyone
- * views everything except People Analyzer scores).
+ * views everything except Employee Assessment scores).
  */
 export async function listEntriesForMetric(
   db: Db,
@@ -410,7 +410,7 @@ export type MetricTrend = {
  * Per-metric trend of the last `weeks` weeks (default 12) ending with the
  * week of `today`. Retired metrics still trend (history is readable forever
  * — same rule as listEntriesForMetric). Signed-in users only; everyone views
- * everything except People Analyzer scores.
+ * everything except Employee Assessment scores.
  */
 export async function metricTrend(
   db: Db,
