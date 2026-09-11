@@ -147,6 +147,15 @@ version if no version exists yet.
 ## Rocks tables
 
 ### rocks
+
+Ticket-17 deltas: `team_id` omitted (single company, same as todos); column
+sketched as `target_direction` is named `direction` (mirrors metrics);
+`completed`/`completed_at` exist from creation but are only written at quarter
+end (ticket 19). Writes to quarters whose `end_date` has passed are rejected
+(`quarter_read_only`) — the freeze boundary is the calendar date, applied from
+ticket 17 onward so history can never be edited. Permission: admins create
+company rocks (owner NULL) and personal rocks for anyone; members create/edit
+only their own personal rocks.
 | column | type | notes |
 | --- | --- | --- |
 | id | int pk | |

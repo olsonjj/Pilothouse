@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ChartRouteImport } from './routes/chart'
 import { Route as IssuesRouteImport } from './routes/issues'
 import { Route as PeopleRouteImport } from './routes/people'
+import { Route as RocksRouteImport } from './routes/rocks'
 import { Route as ScorecardRouteImport } from './routes/scorecard'
 import { Route as SigninRouteImport } from './routes/signin'
 import { Route as TodosRouteImport } from './routes/todos'
@@ -37,6 +38,11 @@ const IssuesRoute = IssuesRouteImport.update({
 const PeopleRoute = PeopleRouteImport.update({
   id: '/people',
   path: '/people',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RocksRoute = RocksRouteImport.update({
+  id: '/rocks',
+  path: '/rocks',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ScorecardRoute = ScorecardRouteImport.update({
@@ -70,6 +76,7 @@ export interface FileRoutesByFullPath {
   '/chart': typeof ChartRoute
   '/issues': typeof IssuesRoute
   '/people': typeof PeopleRouteWithChildren
+  '/rocks': typeof RocksRoute
   '/scorecard': typeof ScorecardRoute
   '/signin': typeof SigninRoute
   '/todos': typeof TodosRoute
@@ -81,6 +88,7 @@ export interface FileRoutesByTo {
   '/chart': typeof ChartRoute
   '/issues': typeof IssuesRoute
   '/people': typeof PeopleRouteWithChildren
+  '/rocks': typeof RocksRoute
   '/scorecard': typeof ScorecardRoute
   '/signin': typeof SigninRoute
   '/todos': typeof TodosRoute
@@ -93,6 +101,7 @@ export interface FileRoutesById {
   '/chart': typeof ChartRoute
   '/issues': typeof IssuesRoute
   '/people': typeof PeopleRouteWithChildren
+  '/rocks': typeof RocksRoute
   '/scorecard': typeof ScorecardRoute
   '/signin': typeof SigninRoute
   '/todos': typeof TodosRoute
@@ -106,6 +115,7 @@ export interface FileRouteTypes {
     | '/chart'
     | '/issues'
     | '/people'
+    | '/rocks'
     | '/scorecard'
     | '/signin'
     | '/todos'
@@ -117,6 +127,7 @@ export interface FileRouteTypes {
     | '/chart'
     | '/issues'
     | '/people'
+    | '/rocks'
     | '/scorecard'
     | '/signin'
     | '/todos'
@@ -128,6 +139,7 @@ export interface FileRouteTypes {
     | '/chart'
     | '/issues'
     | '/people'
+    | '/rocks'
     | '/scorecard'
     | '/signin'
     | '/todos'
@@ -140,6 +152,7 @@ export interface RootRouteChildren {
   ChartRoute: typeof ChartRoute
   IssuesRoute: typeof IssuesRoute
   PeopleRoute: typeof PeopleRouteWithChildren
+  RocksRoute: typeof RocksRoute
   ScorecardRoute: typeof ScorecardRoute
   SigninRoute: typeof SigninRoute
   TodosRoute: typeof TodosRoute
@@ -174,6 +187,13 @@ declare module '@tanstack/react-router' {
       path: '/people'
       fullPath: '/people'
       preLoaderRoute: typeof PeopleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/rocks': {
+      id: '/rocks'
+      path: '/rocks'
+      fullPath: '/rocks'
+      preLoaderRoute: typeof RocksRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/scorecard': {
@@ -230,6 +250,7 @@ const rootRouteChildren: RootRouteChildren = {
   ChartRoute: ChartRoute,
   IssuesRoute: IssuesRoute,
   PeopleRoute: PeopleRouteWithChildren,
+  RocksRoute: RocksRoute,
   ScorecardRoute: ScorecardRoute,
   SigninRoute: SigninRoute,
   TodosRoute: TodosRoute,

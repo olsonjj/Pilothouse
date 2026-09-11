@@ -1,0 +1,21 @@
+CREATE TABLE `rocks` (
+	`id` integer PRIMARY KEY AUTOINCREMENT NOT NULL,
+	`created_at` text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
+	`updated_at` text DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) NOT NULL,
+	`statement` text NOT NULL,
+	`detail` text,
+	`owner_person_id` integer,
+	`quarter_id` integer NOT NULL,
+	`target` real,
+	`direction` text,
+	`carried_over_from_rock_id` integer,
+	`completed` integer,
+	`completed_at` text,
+	`created_by` integer NOT NULL,
+	FOREIGN KEY (`owner_person_id`) REFERENCES `people`(`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`quarter_id`) REFERENCES `quarters`(`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action,
+	CONSTRAINT "rocks_target_direction_check" CHECK(("rocks"."target" IS NULL AND "rocks"."direction" IS NULL) OR ("rocks"."target" IS NOT NULL AND "rocks"."direction" IS NOT NULL)),
+	CONSTRAINT "rocks_direction_check" CHECK("rocks"."direction" IS NULL OR "rocks"."direction" IN ('gte', 'lte')),
+	CONSTRAINT "rocks_completed_check" CHECK("rocks"."completed" IS NULL OR "rocks"."completed" IN (0, 1))
+);

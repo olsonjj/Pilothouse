@@ -466,3 +466,45 @@ export const issueResolutions = sqliteTable(
   ],
 )
 export type IssueResolution = typeof issueResolutions.$inferSelect
+
+/**
+ * Rocks (ticket 17): the quarter-scoped 3–7 priorities. `owner_person_id`
+ * NULL = company rock (team-scoped per data-model; single company so
+ * `team_id` is omitted — same documented delta as todos). Target + direction
+ * mirror metrics and must co-occur (measuring rocks need both; binary rocks
+ * have neither). `carried_over_from_rock_id` is reserved for ticket 19's
+ * explicit carry-over (self-FK). `completed`/`completed_at` are quarter-end
+ * scoring columns (ticket 19); NULL until then. Delta: data-model sketches
+ * `target_direction`; named `direction` to mirror metrics.
+ */
+export const rocks = sqliteTable(
+  'rocks',
+  {
+    ...mutableFields,
+    statement: text('statement').notNull(),
+    detail: text('detail'),
+    ownerPersonId: integer('owner_person_id').references(() => people.id),
+    quarterId: integer('quarter_id')
+      .notNull()
+      .references(() => quarters.id),
+    target: real('target'),
+    direction: text('direction'),
+    carriedOverFromRockId: integer('carried_over_from_rock_id'),
+    /** 0/1/null; set only at quarter end (ticket 19). */
+    completed: integer('completed'),
+    completedAt: text('completed_at'),
+    createdBy: integer('created_by')
+      .notNull()
+      .references(() => users.id),
+  },
+  (t) => [
+    // Measuring rocks need target AND direction together; binary rocks neither.
+    check(
+      'rocks_target_direction_check',
+      sql`(${t.target} IS NULL AND ${t.direction} IS NULL) OR (${t.target} IS NOT NULL AND ${t.direction} IS NOT NULL)`,
+    ),
+    check('rocks_direction_check', sql`${t.direction} IS NULL OR ${t.direction} IN ('gte', 'lte')`),
+    check('rocks_completed_check', sql`${t.completed} IS NULL OR ${t.completed} IN (0, 1)`),
+  ],
+)
+export type Rock = typeof rocks.$inferSelect
