@@ -129,6 +129,14 @@ describe('L10 lifecycle: start, segments, advance, delete (seam, ticket 21)', ()
       ok: false,
       error: 'meeting_concluded',
     })
+    // advanceSegment on a concluded meeting is also rejected (guard pin).
+    const concludedSegs = started.value.segments
+    const concludeSeg = concludedSegs.find((s) => s.segmentKey === 'conclude')
+    if (!concludeSeg) throw new Error('conclude segment missing')
+    assert.deepEqual(await advanceSegment(db, token, started.value.id, concludeSeg.id), {
+      ok: false,
+      error: 'meeting_concluded',
+    })
     // With no open meeting left, a new one can start — and delete cleanly.
     const second = await startMeeting(db, token)
     assert.equal(second.ok, true)

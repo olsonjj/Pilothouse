@@ -4,7 +4,7 @@
 
 **Blocked by:** 18: Rocks: weekly status, 14: Scorecard: weekly grid, 11: To-Dos: create & complete.
 
-**Status:** done (review pending)
+**Status:** done (reviewer sign-off; concluded-advance guard pin + state-machine comment fix applied)
 
 - [x] Any member starts this week's meeting; one open meeting per team at a time
 - [x] Segments fixed: Segue 5 / Scorecard 5 / Rocks 5 / Headlines 5 / To-Dos 5 / IDS 60 / Conclude 5 (minutes configurable later)

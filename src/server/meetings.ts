@@ -17,7 +17,8 @@ import { listTodosByWeek } from './todos'
  * - startMeeting creates the 7 fixed segments in agenda order, all with
  *   elapsed_seconds = 0, notes = ''; the FIRST segment gets entered_at = now.
  * - The ACTIVE segment is the unique one with entered_at != null AND
- *   elapsed_seconds = 0.
+ *   done_at IS NULL (a sub-second advance leaves elapsed_seconds = 0, so
+ *   elapsed alone can't distinguish done from active).
  * - advanceSegment stamps the active segment (elapsed_seconds = now −
  *   entered_at) and starts the next (entered_at = now). Advancing a
  *   done/non-active segment → 'segment_not_active'; advancing 'conclude' is
