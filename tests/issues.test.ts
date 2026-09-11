@@ -342,7 +342,7 @@ import { DatabaseSync } from 'node:sqlite'
 describe('Ticket 20: issue provenance (seam)', () => {
   it('issueFromRock: origin + source id + derived title persisted; unknown rock rejected; unauth denied; member allowed', async () => {
     const { db } = await createTestDb()
-    const { token, user } = await signedInUser(db)
+    const { token } = await signedInUser(db)
     const member = await signedInUser(db, 'member')
     const quarter = await getCurrentQuarter(db)
     if (!quarter) throw new Error('no current quarter')
