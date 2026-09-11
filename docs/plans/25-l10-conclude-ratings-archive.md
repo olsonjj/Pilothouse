@@ -4,11 +4,11 @@
 
 **Blocked by:** 23: L10: data segments & issue push, 24: L10: IDS.
 
-**Status:** ready-for-agent
+**Status:** done (review pending)
 
-- [ ] Conclude segment: recap of to-dos created in this meeting and cascading messages capture
-- [ ] Each participant records a 1–10 rating (one per person); averages trend over meetings
-- [ ] Concluding flips unsolved meeting issues to carried and returns them to the long-term list
-- [ ] Concluded meeting is frozen: notes, issues, to-dos, ratings, durations — all immutable
-- [ ] Meeting history list shows past meetings with dates, ratings, durations
-- [ ] Seam tests cover conclude transitions, immutability, and rating rules
+- [x] Conclude segment: recap of to-dos created in this meeting and cascading messages capture
+- [x] Each participant records a 1–10 rating (one per person); averages trend over meetings
+- [x] Concluding flips unsolved meeting issues to carried and returns them to the long-term list
+- [x] Concluded meeting is frozen: notes, issues, to-dos, ratings, durations — all immutable
+- [x] Meeting history list shows past meetings with dates, ratings, durations
+- [x] Seam tests cover conclude transitions, immutability, and rating rules

@@ -120,6 +120,13 @@
       "when": 1789097877803,
       "tag": "0016_wakeful_dust",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1789133727806,
+      "tag": "0017_freezing_scarlet_spider",
+      "breakpoints": true
     }
   ]
 }

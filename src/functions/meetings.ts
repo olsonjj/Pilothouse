@@ -21,6 +21,10 @@ import {
   removeMeetingIssue,
   pullLongTermIssues,
   solveMeetingIssue,
+  concludeMeeting,
+  setRating,
+  listMeetingRecap,
+  ratingTrend,
 } from '../server/meetings'
 
 /** Thin cookie-layer wrappers around src/server/meetings.ts. */
@@ -152,3 +156,29 @@ export const solveMeetingIssueFn = createServerFn({ method: 'POST' })
       todos: (data.todos ?? []).map((t) => ({ title: t.title ?? '', assigneePersonId: t.assigneePersonId ?? 0 })),
     })
   })
+
+export const concludeMeetingFn = createServerFn({ method: 'POST' })
+  .validator((d: unknown) => d as { meetingId?: number })
+  .handler(async ({ data }) => {
+    const db = await getDb()
+    return concludeMeeting(db, getCookie(SESSION_COOKIE), data.meetingId ?? 0)
+  })
+
+export const setRatingFn = createServerFn({ method: 'POST' })
+  .validator((d: unknown) => d as { meetingId?: number; score?: number })
+  .handler(async ({ data }) => {
+    const db = await getDb()
+    return setRating(db, getCookie(SESSION_COOKIE), data.meetingId ?? 0, data.score ?? 0)
+  })
+
+export const listMeetingRecapFn = createServerFn({ method: 'GET' })
+  .validator((d: unknown) => d as { meetingId?: number })
+  .handler(async ({ data }) => {
+    const db = await getDb()
+    return listMeetingRecap(db, getCookie(SESSION_COOKIE), data.meetingId ?? 0)
+  })
+
+export const ratingTrendFn = createServerFn({ method: 'GET' }).handler(async () => {
+  const db = await getDb()
+  return ratingTrend(db, getCookie(SESSION_COOKIE))
+})

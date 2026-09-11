@@ -629,3 +629,29 @@ export const meetingIssues = sqliteTable(
   ],
 )
 export type MeetingIssue = typeof meetingIssues.$inferSelect
+
+/**
+ * Per-participant L10 meeting ratings (ticket 25): one 1–10 score per
+ * person per meeting (UNIQUE), overwritten on re-rate. Ratings are the ONE
+ * post-conclude mutable surface (late raters can still rate a concluded
+ * meeting — documented delta; notes/issues/to-dos/durations freeze).
+ * Column named `score` per data-model.
+ */
+export const meetingRatings = sqliteTable(
+  'meeting_ratings',
+  {
+    ...mutableFields,
+    meetingId: integer('meeting_id')
+      .notNull()
+      .references(() => meetings.id),
+    personId: integer('person_id')
+      .notNull()
+      .references(() => people.id),
+    score: integer('score').notNull(),
+  },
+  (t) => [
+    uniqueIndex('meeting_ratings_meeting_person_idx').on(t.meetingId, t.personId),
+    check('meeting_ratings_score_check', sql`${t.score} BETWEEN 1 AND 10`),
+  ],
+)
+export type MeetingRating = typeof meetingRatings.$inferSelect

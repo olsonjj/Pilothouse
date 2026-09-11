@@ -407,7 +407,27 @@ row LAST. The harmless crash direction is a queue row lagging in in_ids
 
 ### meeting_ratings
 `id, meeting_id FK, person_id FK, score(int CHECK 1..10)`.
-`UNIQUE(meeting_id, person_id)`. Trend = average per meeting over time.
+`UNIQUE(meeting_id, person_id)` — one rating per person, overwrite on
+re-rate. Trend = average per meeting over time.
+
+**Ticket 25 conclude semantics (decided during build):**
+- **Conclude permission:** any signed-in user concludes (the facilitator is
+  advisory, same rule as segment advancement).
+- **Carried-back:** flipping lingering `in_ids` queue rows to 'carried' IS the
+  carry-back — no issue writes. Unresolved long-term issues are already on
+  the team's list (keep-row model); a crash-window resolved issue stays
+  solved (the queue row state is cosmetic). `solved_today` rows are untouched.
+- **Rating window:** ratings are writable on open AND concluded meetings —
+  the documented delta vs "frozen archive": notes, issues, to-dos and
+  durations freeze at conclude, but ratings stay open for late raters
+  (overwrite semantics; the trend is the point). Unlinked accounts can't
+  rate (`person_required`) — ratings belong to people.
+- **Cascading messages:** stored in the conclude segment's notes (the
+  existing last-write-wins notes surface — data-model defines no separate
+  column; documented delta).
+- Conclude freeze is enforced by the existing `meeting_concluded` guards on
+  every write path (advance/notes/push/solve/facilitator/delete) — pinned by
+  tests.
 
 ## Cross-module links recap
 

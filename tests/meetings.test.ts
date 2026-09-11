@@ -19,13 +19,17 @@ import {
   removeMeetingIssue,
   pullLongTermIssues,
   solveMeetingIssue,
+  concludeMeeting,
+  setRating,
+  listMeetingRecap,
+  ratingTrend,
   SEGMENT_AGENDA,
 } from '../src/server/meetings'
 import { createPerson, linkUserToPerson } from '../src/server/people'
 import { setEntry, createMetric } from '../src/server/metrics'
 import { createRock, setStatus } from '../src/server/rocks'
 import { createTodo, completeTodo, dueDateFrom } from '../src/server/todos'
-import { addIssue, resolveIssue } from '../src/server/issues'
+import { addIssue, resolveIssue, listIssues } from '../src/server/issues'
 import { issueResolutions, todos as todosTable } from '../src/server/schema'
 import { eq } from 'drizzle-orm'
 import { createTestDb, signedInUser } from './helpers'
@@ -116,7 +120,7 @@ describe('L10 lifecycle: start, segments, advance, delete (seam, ticket 21)', ()
     // Advancing 'conclude' is ticket 25's action.
     assert.deepEqual(await advanceSegment(db, token, started.value.id, segs[6].id), {
       ok: false,
-      error: 'conclude_is_ticket_25',
+      error: 'conclude_explicit',
     })
     // Advance through all six advancable segments; conclude stays active.
     let current = started.value
@@ -800,9 +804,10 @@ describe('IDS: pull long-term issues + solve in-session (seam, ticket 24)', () =
       await solveMeetingIssue(db, token, started.value.id, crashRow, { note: 'crash retry', todos: [] }),
       { ok: false, error: 'already_resolved' },
     )
-    const lagged = (await listMeetingIssues(db, token, started.value.id)).value.find(
-      (r) => r.meetingIssueId === crashRow,
-    )
+    const laggedList = await listMeetingIssues(db, token, started.value.id)
+    assert.equal(laggedList.ok, true)
+    if (!laggedList.ok) throw new Error('list failed')
+    const lagged = laggedList.value.find((r) => r.meetingIssueId === crashRow)
     assert.equal(lagged?.state, 'in_ids')
 
     // Concluded meeting guard.
@@ -850,5 +855,247 @@ describe('IDS: pull long-term issues + solve in-session (seam, ticket 24)', () =
     assert.equal(memberPull.ok, true)
     if (!memberPull.ok) throw new Error('member pull failed')
     assert.equal(memberPull.value[0]?.alreadyQueued, true)
+  })
+})
+
+describe('Conclude, ratings & frozen archive (seam, ticket 25)', () => {
+  it('conclude round-trip: in_ids → carried, solved_today untouched, crash-window rows carried but issue stays solved', async () => {
+    const { db } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const started = await startMeeting(db, token)
+    if (!started.ok) throw new Error('start failed')
+    // Three queue rows: plain in_ids; solved_today; crash-window (in_ids + resolved).
+    const i1 = await addIssue(db, token, { title: 'plain', classification: 'long_term' })
+    const i2 = await addIssue(db, token, { title: 'solved in room', classification: 'long_term' })
+    const i3 = await addIssue(db, token, { title: 'crash window', classification: 'long_term' })
+    if (!i1.ok || !i2.ok || !i3.ok) throw new Error('fixture failed')
+    assert.equal((await pushToMeeting(db, token, started.value.id, i1.value.id)).ok, true)
+    assert.equal((await pushToMeeting(db, token, started.value.id, i2.value.id)).ok, true)
+    assert.equal((await pushToMeeting(db, token, started.value.id, i3.value.id)).ok, true)
+    // Solve i2 properly to get solved_today.
+    const queueBefore = await listMeetingIssues(db, token, started.value.id)
+    if (!queueBefore.ok) throw new Error('list failed')
+    const rows = queueBefore.value
+    const rowFor = (issueId: number) => rows.find((r) => r.issueId === issueId)!
+    assert.equal(
+      (await solveMeetingIssue(db, token, started.value.id, rowFor(i2.value.id).meetingIssueId, { note: 'done', todos: [] }))
+        .ok,
+      true,
+    )
+    // Crash window: resolve i3 directly (bypassing the queue flip).
+    assert.equal((await resolveIssue(db, token, i3.value.id, { outcome: 'solved', note: 'crashed' })).ok, true)
+
+    const concluded = await concludeMeeting(db, token, started.value.id)
+    assert.equal(concluded.ok, true)
+    if (!concluded.ok) throw new Error('conclude failed')
+    assert.equal(concluded.value.carriedCount, 2) // plain + crash-window rows
+
+    // Meeting frozen.
+    const read = await getMeeting(db, token, started.value.id)
+    assert.equal(read.ok, true)
+    if (!read.ok) throw new Error('read failed')
+    assert.equal(read.value.status, 'concluded')
+    assert.equal(read.value.concludedAt != null, true)
+
+    // Queue states: in_ids → carried; solved_today UNTOUCHED (rowFor reads
+    // the FRESH post-conclude list — the pre-conclude snapshot is stale).
+    const queueAfter = await listMeetingIssues(db, token, started.value.id)
+    if (!queueAfter.ok) throw new Error('list failed')
+    const freshRowFor = (issueId: number) => queueAfter.value.find((r) => r.issueId === issueId)!
+    assert.equal(freshRowFor(i1.value.id).state, 'carried')
+    assert.equal(freshRowFor(i2.value.id).state, 'solved_today')
+    assert.equal(freshRowFor(i3.value.id).state, 'carried')
+
+    // Crash-window issue STILL solved (resolution exists).
+    const crashRes = await db
+      .select()
+      .from(issueResolutions)
+      .where(eq(issueResolutions.issueId, i3.value.id))
+      .get()
+    assert.equal(crashRes?.outcome, 'solved')
+
+    // Unresolved carried issue is on the long-term list (keep-row: no action needed).
+    const longList = await listIssues(db, token, { classification: 'long_term' })
+    if (!longList.ok) throw new Error('list failed')
+    assert.ok(longList.value.some((i) => i.id === i1.value.id && i.status === 'open'))
+  })
+
+  it('post-conclude immutability: advance/notes/push/solve/facilitator/delete ALL rejected', async () => {
+    const { db, sqlite } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const started = await startMeeting(db, token)
+    if (!started.ok) throw new Error('start failed')
+    const issue = await addIssue(db, token, { title: 'queued', classification: 'long_term' })
+    if (!issue.ok) throw new Error('fixture failed')
+    assert.equal((await pushToMeeting(db, token, started.value.id, issue.value.id)).ok, true)
+    assert.equal((await concludeMeeting(db, token, started.value.id)).ok, true)
+    const meetingRead = await getMeeting(db, token, started.value.id)
+    assert.equal(meetingRead.ok, true)
+    if (!meetingRead.ok) throw new Error('read failed')
+    const segs = meetingRead.value.segments
+    const activeSeg = segs.find((s) => s.active) ?? segs[0]
+
+    assert.deepEqual(await advanceSegment(db, token, started.value.id, activeSeg.id), {
+      ok: false,
+      error: 'meeting_concluded',
+    })
+    assert.deepEqual(await saveSegmentNotes(db, token, started.value.id, activeSeg.id, 'typo fix'), {
+      ok: false,
+      error: 'meeting_concluded',
+    })
+    assert.deepEqual(await pushToMeeting(db, token, started.value.id, issue.value.id), {
+      ok: false,
+      error: 'meeting_concluded',
+    })
+    assert.deepEqual(await solveMeetingIssue(db, token, started.value.id, issue.value.id, { note: 'n', todos: [] }), {
+      ok: false,
+      error: 'meeting_concluded',
+    })
+    assert.deepEqual(await setFacilitator(db, token, started.value.id, null), {
+      ok: false,
+      error: 'meeting_concluded',
+    })
+    assert.deepEqual(await deleteMeeting(db, token, started.value.id), {
+      ok: false,
+      error: 'meeting_concluded',
+    })
+    // Advance of the conclude segment still explicit-rejects (conclude_explicit).
+    const concludeSeg = segs.find((s) => s.segmentKey === 'conclude')!
+    assert.deepEqual(await advanceSegment(db, token, started.value.id, concludeSeg.id), {
+      ok: false,
+      error: 'meeting_concluded',
+    })
+    void sqlite
+  })
+
+  it('setRating: round-trip + overwrite; boundaries 1/10 valid, 0/11 rejected; person_required for unlinked; unauth denied', async () => {
+    const { db } = await createTestDb()
+    const { token, user } = await signedInUser(db) // unlinked admin fixture
+    const started = await startMeeting(db, token)
+    if (!started.ok) throw new Error('start failed')
+    const alice = await personFor(db, token, 'Alice')
+    // Link the admin to a person so they can rate.
+    assert.equal((await linkUserToPerson(db, token, user.id, alice.id)).ok, true)
+
+    // Unlinked accounts can't rate.
+    const member = await signedInUser(db, 'member')
+    assert.deepEqual(await setRating(db, member.token, started.value.id, 7), {
+      ok: false,
+      error: 'person_required',
+    })
+
+    // Boundary pins: 0 and 11 rejected; 1 and 10 valid.
+    assert.deepEqual(await setRating(db, token, started.value.id, 0), { ok: false, error: 'invalid_score' })
+    assert.deepEqual(await setRating(db, token, started.value.id, 11), { ok: false, error: 'invalid_score' })
+    assert.deepEqual(await setRating(db, token, started.value.id, 3.5), { ok: false, error: 'invalid_score' })
+    const low = await setRating(db, token, started.value.id, 1)
+    assert.equal(low.ok, true)
+    const high = await setRating(db, token, started.value.id, 10)
+    assert.equal(high.ok, true)
+    if (!high.ok) throw new Error('rating failed')
+    assert.deepEqual(high.value.ratings, [{ personId: alice.id, personName: 'Alice', score: 10 }])
+    assert.equal(high.value.avgRating, 10) // overwrite, one row
+
+    // Unauthenticated denied.
+    assert.equal((await setRating(db, undefined, started.value.id, 7)).ok, false)
+    // Unknown meeting.
+    assert.deepEqual(await setRating(db, token, 99999, 7), { ok: false, error: 'meeting_not_found' })
+  })
+
+  it('conclude guards: already-concluded rejected; unknown meeting; rating on concluded meeting allowed (documented delta)', async () => {
+    const { db } = await createTestDb()
+    const { token, user } = await signedInUser(db)
+    const alice = await personFor(db, token, 'Alice')
+    const started = await startMeeting(db, token)
+    if (!started.ok) throw new Error('start failed')
+    assert.deepEqual(await concludeMeeting(db, token, 99999), { ok: false, error: 'meeting_not_found' })
+    assert.equal((await concludeMeeting(db, token, started.value.id)).ok, true)
+    assert.deepEqual(await concludeMeeting(db, token, started.value.id), {
+      ok: false,
+      error: 'meeting_concluded',
+    })
+
+    // The documented delta: ratings remain writable post-conclude.
+    assert.equal((await linkUserToPerson(db, token, user.id, alice.id)).ok, true)
+    const late = await setRating(db, token, started.value.id, 8)
+    assert.equal(late.ok, true)
+    if (!late.ok) throw new Error('late rating failed')
+    assert.equal(late.value.avgRating, 8)
+  })
+
+  it('recap: new to-dos listed with assignees; cascading messages = conclude segment notes; carried count', async () => {
+    const { db, sqlite } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const started = await startMeeting(db, token)
+    if (!started.ok) throw new Error('start failed')
+    const alice = await personFor(db, token, 'Alice')
+    const issue = await addIssue(db, token, { title: 'to solve', classification: 'long_term' })
+    if (!issue.ok) throw new Error('fixture failed')
+    assert.equal((await pushToMeeting(db, token, started.value.id, issue.value.id)).ok, true)
+    const queue = await listMeetingIssues(db, token, started.value.id)
+    if (!queue.ok) throw new Error('list failed')
+    const solved = await solveMeetingIssue(db, token, started.value.id, queue.value[0].meetingIssueId, {
+      note: 'split it',
+      todos: [{ title: 'do A', assigneePersonId: alice.id }],
+    })
+    assert.equal(solved.ok, true)
+
+    // Cascading messages via the conclude segment's notes (documented storage).
+    const meetingRead = await getMeeting(db, token, started.value.id)
+    assert.equal(meetingRead.ok, true)
+    if (!meetingRead.ok) throw new Error('read failed')
+    const concludeSeg = meetingRead.value.segments.find((s) => s.segmentKey === 'conclude')!
+    assert.equal((await saveSegmentNotes(db, token, started.value.id, concludeSeg.id, 'tell the team X')).ok, true)
+
+    assert.equal((await concludeMeeting(db, token, started.value.id)).ok, true)
+    const recap = await listMeetingRecap(db, token, started.value.id)
+    assert.equal(recap.ok, true)
+    if (!recap.ok) throw new Error('recap failed')
+    assert.equal(recap.value.newTodos.length, 1)
+    assert.equal(recap.value.newTodos[0]?.title, 'do A')
+    assert.equal(recap.value.newTodos[0]?.assigneeName, 'Alice')
+    assert.equal(recap.value.carriedCount, 0) // the only queue row was solved_today
+    assert.deepEqual(recap.value.ratings, [])
+    assert.equal(recap.value.avgRating, null)
+    assert.equal(recap.value.cascadingMessages, 'tell the team X')
+    void sqlite
+  })
+
+  it('ratingTrend: pinned averages (7,9 → 8.0; unrated → null), oldest→newest', async () => {
+    const { db } = await createTestDb()
+    const { token, user } = await signedInUser(db)
+    const alice = await personFor(db, token, 'Alice')
+    assert.equal((await linkUserToPerson(db, token, user.id, alice.id)).ok, true)
+
+    const m1 = await startMeeting(db, token)
+    if (!m1.ok) throw new Error('start failed')
+    // Two raters on meeting 1: 7 and 9 → 8.0. (member rates via linked person)
+    const member = await signedInUser(db, 'member')
+    const bob = await personFor(db, token, 'Bob')
+    assert.equal((await linkUserToPerson(db, token, member.user.id, bob.id)).ok, true)
+    assert.equal((await setRating(db, token, m1.value.id, 7)).ok, true)
+    assert.equal((await setRating(db, member.token, m1.value.id, 9)).ok, true)
+    assert.equal((await concludeMeeting(db, token, m1.value.id)).ok, true)
+
+    // Meeting 2: one rater, 6 → 6.0.
+    const m2 = await startMeeting(db, token)
+    if (!m2.ok) throw new Error('start failed')
+    assert.equal((await setRating(db, token, m2.value.id, 6)).ok, true)
+    assert.equal((await concludeMeeting(db, token, m2.value.id)).ok, true)
+
+    // Meeting 3: open + unrated → null.
+    const m3 = await startMeeting(db, token)
+    if (!m3.ok) throw new Error('start failed')
+
+    const trend = await ratingTrend(db, token)
+    assert.equal(trend.ok, true)
+    if (!trend.ok) throw new Error('trend failed')
+    assert.equal(trend.value.length, 3)
+    assert.deepEqual(
+      trend.value.map((t) => t.avgRating),
+      [8, 6, null],
+    )
+    assert.equal(trend.value[0]?.status, 'concluded')
+    assert.equal(trend.value[2]?.status, 'open')
   })
 })

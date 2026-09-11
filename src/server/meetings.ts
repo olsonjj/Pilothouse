@@ -1,10 +1,12 @@
 import type { Db } from './db'
 import {
   meetingIssues,
+  meetingRatings,
   meetings,
   meetingSegments,
   people,
   rocks,
+  todos,
   users,
   issueResolutions,
   issues,
@@ -67,7 +69,9 @@ export type MeetingError =
   | 'open_meeting_exists'
   | 'segment_not_active'
   | 'segment_not_found'
-  | 'conclude_is_ticket_25'
+  | 'conclude_explicit'
+  | 'person_required'
+  | 'invalid_score'
   | 'person_not_found'
   | 'notes_too_large'
   | 'issue_not_found'
@@ -301,8 +305,9 @@ export async function advanceSegment(
   if (idx === -1) return { ok: false, error: 'segment_not_found' }
   const target = sorted[idx]
   if (target.segmentKey === 'conclude') {
-    // Concluding the meeting is ticket 25's explicit action, not an advance.
-    return { ok: false, error: 'conclude_is_ticket_25' }
+    // The last segment doesn't advance — concluding the meeting is the
+    // explicit concludeMeeting act.
+    return { ok: false, error: 'conclude_explicit' }
   }
   const ai = activeIndex(sorted)
   if (ai !== idx) return { ok: false, error: 'segment_not_active' }
@@ -926,3 +931,237 @@ export async function solveMeetingIssue(
 }
 
 export { formatWeekLabel, weekStart }
+
+// ---------------------------------------------------------------------------
+// Ticket 25: conclude, ratings & frozen archive
+// ---------------------------------------------------------------------------
+
+export type MeetingRatingView = {
+  personId: number
+  personName: string
+  score: number
+}
+
+export type MeetingRecap = {
+  /** To-dos created in this meeting (source_meeting_id), with assignees. */
+  newTodos: Array<{ id: number; title: string; assigneeName: string }>
+  /** Number of queue rows flipped to 'carried' at conclude (0 while open). */
+  carriedCount: number
+  /** Ratings so far (one per person, overwrite semantics). */
+  ratings: MeetingRatingView[]
+  /** Average score, one decimal; null when no ratings yet. */
+  avgRating: number | null
+  /** Cascading messages (stored in the conclude segment's notes — documented delta). */
+  cascadingMessages: string
+}
+
+/**
+ * The conclude recap (ticket 25): new to-dos, ratings, carried count, and the
+ * cascading-messages text. Read-only; works for open meetings (the Conclude
+ * segment shows it live) and concluded archives alike.
+ */
+export async function listMeetingRecap(
+  db: Db,
+  token: string | undefined,
+  meetingId: number,
+): Promise<MeetingResult<MeetingRecap>> {
+  const auth = await getCurrentUser(db, token)
+  if (!auth.ok) return auth
+  const loaded = await loadMeeting(db, meetingId)
+  if (!loaded) return { ok: false, error: 'meeting_not_found' }
+
+  // New to-dos: assignee name join — SQL-aliased uniquely (proxy constraint).
+  const todoRows = await db
+    .select({
+      id: sql<number>`"todos"."id"`.as('t_id'),
+      title: sql<string>`"todos"."title"`.as('t_title'),
+      assigneeName: sql<string>`"people"."full_name"`.as('p_assignee'),
+    })
+    .from(todos)
+    .innerJoin(people, eq(todos.assigneePersonId, people.id))
+    .where(eq(todos.sourceMeetingId, meetingId))
+    .orderBy(asc(todos.id))
+
+  // Ratings with person names (aliased uniquely).
+  const ratingRows = await db
+    .select({
+      personId: sql<number>`"meeting_ratings"."person_id"`.as('mr_person'),
+      score: sql<number>`"meeting_ratings"."score"`.as('mr_score'),
+      personName: sql<string>`"people"."full_name"`.as('p_rater'),
+    })
+    .from(meetingRatings)
+    .innerJoin(people, eq(meetingRatings.personId, people.id))
+    .where(eq(meetingRatings.meetingId, meetingId))
+    .orderBy(asc(meetingRatings.id))
+
+  const carriedRows = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(meetingIssues)
+    .where(and(eq(meetingIssues.meetingId, meetingId), eq(meetingIssues.state, 'carried')))
+
+  const concludeSeg = await db
+    .select({ notes: meetingSegments.notes })
+    .from(meetingSegments)
+    .where(and(eq(meetingSegments.meetingId, meetingId), eq(meetingSegments.segmentKey, 'conclude')))
+    .get()
+
+  const scores = ratingRows.map((r) => Number(r.score))
+  const avg = scores.length === 0 ? null : Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10
+
+  return {
+    ok: true,
+    value: {
+      newTodos: todoRows.map((t) => ({
+        id: Number(t.id),
+        title: t.title,
+        assigneeName: t.assigneeName,
+      })),
+      carriedCount: Number(carriedRows[0]?.count ?? 0),
+      ratings: ratingRows.map((r) => ({
+        personId: Number(r.personId),
+        personName: r.personName,
+        score: Number(r.score),
+      })),
+      avgRating: avg,
+      cascadingMessages: concludeSeg?.notes ?? '',
+    },
+  }
+}
+
+/**
+ * Record the signed-in user's 1–10 rating for a meeting (ticket 25). One per
+ * person (UNIQUE(meeting_id, person_id), overwrite on re-rate). ALLOWED on
+ * open AND concluded meetings — the documented delta: EOS records ratings at
+ * conclude, but a late rater shouldn't lose their trend datapoint; ratings
+ * are the one post-conclude mutable surface. Unlinked accounts can't rate
+ * (ratings belong to people per data-model) → 'person_required'.
+ */
+export async function setRating(
+  db: Db,
+  token: string | undefined,
+  meetingId: number,
+  score: number,
+): Promise<MeetingResult<MeetingRecap>> {
+  const auth = await getCurrentUser(db, token)
+  if (!auth.ok) return auth
+  const loaded = await loadMeeting(db, meetingId)
+  if (!loaded) return { ok: false, error: 'meeting_not_found' }
+  const user = auth.user
+  if (user.personId == null) return { ok: false, error: 'person_required' }
+  if (!Number.isInteger(score) || score < 1 || score > 10) {
+    return { ok: false, error: 'invalid_score' }
+  }
+  const person = await db
+    .select({ id: people.id })
+    .from(people)
+    .where(eq(people.id, user.personId))
+    .get()
+  if (!person) return { ok: false, error: 'person_required' }
+
+  const existing = await db
+    .select({ id: meetingRatings.id })
+    .from(meetingRatings)
+    .where(and(eq(meetingRatings.meetingId, meetingId), eq(meetingRatings.personId, user.personId)))
+    .get()
+  const now = nowIso()
+  if (existing) {
+    await db
+      .update(meetingRatings)
+      .set({ score, updatedAt: now })
+      .where(eq(meetingRatings.id, existing.id))
+  } else {
+    await db.insert(meetingRatings).values({ meetingId, personId: user.personId, score })
+  }
+  return listMeetingRecap(db, token, meetingId)
+}
+
+/**
+ * Conclude the meeting (ticket 25): any signed-in user may conclude (the
+ * facilitator is advisory — same decided rule as segment advancement;
+ * documented). The meeting must be open. The conclude act:
+ *   1. Flip ALL lingering in_ids queue rows to 'carried' — per the ticket-24
+ *      crash-window contract, lingering in_ids is conclude's business. The
+ *      ISSUE itself is untouched: unresolved long-term issues are already on
+ *      the team's long-term list (keep-row model — "carried back" needs no
+ *      issue writes), and a crash-window resolved issue stays solved.
+ *   2. Freeze: status='concluded', concluded_at=now. Notes, queue, to-dos and
+ *      durations become immutable (every write path rejects on concluded);
+ *      ratings remain the one mutable surface (setRating decision).
+ * Cascading messages are NOT stored here — they live in the conclude
+ * segment's notes (edited during the meeting via the normal notes path).
+ */
+export async function concludeMeeting(
+  db: Db,
+  token: string | undefined,
+  meetingId: number,
+): Promise<MeetingResult<{ carriedCount: number }>> {
+  const auth = await getCurrentUser(db, token)
+  if (!auth.ok) return auth
+  const loaded = await loadMeeting(db, meetingId)
+  if (!loaded) return { ok: false, error: 'meeting_not_found' }
+  if (loaded.meeting.status === 'concluded') return { ok: false, error: 'meeting_concluded' }
+
+  const now = nowIso()
+  const flipped = await db
+    .update(meetingIssues)
+    .set({ state: 'carried', updatedAt: now })
+    .where(and(eq(meetingIssues.meetingId, meetingId), eq(meetingIssues.state, 'in_ids')))
+    .returning({ id: meetingIssues.id })
+
+  await db
+    .update(meetings)
+    .set({ status: 'concluded', concludedAt: now, updatedAt: now })
+    .where(eq(meetings.id, meetingId))
+
+  return { ok: true, value: { carriedCount: flipped.length } }
+}
+
+export type MeetingTrendPoint = {
+  meetingId: number
+  date: string
+  status: 'open' | 'concluded'
+  avgRating: number | null
+}
+
+/**
+ * Rating trend (ticket 25): meetings ordered oldest→newest with their average
+ * rating (null when unrated). Open meetings appear too (live datapoint).
+ */
+export async function ratingTrend(
+  db: Db,
+  token: string | undefined,
+): Promise<MeetingResult<MeetingTrendPoint[]>> {
+  const auth = await getCurrentUser(db, token)
+  if (!auth.ok) return auth
+  const all = await db
+    .select({ id: meetings.id, date: meetings.date, status: meetings.status })
+    .from(meetings)
+    .orderBy(asc(meetings.id))
+  const ratingRows = await db
+    .select({
+      meetingId: meetingRatings.meetingId,
+      score: meetingRatings.score,
+    })
+    .from(meetingRatings)
+  const byMeeting = new Map<number, number[]>()
+  for (const r of ratingRows) {
+    const list = byMeeting.get(r.meetingId) ?? []
+    list.push(r.score)
+    byMeeting.set(r.meetingId, list)
+  }
+  return {
+    ok: true,
+    value: all.map((m) => {
+      const scores = byMeeting.get(m.id)
+      return {
+        meetingId: m.id,
+        date: m.date,
+        status: m.status as 'open' | 'concluded',
+        avgRating:
+          scores && scores.length > 0
+            ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10
+            : null,
+      }
+    }),
+  }
+}

@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { getCurrentUserFn, signOutFn } from '../functions/auth'
 import { listPeopleFn } from '../functions/people'
 import {
+  getMeetingFn,
   getOpenMeetingFn,
   startMeetingFn,
   advanceSegmentFn,
@@ -19,24 +20,37 @@ import {
   removeMeetingIssueFn,
   pullLongTermIssuesFn,
   solveMeetingIssueFn,
+  concludeMeetingFn,
+  setRatingFn,
+  listMeetingRecapFn,
+  ratingTrendFn,
 } from '../functions/meetings'
 import { listIssuesFn } from '../functions/issues'
 import { getCurrentPeriodFn } from '../functions/quarters'
-import type { MeetingWithSegments, SegmentView, MeetingSummary, MeetingIssueView } from '../server/meetings'
+import type {
+  MeetingWithSegments,
+  SegmentView,
+  MeetingSummary,
+  MeetingIssueView,
+  MeetingRecap,
+  MeetingTrendPoint,
+} from '../server/meetings'
 
 export const Route = createFileRoute('/l10')({
   loader: async () => {
-    const [me, people, open, history] = await Promise.all([
+    const [me, people, open, history, trend] = await Promise.all([
       getCurrentUserFn(),
       listPeopleFn(),
       getOpenMeetingFn(),
       listMeetingsFn(),
+      ratingTrendFn(),
     ])
     return {
       me: me.ok ? me.user : null,
       people: people.ok ? people.value : [],
       open: open.ok ? open.value : null,
       history: history.ok ? history.value : [],
+      trend: trend.ok ? trend.value : [],
     }
   },
   component: L10Page,
@@ -130,8 +144,12 @@ function errorText(error: string): string {
       return 'That segment is not the current one.'
     case 'segment_not_found':
       return 'That segment no longer exists.'
-    case 'conclude_is_ticket_25':
-      return 'Concluding the meeting happens in the Conclude step (coming in ticket 25).'
+    case 'conclude_explicit':
+      return 'The last segment does not advance — use the Conclude button below.'
+    case 'person_required':
+      return 'Link your account to a person before rating (People page).'
+    case 'invalid_score':
+      return 'Rating must be a whole number from 1 to 10.'
     case 'person_not_found':
       return 'That person no longer exists.'
     case 'notes_too_large':
@@ -315,6 +333,56 @@ function L10Page() {
     if (ok) setHeadline('')
   }
 
+  useEffect(() => {
+    if (!open) {
+      setRecap(null)
+      return
+    }
+    let cancelled = false
+    listMeetingRecapFn({ data: { meetingId: open.id } }).then((result) => {
+      if (!cancelled && result.ok) setRecap(result.value)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [open?.id, meetingIssues.length])
+
+  async function handleConclude() {
+    if (!open) return
+    setBusy(true)
+    const result = await concludeMeetingFn({ data: { meetingId: open.id } })
+    setBusy(false)
+    if (!result.ok) {
+      setError(errorText(result.error))
+      return
+    }
+    setOpen(null)
+    setRecap(null)
+    await refreshHistory()
+  }
+
+  async function handleRate() {
+    if (!open || myScore == null) return
+    setBusy(true)
+    const result = await setRatingFn({ data: { meetingId: open.id, score: myScore } })
+    setBusy(false)
+    if (!result.ok) {
+      setError(errorText(result.error))
+      return
+    }
+    setRecap(result.value)
+    setMyScore(null)
+  }
+
+  async function openFrozen(meetingId: number) {
+    const [meeting, recapResult] = await Promise.all([
+      getMeetingFn({ data: { meetingId } }),
+      listMeetingRecapFn({ data: { meetingId } }),
+    ])
+    if (meeting.ok) setFrozen(meeting.value)
+    if (recapResult.ok) setFrozenRecap(recapResult.value)
+  }
+
   async function handleRemoveMeetingIssue(issueId: number) {
     if (!open) return
     await push(() => removeMeetingIssueFn({ data: { meetingId: open.id, issueId } }))
@@ -326,6 +394,10 @@ function L10Page() {
   const [showPull, setShowPull] = useState(false)
   const [solvingId, setSolvingId] = useState<number | null>(null)
   const [solveNote, setSolveNote] = useState('')
+  const [recap, setRecap] = useState<MeetingRecap | null>(null)
+  const [myScore, setMyScore] = useState<number | null>(null)
+  const [frozen, setFrozen] = useState<MeetingWithSegments | null>(null)
+  const [frozenRecap, setFrozenRecap] = useState<MeetingRecap | null>(null)
   const [solveTodos, setSolveTodos] = useState<Array<{ title: string; assigneePersonId: number | null }>>([])
 
   async function openPullPanel() {
@@ -614,6 +686,77 @@ function L10Page() {
             </div>
           )}
 
+          {/* Conclude panel (ticket 25): recap, ratings, cascading messages. */}
+          {open && (
+            <div className="mt-4 rounded border border-amber-200 bg-amber-50 p-3 text-xs">
+              <div className="flex items-center justify-between">
+                <h3 className="font-medium text-amber-800">Conclude</h3>
+                {recap && (
+                  <span className="text-[10px] text-amber-700">
+                    {recap.newTodos.length} new to-do{recap.newTodos.length === 1 ? '' : 's'} ·{' '}
+                    {recap.carriedCount} to carry back · avg rating{' '}
+                    {recap.avgRating ?? '—'}
+                  </span>
+                )}
+              </div>
+              {recap && recap.newTodos.length > 0 && (
+                <div className="mt-2">
+                  <p className="text-[10px] font-medium text-amber-800">New to-dos this meeting:</p>
+                  <ul className="mt-1 space-y-0.5">
+                    {recap.newTodos.map((t) => (
+                      <li key={t.id} className="truncate">
+                        {t.title} <span className="text-amber-600">→ {t.assigneeName}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <span className="text-[10px] text-amber-800">
+                  Your 1–10 rating{data.me?.personId == null ? ' (link your account to a person first)' : ''}:
+                </span>
+                <select
+                  value={myScore ?? ''}
+                  onChange={(e) => setMyScore(e.target.value ? Number(e.target.value) : null)}
+                  disabled={busy || data.me?.personId == null}
+                  className="rounded border border-amber-300 px-2 py-0.5"
+                >
+                  <option value="">Rate…</option>
+                  {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={handleRate}
+                  disabled={busy || myScore == null || data.me?.personId == null}
+                  className="rounded border border-amber-400 bg-white px-2 py-0.5 text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+                >
+                  Save rating
+                </button>
+                <button
+                  onClick={handleConclude}
+                  disabled={busy}
+                  className="ml-auto rounded bg-amber-600 px-3 py-1 text-white hover:bg-amber-700 disabled:opacity-50"
+                >
+                  Conclude meeting (freeze)
+                </button>
+              </div>
+              {recap && recap.ratings.length > 0 && (
+                <p className="mt-2 text-[10px] text-amber-700">
+                  Ratings so far:{' '}
+                  {recap.ratings.map((r) => `${r.personName}: ${r.score}`).join(' · ')}
+                </p>
+              )}
+              <p className="mt-2 text-[10px] text-amber-600">
+                Cascading messages live in the Conclude segment's notes (editable above).
+                Concluding flips unsolved queue issues back to the long-term list and freezes
+                notes/issues/to-dos/durations; ratings stay open for late raters.
+              </p>
+            </div>
+          )}
+
           {/* IDS queue (ticket 23): pushed issues + the headline composer. */}
           {open && (
             <div className="mt-4 rounded border border-slate-200 bg-white p-3 text-xs">
@@ -795,14 +938,33 @@ function L10Page() {
           No meeting is open. Start one to run this week's Level 10.
         </p>
       )}
-      <HistoryList history={history} />
+      {frozen && (
+        <FrozenArchive
+          meeting={frozen}
+          recap={frozenRecap}
+          onClose={() => {
+            setFrozen(null)
+            setFrozenRecap(null)
+          }}
+        />
+      )}
+      <HistoryList
+        history={history}
+        trend={data.trend}
+        onOpenArchive={(id) => void openFrozen(id)}
+      />
     </main>
   )
 }
-function HistoryList(props: { history: MeetingSummary[] }) {
+function HistoryList(props: {
+  history: MeetingSummary[]
+  trend: MeetingTrendPoint[]
+  onOpenArchive: (meetingId: number) => void
+}) {
   if (props.history.length === 0) {
     return <p className="mt-6 text-xs text-slate-400">No past meetings.</p>
   }
+  const avg = new Map(props.trend.map((t) => [t.meetingId, t.avgRating]))
   return (
     <section className="mt-6">
       <h2 className="text-sm font-medium text-slate-700">History</h2>
@@ -816,12 +978,78 @@ function HistoryList(props: { history: MeetingSummary[] }) {
               {m.date}
               {m.status === 'open' ? ' (open)' : ' (concluded)'}
             </span>
-            <span className="text-xs text-slate-400">
+            <span className="flex items-center gap-3 text-xs text-slate-400">
+              {m.status === 'concluded' && (
+                <span>
+                  avg rating: <span className="font-medium text-slate-600">{avg.get(m.id) ?? '—'}</span>
+                </span>
+              )}
               {m.facilitatorName ? `facilitated by ${m.facilitatorName}` : 'no facilitator'}
+              {m.status === 'concluded' && (
+                <button
+                  onClick={() => props.onOpenArchive(m.id)}
+                  className="rounded border border-slate-300 px-2 py-0.5 text-[10px] text-slate-600 hover:bg-slate-50"
+                >
+                  View archive
+                </button>
+              )}
             </span>
           </li>
         ))}
       </ul>
+    </section>
+  )
+}
+
+/** Read-only concluded-meeting archive (ticket 25): notes, durations, recap, ratings. */
+function FrozenArchive(props: {
+  meeting: MeetingWithSegments
+  recap: MeetingRecap | null
+  onClose: () => void
+}) {
+  return (
+    <section className="mt-6 rounded border border-slate-300 bg-slate-50 p-4 text-sm">
+      <div className="flex items-center justify-between">
+        <h2 className="font-medium text-slate-700">
+          Archive — meeting of {props.meeting.date} (concluded)
+        </h2>
+        <button onClick={props.onClose} className="text-xs text-slate-500 hover:underline">
+          Close
+        </button>
+      </div>
+      <p className="mt-1 text-xs text-slate-500">
+        Total {fmtClock(props.meeting.totalElapsedSeconds)} · frozen {props.meeting.concludedAt ?? ''} ·
+        read-only (ratings remain open for late raters)
+      </p>
+      {props.recap && (
+        <div className="mt-2 text-xs">
+          <p>
+            New to-dos: {props.recap.newTodos.length} · carried back: {props.recap.carriedCount} · avg
+            rating: {props.recap.avgRating ?? '—'}
+          </p>
+          {props.recap.ratings.length > 0 && (
+            <p className="mt-1">
+              Ratings: {props.recap.ratings.map((r) => `${r.personName}: ${r.score}`).join(' · ')}
+            </p>
+          )}
+          {props.recap.cascadingMessages.trim() !== '' && (
+            <p className="mt-1">
+              <span className="font-medium">Cascading messages:</span> {props.recap.cascadingMessages}
+            </p>
+          )}
+        </div>
+      )}
+      <ol className="mt-3 space-y-1 text-xs">
+        {props.meeting.segments.map((s, i) => (
+          <li key={s.id} className="rounded border border-slate-200 bg-white px-3 py-1.5">
+            <span className="font-medium">
+              {i + 1}. {s.label}
+            </span>{' '}
+            <span className="text-slate-400">({fmtClock(s.elapsedSeconds)})</span>
+            {s.notes.trim() !== '' && <p className="mt-1 whitespace-pre-wrap text-slate-600">{s.notes}</p>}
+          </li>
+        ))}
+      </ol>
     </section>
   )
 }
