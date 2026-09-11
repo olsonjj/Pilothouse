@@ -4,7 +4,7 @@
 
 **Blocked by:** 21: L10: lifecycle, segments & timer.
 
-**Status:** done (review pending)
+**Status:** done (reviewer sign-off; constructible foreign-meeting pin + immediate post-rejection read added)
 
 - [x] Meeting state (segment, elapsed time, notes, added items) visible to all participants
 - [x] Polling refreshes the view every 2–3 seconds; no SSE/websockets

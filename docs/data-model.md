@@ -351,9 +351,10 @@ any-participant on open meetings only, with a 100KB cap (`SEGMENT_NOTES_MAX`,
 abuse bound — rejected writes persist nothing). Polling clients re-fetch via
 `getMeeting` (cheap: summary + segments; pre-loads are a separate call and are
 NOT re-run per poll — no state-only variant needed). Client UX: debounced
-~800ms autosave, skip-while-editing (a focused/dirty textarea is never
-clobbered by the poll; other participants' notes apply when you're not
-editing), 2.5s poll interval.
+~800ms autosave, skip-while-editing (a DIRTY — typed-in — textarea is never
+clobbered by the poll; a focused-but-pristine one may be updated by the
+poll; other participants' notes apply when you're not editing), 2.5s poll
+interval.
 
 **Segment state machine (ticket 21, implemented):** planned minutes are NOT
 stored — they come from the fixed agenda constant in the meetings module

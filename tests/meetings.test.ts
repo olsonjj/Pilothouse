@@ -344,15 +344,18 @@ describe('Segment notes: save, last-write-wins, guards (seam, ticket 22)', () =>
       await saveSegmentNotes(db, token, started.value.id, seg.id, 'a'.repeat(100_001)),
       { ok: false, error: 'notes_too_large' },
     )
+    // Rejected writes persist nothing — read IMMEDIATELY after the rejection
+    // (before any accepted write can mask it).
+    const rejectedRead = await getMeeting(db, token, started.value.id)
+    if (!rejectedRead.ok) throw new Error('read failed')
+    assert.equal(
+      rejectedRead.value.segments.find((s) => s.id === seg.id)?.notes,
+      '',
+    )
     assert.equal(
       (await saveSegmentNotes(db, token, started.value.id, seg.id, 'a'.repeat(100_000))).ok,
       true,
     )
-    // Rejected writes persist nothing.
-    const read = await getMeeting(db, token, started.value.id)
-    if (!read.ok) throw new Error('read failed')
-    const readSeg = read.value.segments.find((s) => s.id === seg.id)
-    assert.equal(readSeg?.notes, 'a'.repeat(100_000))
   })
 
   it('unknown segment for the meeting rejected; notes visible to other participants via read', async () => {
@@ -366,9 +369,15 @@ describe('Segment notes: save, last-write-wins, guards (seam, ticket 22)', () =>
       ok: false,
       error: 'segment_not_found',
     })
-    // A segment from a DIFFERENT meeting → segment_not_found.
+    // A segment from a DIFFERENT meeting → segment_not_found. Constructively:
+    // delete meeting 1, start meeting 2, then try meeting-1's segment id.
+    assert.equal((await deleteMeeting(db, token, started.value.id)).ok, true)
     const second = await startMeeting(db, token)
-    assert.equal(second.ok, false) // open meeting exists
+    if (!second.ok) throw new Error('second start failed')
+    assert.deepEqual(await saveSegmentNotes(db, token, second.value.id, seg.id, 'x'), {
+      ok: false,
+      error: 'segment_not_found',
+    })
     void other
     // Save + read from the other participant (polling model).
     assert.equal((await saveSegmentNotes(db, token, started.value.id, seg.id, 'shared')).ok, true)
