@@ -3,7 +3,7 @@
 Pilothouse is an open-source tool for small companies running a leadership
 operating system (inspired by the one described in *Traction* by Gino Wickman;
 not affiliated with EOS Worldwide). Built for a single company (~10 people).
-Historical note: the project used the working names "OpenEOS" and "Boardroom" before the public release; the
+Historical note: the project used the working names "Pilothouse" and "Boardroom" before the public release; the
 spec sections use the original terminology (V/TO, L10, Rocks, …) — the mapping
 to current user-facing names is in [`data-model.md`](./data-model.md).
 

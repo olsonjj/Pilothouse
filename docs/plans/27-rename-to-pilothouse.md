@@ -1,6 +1,6 @@
 # 27: Rename to Pilothouse — de-brand for public release
 
-**What to build:** Rebrand the app (working name OpenEOS/Boardroom) to **Pilothouse** and replace
+**What to build:** Rebrand the app (working name Pilothouse/Boardroom) to **Pilothouse** and replace
 EOS-branded user-facing terminology with neutral names, so the repo can be
 published publicly. Product name, nav labels, page headings, route paths, and
 README are in scope. **DB table/column names and internal identifiers are NOT**
@@ -13,7 +13,7 @@ with or endorsed by EOS Worldwide").
 
 **Status:** done (reviewer SIGN-OFF; meeting.tsx stub regression recovered in b27b706)
 
-- [x] Product renamed Pilothouse (from the working name OpenEOS/Boardroom) everywhere user-facing: package.json name,
+- [x] Product renamed Pilothouse (from the working name Pilothouse/Boardroom) everywhere user-facing: package.json name,
       page titles, sign-in/home headings, cookie name
       (`pilothouse_session` → `pilothouse_session`), DB filename
       (`data/pilothouse.db` → `data/pilothouse.db`, file MOVED so existing data

@@ -14,4 +14,4 @@ todos.json
 .data
 
 # Pilothouse runtime data (SQLite db + backups). Pattern is documented in README.
-data/
+data/.scratch/
