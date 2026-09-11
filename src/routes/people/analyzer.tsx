@@ -1,14 +1,23 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { getCurrentUserFn, signOutFn } from '../../functions/auth'
-import { listQuartersFn } from '../../functions/quarters'
+import { getCurrentPeriodFn, listQuartersFn } from '../../functions/quarters'
 import { getAnalyzerFn, setScoreFn } from '../../functions/peopleAnalyzer'
 import type { AnalyzerRow, Score } from '../../server/peopleAnalyzer'
 
 export const Route = createFileRoute('/people/analyzer')({
   loader: async () => {
-    const [me, quarterList] = await Promise.all([getCurrentUserFn(), listQuartersFn()])
-    return { me: me.ok ? me.user : null, quarters: quarterList.ok ? quarterList.value : [] }
+    const [me, quarterList, period] = await Promise.all([
+      getCurrentUserFn(),
+      listQuartersFn(),
+      getCurrentPeriodFn(),
+    ])
+    return {
+      me: me.ok ? me.user : null,
+      quarters: quarterList.ok ? quarterList.value : [],
+      /** Current quarter id for the default selector (null if unseeded). */
+      currentQuarterId: period.ok ? (period.value.quarter?.id ?? null) : null,
+    }
   },
   component: AnalyzerPage,
 })
@@ -31,7 +40,7 @@ function AnalyzerPage() {
   const isAdmin = data.me?.role === 'admin'
 
   const [quarterId, setQuarterId] = useState<number | null>(
-    data.quarters.length > 0 ? data.quarters[data.quarters.length - 1].id : null,
+    data.currentQuarterId ?? (data.quarters.length > 0 ? data.quarters[0].id : null),
   )
   const [view, setView] = useState<Awaited<ReturnType<typeof getAnalyzerFn>> | null>(null)
   const [error, setError] = useState<string | null>(null)
