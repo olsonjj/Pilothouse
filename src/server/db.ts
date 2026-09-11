@@ -12,7 +12,7 @@ import fs from 'node:fs'
 
 export type Db = SqliteRemoteDatabase<typeof schema>
 
-const DB_FILE = process.env.PILOTHOUSE_DB_PATH ?? path.resolve('data/Pilothouse.db')
+const DB_FILE = process.env.PILOTHOUSE_DB_PATH ?? path.resolve('data/pilothouse.db')
 const MIGRATIONS_FOLDER = path.resolve('drizzle')
 
 type Row = Record<string, unknown>

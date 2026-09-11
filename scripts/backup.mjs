@@ -6,8 +6,8 @@ import { DatabaseSync } from 'node:sqlite'
 import fs from 'node:fs'
 import path from 'node:path'
 
-const dbFile = process.env.BOARDROOM_DB_PATH ?? path.resolve('data/boardroom.db')
-const backupDir = process.env.BOARDROOM_BACKUP_DIR ?? path.join(path.dirname(dbFile), 'backups')
+const dbFile = process.env.PILOTHOUSE_DB_PATH ?? path.resolve('data/pilothouse.db')
+const backupDir = process.env.PILOTHOUSE_BACKUP_DIR ?? path.join(path.dirname(dbFile), 'backups')
 
 if (!fs.existsSync(dbFile)) {
   console.error(`Database not found: ${dbFile}`)
