@@ -4,7 +4,7 @@
 
 **Blocked by:** 22: L10: live shared view & notes, 20: Issues: provenance & quarter-end carry.
 
-**Status:** done (review pending)
+**Status:** done (reviewer sign-off; guard-hoist applied — rejected pushes persist nothing, pinned)
 
 - [x] Scorecard segment shows the previous week's column with pass/fail per metric
 - [x] Rocks segment shows each rock's latest status (traffic light)

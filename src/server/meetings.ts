@@ -22,7 +22,7 @@ import {
 } from './issues'
 import type { IssueError } from './issues'
 import { listEntriesForGrid } from './metrics'
-import { listLatestStatuses, listRocks, type StatusError } from './rocks'
+import { listLatestStatuses, listRocks, type StatusError, type RockError } from './rocks'
 import { listTodosByWeek } from './todos'
 
 /**
@@ -578,7 +578,7 @@ export type PushOutcome = {
  * through (not_red, todo_not_missed, title_required, …). Callers match on
  * the literal; documented in data-model.md (ticket 23).
  */
-export type PushError = MeetingError | IssueError | StatusError
+export type PushError = MeetingError | IssueError | StatusError | RockError
 export type PushResult = { ok: true; value: PushOutcome } | { ok: false; error: PushError }
 
 /** Open meeting or reject — every queue mutation requires it. */
@@ -637,6 +637,9 @@ export async function pushRedCell(
   meetingId: number,
   entryId: number,
 ): Promise<PushResult> {
+  // Guard the meeting BEFORE creating anything — a rejected push persists nothing.
+  const meeting = await openMeetingById(db, meetingId)
+  if (!meeting.ok) return meeting
   const created = await issueFromScorecardEntry(db, token, entryId)
   if (!created.ok) return created
   return pushToMeeting(db, token, meetingId, created.value.id)
@@ -657,8 +660,11 @@ export async function pushOffTrackRock(
 ): Promise<PushResult> {
   const auth = await getCurrentUser(db, token)
   if (!auth.ok) return auth
+  // Guard the meeting BEFORE creating anything — a rejected push persists nothing.
+  const meeting = await openMeetingById(db, meetingId)
+  if (!meeting.ok) return meeting
   const rock = await db.select().from(rocks).where(eq(rocks.id, rockId)).get()
-  if (!rock) return { ok: false, error: 'issue_not_found' }
+  if (!rock) return { ok: false, error: 'rock_not_found' }
   const statuses = await listLatestStatuses(db, token, rock.quarterId)
   if (!statuses.ok) return statuses
   const st = statuses.value.find((s) => s.rockId === rockId)
@@ -680,6 +686,9 @@ export async function pushMissedTodo(
   meetingId: number,
   todoId: number,
 ): Promise<PushResult> {
+  // Guard the meeting BEFORE creating anything — a rejected push persists nothing.
+  const meeting = await openMeetingById(db, meetingId)
+  if (!meeting.ok) return meeting
   const created = await issueFromTodo(db, token, todoId)
   if (!created.ok) return created
   return pushToMeeting(db, token, meetingId, created.value.id)
@@ -696,6 +705,9 @@ export async function pushHeadline(
   meetingId: number,
   title: string,
 ): Promise<PushResult> {
+  // Guard the meeting BEFORE creating anything — a rejected push persists nothing.
+  const meeting = await openMeetingById(db, meetingId)
+  if (!meeting.ok) return meeting
   const created = await addIssue(db, token, { title, classification: 'long_term' })
   if (!created.ok) return created
   return pushToMeeting(db, token, meetingId, created.value.id)

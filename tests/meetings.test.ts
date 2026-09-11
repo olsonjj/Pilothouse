@@ -471,7 +471,7 @@ describe('Meeting issue queue: push, dedup, remove (seam, ticket 23)', () => {
   })
 
   it('pushRedCell: red cell queues from_scorecard issue with entry source; green cell rejected (not_red)', async () => {
-    const { db } = await createTestDb()
+    const { db, sqlite } = await createTestDb()
     const { token } = await signedInUser(db)
     const started = await startMeeting(db, token)
     if (!started.ok) throw new Error('start failed')
@@ -494,6 +494,20 @@ describe('Meeting issue queue: push, dedup, remove (seam, ticket 23)', () => {
     assert.equal(queue.value.length, 1)
     assert.equal(queue.value[0].origin, 'from_scorecard')
     assert.match(queue.value[0].title, /Red metric: Calls/)
+
+    // GUARD-HOIST PIN (ticket-23 review): a push rejected on the meeting
+    // (concluded) persists NO issue — the guard precedes creation.
+    sqliteExec(sqlite, `UPDATE meetings SET status = 'concluded' WHERE id = ${started.value.id}`)
+    const redAgain = await setEntry(db, token, metric.value.id, monday, 4) // red again
+    if (!redAgain.ok) throw new Error('entry fixture failed')
+    assert.deepEqual(await pushRedCell(db, token, started.value.id, redAgain.value.id), {
+      ok: false,
+      error: 'meeting_concluded',
+    })
+    const countAfterReject = await listMeetingIssues(db, token, started.value.id)
+    if (!countAfterReject.ok) throw new Error('list failed')
+    assert.equal(countAfterReject.value.length, 1) // unchanged — nothing persisted
+    sqliteExec(sqlite, `UPDATE meetings SET status = 'open' WHERE id = ${started.value.id}`)
 
     // Fix the number to green; re-push path via issueFromScorecardEntry → not_red.
     const green = await setEntry(db, token, metric.value.id, monday, 12)
