@@ -139,7 +139,7 @@ describe('Data: metric definitions (seam, ticket 13)', () => {
     const { token } = await signedInUser(db)
     const owner = await personFor(db, token, 'Alice')
     // "Defects" targeting zero (lte); deviation-from-baseline targeting below
-    // zero (gte). specs/scorecard.md imposes no sign restriction; the seam
+    // zero (gte). specs/data.md imposes no sign restriction; the seam
     // requires only finiteness.
     const zero = await createMetric(db, token, {
       name: 'Open defects',

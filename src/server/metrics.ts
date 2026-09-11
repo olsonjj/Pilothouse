@@ -210,11 +210,11 @@ function normalizeActual(actual: unknown): number | null {
  * Enter (or overwrite) one metric's number for one week.
  *
  * Permissions: admin any metric; the metric's owner their own; other members
- * forbidden (specs/scorecard.md: "the owner (or any admin) enters").
+ * forbidden (specs/data.md: "the owner (or any admin) enters").
  *
  * Re-entry overwrites `actual` AND re-captures `target_at_entry` from the
  * metric's CURRENT target: the entry's history basis is "the target in force
- * when the number was last written" (specs/scorecard.md: history rows keep the
+ * when the number was last written" (specs/data.md: history rows keep the
  * target in force that week). A re-target therefore changes how the week's
  * pass/fail renders — decided, documented in data-model.md.
  *

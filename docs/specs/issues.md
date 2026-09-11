@@ -28,7 +28,7 @@ meetings, and carry-forward behavior.
 
 ### IDS support (in the L10)
 
-- Full IDS interaction lives in the meeting module (see level-10-meeting.md);
+- Full IDS interaction lives in the meeting module (see weekly-meeting.md);
   this module owns the lists and provides the carry-in/carry-out behavior:
   - Pull any long-term issue into the current meeting's IDS queue.
   - Anything unsolved when the meeting concludes returns to the long-term list
