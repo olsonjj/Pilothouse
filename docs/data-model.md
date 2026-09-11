@@ -118,6 +118,17 @@ all rows, active and inactive; the default list is **active-only** (read view
 and future scorers consume it — admins fetch inactive rows explicitly);
 reordering assigns contiguous `sort_order` 0..n-1 from a complete ID list.
 
+### people_analyzer_scores
+`person_id FK→people, quarter_id FK→quarters, core_value_id FK→core_values,
+score TEXT CHECK IN ('+','-','--')`, `UNIQUE(person_id, quarter_id,
+core_value_id)` — re-entering overwrites. Status (ticket 10): implemented.
+Display names are JOINED from `core_values`/`people` at read time (never
+denormalized). Grid columns = active values, then inactive values that still
+hold scores for the selected quarter (historical scores stay visible). GWC
+summary column rolls up from ACTIVE seat assignments (ended ones excluded);
+the "right person / right seat" verdict is derived (GWC first, then scores).
+ADMIN-ONLY view and edit at the seam.
+
 ### vto_versions
 One row per save (snapshot model, spec: "editing creates a new version").
 Scalar columns for: core focus ("why" + "what"), 10-year target (+ optional

@@ -161,14 +161,24 @@ function PeoplePage() {
 
       <div className="mt-6 flex items-center justify-between">
         <h1 className="text-xl font-semibold">People</h1>
-        {isAdmin && (
-          <button
-            onClick={openCreate}
-            className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
-          >
-            Add person
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {isAdmin && (
+            <Link
+              to="/people/analyzer"
+              className="text-sm text-blue-600 hover:underline"
+            >
+              People Analyzer
+            </Link>
+          )}
+          {isAdmin && (
+            <button
+              onClick={openCreate}
+              className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
+            >
+              Add person
+            </button>
+          )}
+        </div>
       </div>
 
       {formError && <p className="mt-2 text-sm text-red-600">{formError}</p>}

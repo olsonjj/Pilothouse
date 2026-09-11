@@ -212,6 +212,35 @@ export type CoreValue = typeof coreValues.$inferSelect
 export type Role = 'admin' | 'member'
 
 /**
+ * People Analyzer scores (ticket 10): one row per (person, quarter, core
+ * value). Scores are ADMIN-ONLY view + edit (sensitive — data-model.md access
+ * rules). Re-entering a triple overwrites (unique index + upsert). Value IDs
+ * are stable (ticket 07: rows never deleted) so scores survive renames and
+ * deactivations; display joins core_values for names — never denormalized.
+ */
+export const peopleAnalyzerScores = sqliteTable(
+  'people_analyzer_scores',
+  {
+    ...mutableFields,
+    personId: integer('person_id')
+      .notNull()
+      .references(() => people.id),
+    quarterId: integer('quarter_id')
+      .notNull()
+      .references(() => quarters.id),
+    coreValueId: integer('core_value_id')
+      .notNull()
+      .references(() => coreValues.id),
+    /** '+' exemplifies, '-' mostly/needs work, '--' does not exemplify. */
+    score: text('score').notNull(),
+  },
+  (t) => [
+    check('people_analyzer_score_check', sql`${t.score} IN ('+', '-', '--')`),
+    uniqueIndex('people_analyzer_unique_idx').on(t.personId, t.quarterId, t.coreValueId),
+  ],
+)
+
+/**
  * V/TO version history (ticket 06): one immutable snapshot row per save.
  * Content columns mirror the live `vto` row (no id/created_at/updated_at of
  * their own meaning); plus published_at (snapshot time) and created_by (author
@@ -256,3 +285,4 @@ export const vtoVersions = sqliteTable('vto_versions', {
   ),
 ],
 )
+export type PeopleAnalyzerScore = typeof peopleAnalyzerScores.$inferSelect

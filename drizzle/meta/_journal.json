@@ -57,6 +57,13 @@
       "when": 1789083977934,
       "tag": "0007_add_gwc",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1789084420598,
+      "tag": "0008_add_people_analyzer",
+      "breakpoints": true
     }
   ]
 }
