@@ -47,7 +47,7 @@ function errorText(error: string): string {
     case 'already_resolved':
       return 'That issue is already resolved.'
     case 'not_red':
-      return 'That scorecard cell is not red — only misses become issues.'
+      return 'That data cell is not red — only misses become issues.'
     case 'todo_not_missed':
       return 'That to-do is completed — not a miss.'
     case 'quarter_not_ended':
@@ -130,9 +130,9 @@ function IssuesPage() {
   function originLabel(origin: string): string | null {
     switch (origin) {
       case 'from_rock':
-        return 'from rock'
+        return 'from goal'
       case 'from_scorecard':
-        return 'from scorecard'
+        return 'from data'
       case 'from_todo':
         return 'from to-do'
       case 'from_meeting':

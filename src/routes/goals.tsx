@@ -74,7 +74,7 @@ function errorText(error: string): string {
     case 'forbidden':
       return 'Members can only create and edit their own personal goals.'
     case 'statement_required':
-      return 'A rock statement is required.'
+      return 'A goal statement is required.'
     case 'target_direction_mismatch':
       return 'A target needs a direction (and vice versa) — or leave both empty.'
     case 'invalid_target':
@@ -88,7 +88,7 @@ function errorText(error: string): string {
     case 'owner_not_found':
       return 'That person no longer exists — refresh.'
     case 'rock_not_found':
-      return 'That rock no longer exists — refresh.'
+      return 'That goal no longer exists — refresh.'
     default:
       return 'Something went wrong.'
   }
@@ -310,7 +310,7 @@ function RocksPage() {
           {rock.carriedOverFromRockId != null && (
             <span
               className="ml-2 rounded bg-purple-100 px-1.5 py-0.5 text-xs font-medium text-purple-700"
-              title={`carried over from rock #${rock.carriedOverFromRockId}`}
+              title={`carried over from goal #${rock.carriedOverFromRockId}`}
             >
               ↩ carried over
             </span>
@@ -409,7 +409,7 @@ function RocksPage() {
                 <button
                   disabled={busy}
                   onClick={() => handleCarry(rock.id)}
-                  title="Copy into a future quarter as a new rock (original untouched)"
+                  title="Copy into a future quarter as a new goal (original untouched)"
                   className="rounded border border-purple-400 px-2 py-0.5 text-purple-700 hover:bg-purple-50 disabled:opacity-40"
                 >
                   ↩ carry
@@ -513,7 +513,7 @@ function RocksPage() {
           onSubmit={handleSave}
           className="mt-4 space-y-3 rounded border border-slate-200 bg-white p-4 shadow-sm"
         >
-          <h2 className="font-medium">{editing.id ? 'Edit rock' : 'New rock'}</h2>
+          <h2 className="font-medium">{editing.id ? 'Edit goal' : 'New goal'}</h2>
           <label className="block text-sm">
             <span className="text-slate-700">
               Statement <span className="text-slate-400">(verb + what + done-by)</span>
@@ -543,7 +543,7 @@ function RocksPage() {
                 className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
                 disabled={!isAdmin}
               >
-                {isAdmin && <option value="">Company rock (no owner)</option>}
+                {isAdmin && <option value="">Company goal (no owner)</option>}
                 {!isAdmin && <option value={String(myPersonId)}>Me</option>}
                 {isAdmin && peopleOptions}
               </select>
@@ -738,17 +738,17 @@ function StatusControls(props: {
 function statusErrorText(error: string): string {
   switch (error) {
     case 'forbidden':
-      return 'You can only set statuses on your own rocks.'
+      return 'You can only set statuses on your own goals.'
     case 'invalid_status':
       return 'Pick on track, off track, or measuring.'
     case 'invalid_week':
       return 'That week is not a valid date.'
     case 'measuring_requires_target':
-      return 'Measuring needs a rock target — edit the rock to set one.'
+      return 'Measuring needs a goal target — edit the rock to set one.'
     case 'invalid_actual':
       return 'Enter a finite number for the actual.'
     case 'actual_not_allowed':
-      return 'Only measuring rocks carry a weekly actual.'
+      return 'Only measuring goals carry a weekly actual.'
     case 'comment_too_long':
       return 'Comments are one line, max 200 characters.'
     case 'quarter_read_only':

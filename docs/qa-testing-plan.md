@@ -8,13 +8,13 @@ top to bottom; each case has steps and the expected result.*
 
 - [x] Start the app: `pnpm dev` (serves at http://localhost:3250; port 3000 is
       taken by the dev default script — use `node_modules/.bin/vite dev --port 3250`).
-- [x] Sign in as the owner: `owner@Pilothouse.local` / `Pilothouse-owner-dev`.
+- [x] Sign in as the owner: `owner@pilothouse.local` / `Pilothouse-owner-dev`.
 - [x] **Create a second (member) account** — there is deliberately no signup UI
       (accounts come from the seed; adding a creation UI was never a ticket).
       Run this, then restart the dev server so it seeds nothing weird:
 
       ```sql
-      -- sqlite3 data/Pilothouse.db
+      -- sqlite3 data/pilothouse.db
       INSERT INTO users (email, password_hash, name, role, created_at, updated_at)
       VALUES ('member@openeos.local',
         '<copy the owner's password_hash value and reuse it — same password>',
@@ -209,7 +209,7 @@ the expected result (include what you saw).
 |---|---|---|
 | Edit the Company page, seats, Right Fit, Employee Assessment, company goals, any metric entry | ✅ | ❌ |
 | View everything except other people's Analyzer scores | ✅ | ✅ |
-| Create own goals, enter own metrics, add/resolve issues, push/solve in L10 | ✅ | ✅ |
+| Create own goals, enter own metrics, add/resolve issues, push/solve in the Weekly Meeting | ✅ | ✅ |
 | Conclude meeting, carry issues, score goals at quarter end | ✅ | ❌ |
 | Rate meetings (linked account required) | ✅ | ✅ |
 

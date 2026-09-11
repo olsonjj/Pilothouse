@@ -472,7 +472,7 @@ Tables land in the build order from the README (foundation → accountability
 chart → vto → todos → scorecard → issues → rocks → L10). The schema above is the
 end state; each phase adds its tables plus any back-references (e.g., core
 values exist before People Analyzer scores).
-## Boardroom rename (ticket 27)
+## Pilothouse rename (ticket 27 — first shipped as "Boardroom", renamed before release)
 
 The app was renamed **Boardroom** (from OpenEOS) and EOS-branded user-facing
 names were replaced with neutral ones for the public release: Scorecard →

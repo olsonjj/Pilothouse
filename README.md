@@ -27,11 +27,11 @@ pnpm dev            # dev server (see port note below)
 
 - Dev port: the dev script binds port 3000 (`pnpm dev`); if it's taken, run
   `node_modules/.bin/vite dev --port 3250` directly.
-- On first run the app migrates the SQLite database (`data/Pilothouse.db`),
+- On first run the app migrates the SQLite database (`data/pilothouse.db`),
   seeds an owner admin, and seeds EOS-style quarters for the current and next
   year.
-- **Seed credentials (DEV-ONLY default):** `owner@Pilothouse.local` /
-  `Pilothouse-owner-dev`. Override before first run with
+- **Seed credentials (DEV-ONLY default):** `owner@pilothouse.local` /
+  `pilothouse-owner-dev`. Override before first run with
   `PILOTHOUSE_OWNER_PASSWORD=<your password>` — never ship an instance with the
   default.
 - Then sign in, create your people on the People page, link logins, and add
@@ -52,7 +52,7 @@ The app also snapshots the database on server start and on an interval
 
 ## Environment variables
 
-- `PILOTHOUSE_DB_PATH` — SQLite file location (default `data/Pilothouse.db`)
+- `PILOTHOUSE_DB_PATH` — SQLite file location (default `data/pilothouse.db`)
 - `PILOTHOUSE_OWNER_PASSWORD` — first-run owner password (dev default otherwise)
 - `PILOTHOUSE_DISABLE_BACKUP` — set in tests to disable the snapshot job
 - `PILOTHOUSE_BACKUP_INTERVAL_HOURS` — snapshot cadence

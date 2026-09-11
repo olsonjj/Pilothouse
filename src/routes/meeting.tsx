@@ -610,7 +610,7 @@ function L10Page() {
               <div className="rounded border border-slate-200 p-3">
                 <h3 className="font-medium text-slate-700">Rocks</h3>
                 {pre.rocks.length === 0 ? (
-                  <p className="mt-1 text-slate-400">No rocks this quarter.</p>
+                  <p className="mt-1 text-slate-400">No goals this quarter.</p>
                 ) : (
                   <ul className="mt-1 space-y-1">
                     {pre.rocks.map((r) => (
@@ -818,7 +818,7 @@ function L10Page() {
               )}
               {meetingIssues.length === 0 ? (
                 <p className="mt-2 text-slate-400">
-                  Nothing queued yet — push red cells, off-track rocks, or missed to-dos above.
+                  Nothing queued yet — push red cells, off-track goals, or missed to-dos above.
                 </p>
               ) : (
                 <ul className="mt-2 space-y-1">
@@ -833,7 +833,7 @@ function L10Page() {
                         </span>
                         <span className="flex items-center gap-2">
                           <span className={mi.status === 'resolved' ? 'text-slate-400 line-through' : ''}>
-                            {mi.state === 'in_ids' ? 'in IDS' : mi.state}
+                            {mi.state === 'in_ids' ? 'in Issues' : mi.state}
                           </span>
                           {mi.state === 'in_ids' && (
                             <>

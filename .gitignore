@@ -13,5 +13,5 @@ __unconfig*
 todos.json
 .data
 
-# Boardroom runtime data (SQLite db + backups). Pattern is documented in README.
+# Pilothouse runtime data (SQLite db + backups). Pattern is documented in README.
 data/
