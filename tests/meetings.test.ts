@@ -965,6 +965,18 @@ describe('Conclude, ratings & frozen archive (seam, ticket 25)', () => {
       ok: false,
       error: 'meeting_concluded',
     })
+    // Pull and remove are also frozen post-conclude (review P2 — the two
+    // queue ops the ticket-25 freeze test initially omitted).
+    const pulledIssue = await addIssue(db, token, { title: 'post-conclude pull', classification: 'long_term' })
+    if (!pulledIssue.ok) throw new Error('fixture failed')
+    assert.deepEqual(await pullLongTermIssues(db, token, started.value.id, [pulledIssue.value.id]), {
+      ok: false,
+      error: 'meeting_concluded',
+    })
+    assert.deepEqual(await removeMeetingIssue(db, token, started.value.id, issue.value.id), {
+      ok: false,
+      error: 'meeting_concluded',
+    })
     void sqlite
   })
 

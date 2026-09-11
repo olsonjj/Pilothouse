@@ -4,7 +4,7 @@
 
 **Blocked by:** 23: L10: data segments & issue push, 24: L10: IDS.
 
-**Status:** done (review pending)
+**Status:** done (reviewer sign-off — FINAL; post-conclude pull/remove pins added)
 
 - [x] Conclude segment: recap of to-dos created in this meeting and cascading messages capture
 - [x] Each participant records a 1–10 rating (one per person); averages trend over meetings
