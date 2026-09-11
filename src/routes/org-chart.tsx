@@ -636,7 +636,7 @@ function OccupantGwc(props: {
             onClick={openEditor}
             className="rounded border border-slate-300 px-2 py-0.5 text-xs hover:bg-slate-100"
           >
-            GWC
+            Right Fit
           </button>
         )}
       </div>

@@ -212,7 +212,7 @@ export async function updateVto(
 
   const uniques = validateList(input.marketingThreeUniques)
   if (uniques === 'invalid') return { ok: false, error: 'invalid_list' }
-  if (uniques.length > 3) return { ok: false, error: 'invalid_list' } // EOS: three uniques
+  if (uniques.length > 3) return { ok: false, error: 'invalid_list' } // three uniques (methodology cap)
 
   const threeYearItems = validateList(input.threeYearItems)
   if (threeYearItems === 'invalid') return { ok: false, error: 'invalid_list' }

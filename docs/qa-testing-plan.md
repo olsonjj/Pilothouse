@@ -74,19 +74,19 @@ the expected result (include what you saw).
 - [ ] 4.5 Assign a second person to an occupied seat → rejected (one occupant).
 - [ ] 4.6 End an assignment → seat becomes empty; the assignment moves to
       history with an end date (never deleted).
-- [ ] 4.7 GWC: open a seat with an active assignment → set Get/Want/Capacity +
+- [ ] 4.7 Right Fit: open a seat with an active assignment → set Get/Want/Capacity +
       note → Save → shown on the seat detail and the person's row.
-- [ ] 4.8 *(member)* sees the chart and GWC read-only; no Edit/Assign/GWC buttons.
+- [ ] 4.8 *(member)* sees the chart and Right Fit read-only; no Edit/Assign/Right Fit buttons.
 
-## 5. GWC (ticket 09)
+## 5. Right Fit (ticket 09)
 
-- [ ] 5.1 GWC editor only appears for admins, on the **active** assignment.
+- [ ] 5.1 Right Fit editor only appears for admins, on the **active** assignment.
 - [ ] 5.2 Re-save overwrites (values update, history row keeps its own ratings).
 
 ## 6. Employee Assessment (ticket 10)
 
 - [ ] 6.1 As admin: `/people/analyzer` — quarter selector, people × core-values
-      grid, GWC summary column, verdict column ("Rate GWC first" when GWC
+      grid, Right Fit summary column, verdict column ("Complete Right Fit first" when Right Fit
       incomplete).
 - [ ] 6.2 Set +/−/−− scores; re-entering overwrites (no duplicate rows).
 - [ ] 6.3 Rename a core value → scores still render under the new name.

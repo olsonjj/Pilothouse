@@ -485,7 +485,7 @@ function RocksPage() {
           <span className="font-medium">Quarter completion</span>
           <span className="ml-2 text-slate-500">
             team {completion.team.completed}/{completion.team.total} = {completion.team.rate ?? '—'}%
-            <span className="text-slate-400"> (EOS norm ~80%)</span>
+            <span className="text-slate-400"> (~80% norm)</span>
           </span>
           <ul className="mt-2 space-y-1">
             {completion.people.map((p) => (

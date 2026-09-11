@@ -12,7 +12,7 @@ import { normalizeWeek } from './week'
  * anyone; members create personal rocks for THEMSELVES only (a member's rock
  * must be owned by their linked person). Editing follows the same rule: admin
  * any, member own. Past quarters (end_date < today) are read-only history —
- * EOS quarter-end scoring (ticket 19) freezes them; pre-scoring writes are
+ * quarter-end scoring (ticket 19) freezes them; pre-scoring writes are
  * rejected the same way to keep the freeze boundary at a single date.
  *
  * The 7-rock cap is a soft nudge (never a block): creating the 8th company

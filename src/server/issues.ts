@@ -397,7 +397,7 @@ export async function listIssues(
  * Origin issues are always long_term and land in the CURRENT quarter — the
  * list where the meeting works — regardless of the source row's own quarter (a rock
  * or entry from any quarter can be pushed; decided ticket 20, documented).
- * Duplicates are ALLOWED: the EOS room may push the same red cell twice and
+ * Duplicates are ALLOWED: the room may push the same red cell twice and
  * the team decides in the room (the L10's meeting_issues UNIQUE handles
  * in-meeting dedup at ticket 23). Any signed-in user — issues are team
  * property.

@@ -146,7 +146,7 @@ export const vto = sqliteTable('vto', {
   tenYearTargetDate: text('ten_year_target_date'),
   /** Question 4 sub-fields (target market / proven process / guarantee as text; uniques as JSON list). */
   marketingTargetMarket: text('marketing_target_market'),
-  /** JSON string array — exactly the three uniques (EOS prescribes three). */
+  /** JSON string array — exactly the three uniques (the methodology prescribes three). */
   marketingThreeUniques: text('marketing_three_uniques').notNull().default(sql`'[]'`),
   marketingProvenProcess: text('marketing_proven_process'),
   marketingGuarantee: text('marketing_guarantee'),

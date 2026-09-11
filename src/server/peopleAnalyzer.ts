@@ -90,7 +90,7 @@ function verdict(
   scores: Record<number, Score>,
   activeValueIds: number[],
 ): string {
-  if (gwc.incomplete) return 'Rate GWC first'
+  if (gwc.incomplete) return 'Complete Right Fit first'
   if (!gwc.allTrue) return 'Right person? Not yet'
   if (activeValueIds.length > 0 && activeValueIds.every((id) => scores[id] === '+')) {
     return 'Exemplifies the values'

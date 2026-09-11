@@ -214,7 +214,7 @@ describe('people analyzer scoring', () => {
     assert.equal(byName['Two Seats'].gwc.seats.length, 2)
     assert.equal(byName['Two Seats'].gwc.allTrue, false)
     assert.equal(byName['Two Seats'].gwc.incomplete, true)
-    assert.equal(byName['Two Seats'].verdict, 'Rate GWC first')
+    assert.equal(byName['Two Seats'].verdict, 'Complete Right Fit first')
   })
 
   it('ended assignments stop contributing to the GWC summary', async () => {

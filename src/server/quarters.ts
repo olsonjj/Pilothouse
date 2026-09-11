@@ -5,7 +5,7 @@ import { quarterBounds, quarterKey, todayIso, weekStart, formatWeekLabel, type Q
 import { and, asc, eq, gte, lte } from 'drizzle-orm'
 
 /**
- * Quarters module (ticket 03): calendar-aligned EOS quarters, seeded for the
+ * Quarters module (ticket 03): calendar-aligned quarters, seeded for the
  * current + next calendar years, idempotent. Readable by every signed-in
  * user; nobody edits quarters (seed-only, immutable in schema).
  */

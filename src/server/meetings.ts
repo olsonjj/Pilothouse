@@ -1031,7 +1031,7 @@ export async function listMeetingRecap(
 /**
  * Record the signed-in user's 1–10 rating for a meeting (ticket 25). One per
  * person (UNIQUE(meeting_id, person_id), overwrite on re-rate). ALLOWED on
- * open AND concluded meetings — the documented delta: EOS records ratings at
+ * open AND concluded meetings — the documented delta: the methodology records ratings at
  * conclude, but a late rater shouldn't lose their trend datapoint; ratings
  * are the one post-conclude mutable surface. Unlinked accounts can't rate
  * (ratings belong to people per data-model) → 'person_required'.
