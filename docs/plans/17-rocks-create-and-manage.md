@@ -4,7 +4,7 @@
 
 **Blocked by:** 02: People & account linking, 03: Quarters & week utility.
 
-**Status:** done (rework applied — self-FK added to 0013, boundary pin for end-date; review re-verification pending)
+**Status:** done (re-review SIGN-OFF after self-FK rework)
 
 - [x] Admin sets company rocks; members set their own personal rocks in the open quarter
 - [x] Each rock: statement, optional detail, optional target + direction, owner (null = company rock)

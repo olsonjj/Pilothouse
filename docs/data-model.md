@@ -165,7 +165,7 @@ only their own personal rocks.
 | statement | text | verb + what + done-by |
 | detail | text nullable | few sentences max |
 | target | real nullable | measuring rocks only |
-| target_direction | text CHECK('gte','lte') | default 'gte' |
+| target_direction | text CHECK('gte','lte') | co-occurs with target (no default; binary rocks have neither — ticket-17 decision) |
 | carried_over_from_rock_id | int FK→rocks, nullable | explicit carry-over |
 | completed | int 0/1 nullable | set at quarter end |
 | completed_at | text nullable | |
