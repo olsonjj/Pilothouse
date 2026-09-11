@@ -4,10 +4,10 @@
 
 **Blocked by:** 02: People & account linking.
 
-**Status:** ready-for-agent
+**Status:** done (review pending)
 
-- [ ] Admin creates/edits metrics: name, owner, target, direction (gte/lte), unit suffix, active flag
-- [ ] Members view the metric list
-- [ ] Retired metrics stop appearing in the current grid but keep history
-- [ ] Targets are edited by convention at quarter boundaries
-- [ ] Seam tests cover CRUD and permission denial
+- [x] Admin creates/edits metrics: name, owner, target, direction (gte/lte), unit suffix, active flag
+- [x] Members view the metric list
+- [x] Retired metrics stop appearing in the current grid but keep history
+- [x] Targets are edited by convention at quarter boundaries
+- [x] Seam tests cover CRUD and permission denial

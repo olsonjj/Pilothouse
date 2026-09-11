@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, check, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import { sqliteTable, text, integer, real, check, uniqueIndex } from 'drizzle-orm/sqlite-core'
 import { sql } from 'drizzle-orm'
 
 /**
@@ -324,3 +324,36 @@ export const todos = sqliteTable(
   (t) => [check('todos_status_check', sql`${t.status} IN ('open', 'done', 'dropped')`)],
 )
 export type Todo = typeof todos.$inferSelect
+
+/**
+ * Scorecard metric definitions (ticket 13): the team's weekly pulse metrics.
+ * `team_id` from data-model.md is omitted (single company; documented delta,
+ * same as todos). Targets are REAL numbers — any finite value is allowed,
+ * including 0 and negatives (e.g. "defects" targeting 0, or deviation-from-
+ * baseline metrics targeting below zero; specs/scorecard.md imposes no sign
+ * restriction and the seam validates finiteness). Retire = flip `active` to 0,
+ * never delete — weekly entries (ticket 14) keep referencing the row.
+ */
+export const metrics = sqliteTable(
+  'metrics',
+  {
+    ...mutableFields,
+    name: text('name').notNull(),
+    ownerPersonId: integer('owner_person_id')
+      .notNull()
+      .references(() => people.id),
+    /** Weekly numeric target; compared with `direction` at entry time. */
+    target: real('target').notNull(),
+    /** 'gte' = at/above target is good (default); 'lte' = lower is better. */
+    direction: text('direction').notNull().default('gte'),
+    /** Optional display suffix, e.g. '%', '$', 'h'. */
+    unit: text('unit'),
+    /** 0/1: retired metrics keep their row and entry history (ticket 14). */
+    active: integer('active').notNull().default(1),
+  },
+  (t) => [
+    check('metrics_direction_check', sql`${t.direction} IN ('gte', 'lte')`),
+    check('metrics_active_check', sql`${t.active} IN (0, 1)`),
+  ],
+)
+export type Metric = typeof metrics.$inferSelect

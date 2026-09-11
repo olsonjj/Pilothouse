@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ChartRouteImport } from './routes/chart'
 import { Route as PeopleRouteImport } from './routes/people'
+import { Route as ScorecardRouteImport } from './routes/scorecard'
 import { Route as SigninRouteImport } from './routes/signin'
 import { Route as TodosRouteImport } from './routes/todos'
 import { Route as VtoRouteImport } from './routes/vto'
@@ -30,6 +31,11 @@ const ChartRoute = ChartRouteImport.update({
 const PeopleRoute = PeopleRouteImport.update({
   id: '/people',
   path: '/people',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ScorecardRoute = ScorecardRouteImport.update({
+  id: '/scorecard',
+  path: '/scorecard',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SigninRoute = SigninRouteImport.update({
@@ -57,6 +63,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/chart': typeof ChartRoute
   '/people': typeof PeopleRouteWithChildren
+  '/scorecard': typeof ScorecardRoute
   '/signin': typeof SigninRoute
   '/todos': typeof TodosRoute
   '/vto': typeof VtoRoute
@@ -66,6 +73,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/chart': typeof ChartRoute
   '/people': typeof PeopleRouteWithChildren
+  '/scorecard': typeof ScorecardRoute
   '/signin': typeof SigninRoute
   '/todos': typeof TodosRoute
   '/vto': typeof VtoRoute
@@ -76,6 +84,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/chart': typeof ChartRoute
   '/people': typeof PeopleRouteWithChildren
+  '/scorecard': typeof ScorecardRoute
   '/signin': typeof SigninRoute
   '/todos': typeof TodosRoute
   '/vto': typeof VtoRoute
@@ -87,6 +96,7 @@ export interface FileRouteTypes {
     | '/'
     | '/chart'
     | '/people'
+    | '/scorecard'
     | '/signin'
     | '/todos'
     | '/vto'
@@ -96,6 +106,7 @@ export interface FileRouteTypes {
     | '/'
     | '/chart'
     | '/people'
+    | '/scorecard'
     | '/signin'
     | '/todos'
     | '/vto'
@@ -105,6 +116,7 @@ export interface FileRouteTypes {
     | '/'
     | '/chart'
     | '/people'
+    | '/scorecard'
     | '/signin'
     | '/todos'
     | '/vto'
@@ -115,6 +127,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ChartRoute: typeof ChartRoute
   PeopleRoute: typeof PeopleRouteWithChildren
+  ScorecardRoute: typeof ScorecardRoute
   SigninRoute: typeof SigninRoute
   TodosRoute: typeof TodosRoute
   VtoRoute: typeof VtoRoute
@@ -141,6 +154,13 @@ declare module '@tanstack/react-router' {
       path: '/people'
       fullPath: '/people'
       preLoaderRoute: typeof PeopleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/scorecard': {
+      id: '/scorecard'
+      path: '/scorecard'
+      fullPath: '/scorecard'
+      preLoaderRoute: typeof ScorecardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/signin': {
@@ -189,6 +209,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ChartRoute: ChartRoute,
   PeopleRoute: PeopleRouteWithChildren,
+  ScorecardRoute: ScorecardRoute,
   SigninRoute: SigninRoute,
   TodosRoute: TodosRoute,
   VtoRoute: VtoRoute,
