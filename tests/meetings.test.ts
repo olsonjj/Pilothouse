@@ -379,10 +379,11 @@ describe('Segment notes: save, last-write-wins, guards (seam, ticket 22)', () =>
       error: 'segment_not_found',
     })
     void other
-    // Save + read from the other participant (polling model).
-    assert.equal((await saveSegmentNotes(db, token, started.value.id, seg.id, 'shared')).ok, true)
-    const read = await getMeeting(db, other.token, started.value.id)
+    // Save + read from the other participant (polling model) — on meeting 2.
+    const seg2 = second.value.segments[0]
+    assert.equal((await saveSegmentNotes(db, token, second.value.id, seg2.id, 'shared')).ok, true)
+    const read = await getMeeting(db, other.token, second.value.id)
     if (!read.ok) throw new Error('read failed')
-    assert.equal(read.value.segments.find((s) => s.id === seg.id)?.notes, 'shared')
+    assert.equal(read.value.segments.find((s) => s.id === seg2.id)?.notes, 'shared')
   })
 })
