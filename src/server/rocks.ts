@@ -1,7 +1,8 @@
 import type { Db } from './db'
-import { rocks, people, quarters, type Rock } from './schema'
+import { rocks, people, quarters, rockStatuses, type Rock, type RockStatus } from './schema'
 import { getCurrentUser } from './auth'
-import { and, asc, eq, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, sql } from 'drizzle-orm'
+import { normalizeWeek } from './week'
 
 /**
  * Rocks domain module (ticket 17): quarter-scoped 3–7 priorities.
@@ -303,5 +304,243 @@ export async function listRocks(
       company: withOwners.filter((r) => r.ownerPersonId == null),
       personal: withOwners.filter((r) => r.ownerPersonId != null),
     },
+  }
+}
+// ---------------------------------------------------------------------------
+// Weekly statuses (ticket 18)
+// ---------------------------------------------------------------------------
+
+export const STATUS_COMMENT_CAP = 200
+
+export type RockStatusValue = 'on_track' | 'off_track' | 'measuring'
+
+export type StatusInput = {
+  status: RockStatusValue
+  actual?: unknown
+  comment?: string | null
+}
+
+export type StatusError =
+  | 'unauthenticated'
+  | 'forbidden'
+  | 'not_found'
+  | 'invalid_status'
+  | 'invalid_week'
+  | 'measuring_requires_target'
+  | 'invalid_actual'
+  | 'actual_not_allowed'
+  | 'comment_too_long'
+  | 'quarter_read_only'
+  | 'quarter_not_found'
+
+export type StatusResult<T> = { ok: true; value: T } | { ok: false; error: StatusError }
+
+const STATUS_VALUES: readonly string[] = ['on_track', 'off_track', 'measuring']
+
+function normalizeActualNumber(actual: unknown): number | null {
+  if (typeof actual === 'number' && Number.isFinite(actual)) return actual
+  if (typeof actual === 'string' && actual.trim() !== '') {
+    const n = Number(actual)
+    if (Number.isFinite(n)) return n
+  }
+  return null
+}
+
+/**
+ * Set (or overwrite) one rock's status for one week. Permissions mirror the
+ * scorecard's setEntry (docs/specs/rocks.md + access rules): admin any rock,
+ * the rock's owner their own, other members forbidden. Week normalizes to its
+ * Monday via weekStart; the past-quarter freeze reuses quarterWritable.
+ *
+ * Decisions (documented in data-model.md):
+ * - `actual` on on_track/off_track is REJECTED (not ignored) — silently
+ *   dropping data would hide confusion; measuring-without-actual is likewise
+ *   rejected.
+ * - `comment` is one line, capped at 200 chars (STATUS_COMMENT_CAP).
+ */
+export async function setStatus(
+  db: Db,
+  token: string | undefined,
+  rockId: number,
+  week: unknown,
+  input: StatusInput,
+  today = todayIsoSafe(),
+): Promise<StatusResult<RockStatus>> {
+  const auth = await getCurrentUser(db, token)
+  if (!auth.ok) return auth
+  const rock = await db.select().from(rocks).where(eq(rocks.id, rockId)).get()
+  if (!rock) return { ok: false, error: 'not_found' }
+  if (auth.user.role !== 'admin' && auth.user.personId !== rock.ownerPersonId) {
+    return { ok: false, error: 'forbidden' }
+  }
+  if (!STATUS_VALUES.includes(input.status)) return { ok: false, error: 'invalid_status' }
+
+  const weekMonday = normalizeWeek(week)
+  if (!weekMonday) return { ok: false, error: 'invalid_week' }
+
+  // Statuses live in the writable-quarter discipline: the freeze boundary is
+  // the same single calendar date as rock creation/edits (ticket 17).
+  const writable = await quarterWritable(db, rock.quarterId, today)
+  if (!writable.ok) return { ok: false, error: writable.error as StatusError }
+
+  let actual: number | null = null
+  if (input.status === 'measuring') {
+    // Measuring rocks need target AND direction (co-occurrence CHECK from
+    // ticket 17) AND the week's actual number.
+    if (rock.target == null || rock.direction == null) {
+      return { ok: false, error: 'measuring_requires_target' }
+    }
+    const n = normalizeActualNumber(input.actual)
+    if (n == null) return { ok: false, error: 'invalid_actual' }
+    actual = n
+  } else if (input.actual != null && input.actual !== '') {
+    // Non-measuring statuses carry no number — reject rather than ignore.
+    return { ok: false, error: 'actual_not_allowed' }
+  }
+
+  const comment = input.comment?.trim() ?? null
+  if (comment != null && (comment.length > STATUS_COMMENT_CAP || comment.includes('\n'))) {
+    return { ok: false, error: 'comment_too_long' }
+  }
+
+  const [row] = await db
+    .insert(rockStatuses)
+    .values({
+      rockId,
+      week: weekMonday,
+      status: input.status,
+      actual,
+      comment,
+      entryBy: auth.user.id,
+    })
+    .onConflictDoUpdate({
+      target: [rockStatuses.rockId, rockStatuses.week],
+      set: {
+        status: input.status,
+        actual,
+        comment,
+        entryBy: auth.user.id,
+        updatedAt: new Date().toISOString(),
+      },
+    })
+    .returning()
+  return { ok: true, value: row! }
+}
+
+export type RockStatusWithMeta = RockStatus & {
+  /** True when the two most recent status weeks (latest + the week before) are both off_track. */
+  twoConsecutiveOffTrack: boolean
+}
+
+export type RockStatusHistory = {
+  rockId: number
+  /** Oldest → newest by week. */
+  statuses: RockStatusWithMeta[]
+  /** Latest entry's week (null = no statuses yet). */
+  latestWeek: string | null
+  latestStatus: RockStatusValue | null
+}
+
+/**
+ * Per-rock status history for a quarter's rocks, oldest → newest, with the
+ * 2-consecutive-off-track flag per ENTRY (not per rock): an entry is flagged
+ * when it AND the immediately preceding week's entry (W-1 and W-2 relative to
+ * that entry's week, by weekStart keys — calendar gaps from carry-over don't
+ * matter, only adjacent week keys) are both off_track. A rock is highlighted
+ * when its LATEST entry is flagged.
+ */
+export async function listStatusesForRocks(
+  db: Db,
+  token: string | undefined,
+  quarterId: number,
+): Promise<StatusResult<RockStatusHistory[]>> {
+  const auth = await getCurrentUser(db, token)
+  if (!auth.ok) return auth
+
+  const rocksInQuarter = await db
+    .select({ id: rocks.id })
+    .from(rocks)
+    .where(eq(rocks.quarterId, quarterId))
+  const rockIds = rocksInQuarter.map((r) => Number(r.id))
+  if (rockIds.length === 0) return { ok: true, value: [] }
+
+  // Aliased join columns: unique output names (node:sqlite proxy constraint).
+  const rows = await db
+    .select({
+      id: sql<number>`"rock_statuses"."id"`.as('rs_id'),
+      createdAt: sql<string>`"rock_statuses"."created_at"`.as('rs_created_at'),
+      updatedAt: sql<string>`"rock_statuses"."updated_at"`.as('rs_updated_at'),
+      rockId: sql<number>`"rock_statuses"."rock_id"`.as('rs_rock_id'),
+      week: sql<string>`"rock_statuses"."week"`.as('rs_week'),
+      status: sql<string>`"rock_statuses"."status"`.as('rs_status'),
+      actual: sql<number | null>`"rock_statuses"."actual"`.as('rs_actual'),
+      comment: sql<string | null>`"rock_statuses"."comment"`.as('rs_comment'),
+      entryBy: sql<number>`"rock_statuses"."entry_by"`.as('rs_entry_by'),
+    })
+    .from(rockStatuses)
+    .where(inArray(rockStatuses.rockId, rockIds))
+    .orderBy(asc(rockStatuses.week), asc(rockStatuses.id))
+
+  const byRock = new Map<number, RockStatusWithMeta[]>()
+  for (const r of rows) {
+    const status: RockStatusWithMeta = {
+      id: Number(r.id),
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+      rockId: Number(r.rockId),
+      week: r.week,
+      status: r.status as RockStatusValue,
+      actual: r.actual == null ? null : Number(r.actual),
+      comment: r.comment ?? null,
+      entryBy: Number(r.entryBy),
+      twoConsecutiveOffTrack: false,
+    }
+    const list = byRock.get(status.rockId) ?? []
+    const prev = list[list.length - 1]
+    // Adjacent week keys: prev.week must be exactly 7 days before status.week.
+    const adjacent =
+      prev != null &&
+      Date.parse(status.week) - Date.parse(prev.week) === 7 * 86400000
+    status.twoConsecutiveOffTrack =
+      adjacent && prev.status === 'off_track' && status.status === 'off_track'
+    list.push(status)
+    byRock.set(status.rockId, list)
+  }
+
+  return {
+    ok: true,
+    value: rockIds.map((rockId) => {
+      const statuses = byRock.get(rockId) ?? []
+      const latest = statuses[statuses.length - 1] ?? null
+      return {
+        rockId,
+        statuses,
+        latestWeek: latest?.week ?? null,
+        latestStatus: latest ? (latest.status as RockStatusValue) : null,
+      }
+    }),
+  }
+}
+
+/**
+ * Latest status per rock in a quarter (for the L10 pre-load, ticket 21):
+ * same shape as listStatusesForRocks but the UI only needs the tail.
+ */
+export async function listLatestStatuses(
+  db: Db,
+  token: string | undefined,
+  quarterId: number,
+): Promise<StatusResult<Array<{ rockId: number; latestWeek: string | null; latestStatus: RockStatusValue | null; twoConsecutiveOffTrack: boolean }>>> {
+  const history = await listStatusesForRocks(db, token, quarterId)
+  if (!history.ok) return history
+  return {
+    ok: true,
+    value: history.value.map((h) => ({
+      rockId: h.rockId,
+      latestWeek: h.latestWeek,
+      latestStatus: h.latestStatus,
+      twoConsecutiveOffTrack:
+        h.statuses.length > 0 && h.statuses[h.statuses.length - 1].twoConsecutiveOffTrack,
+    })),
   }
 }

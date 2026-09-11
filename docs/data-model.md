@@ -185,7 +185,15 @@ App-enforced cap nudge: warn above 7 per team (company rocks) and 7 per person.
 | updated_by / updated_at | | |
 
 `UNIQUE(rock_id, week)` — weekly overwrite (decided). App-enforced:
-`measuring` requires a non-null rock target; the 2-consecutive-off-track
+`measuring` requires a non-null rock target AND the week's actual (rejected,
+not ignored, on non-measuring statuses too); comments are one line, capped at
+200 chars; entry permissions mirror the scorecard (admin any, owner own).
+2-consecutive-off-track: an entry is flagged when it and the entry with the
+adjacent preceding week key (exactly 7 days earlier) are both off_track —
+adjacent week keys, not same-month days; the rock is highlighted when its
+LATEST entry is flagged. `entry_by` mirrors metric_entries (data-model
+sketched `updated_by`); writer column names stay one-spelling-per-concept.
+The 2-consecutive-off-track
 highlight is a query, not stored state.
 
 ## Scorecard tables

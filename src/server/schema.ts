@@ -511,3 +511,37 @@ export const rocks = sqliteTable(
   ],
 )
 export type Rock = typeof rocks.$inferSelect
+
+/**
+ * Weekly rock status (ticket 18): one row per rock per week (Monday keys,
+ * `UNIQUE(rock_id, week)` overwrite). `actual` is set iff status='measuring'
+ * (app-enforced: measuring requires the rock to have target + direction).
+ * `entry_by` records who wrote the status (admin or the rock's owner).
+ * Ticket-17 note: data-model sketched `updated_by`; `entry_by` mirrors
+ * metric_entries' `entry_by` — one spelling per concept across modules.
+ */
+export const rockStatuses = sqliteTable(
+  'rock_statuses',
+  {
+    ...mutableFields,
+    rockId: integer('rock_id')
+      .notNull()
+      .references(() => rocks.id),
+    week: text('week').notNull(),
+    status: text('status').notNull(),
+    actual: real('actual'),
+    /** One line, capped at 200 chars (app-enforced). */
+    comment: text('comment'),
+    entryBy: integer('entry_by')
+      .notNull()
+      .references(() => users.id),
+  },
+  (t) => [
+    uniqueIndex('rock_statuses_rock_week_idx').on(t.rockId, t.week),
+    check(
+      'rock_statuses_status_check',
+      sql`${t.status} IN ('on_track', 'off_track', 'measuring')`,
+    ),
+  ],
+)
+export type RockStatus = typeof rockStatuses.$inferSelect

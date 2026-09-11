@@ -3,8 +3,10 @@ import { useState } from 'react'
 import { getCurrentUserFn, signOutFn } from '../functions/auth'
 import { listQuartersFn, getCurrentPeriodFn } from '../functions/quarters'
 import { listPeopleFn } from '../functions/people'
-import { listRocksFn, createRockFn, updateRockFn } from '../functions/rocks'
+import { listRocksFn, createRockFn, updateRockFn, setStatusFn, listStatusesFn } from '../functions/rocks'
 import type { RockWithOwner, RockList } from '../server/rocks'
+import type { RockStatusValue } from '../server/rocks'
+import { weekStart } from '../server/week'
 
 export const Route = createFileRoute('/rocks')({
   loader: async () => {
@@ -22,12 +24,19 @@ export const Route = createFileRoute('/rocks')({
       : fallbackQuarterId
     const rocks =
       currentQuarterId == null ? null : await listRocksFn({ data: { quarterId: currentQuarterId } })
+    const statusHistory =
+      currentQuarterId == null
+        ? null
+        : await listStatusesFn({ data: { quarterId: currentQuarterId } })
     return {
       me: me.ok ? me.user : null,
       quarters: quarterList.ok ? quarterList.value : [],
       people: peopleList.ok ? peopleList.value : [],
       currentQuarterId,
+      /** Today's ISO date — the client uses it for the current-week column. */
+      today: period.ok ? period.value.today : null,
       rocks,
+      statusHistory: statusHistory && statusHistory.ok ? statusHistory.value : [],
     }
   },
   component: RocksPage,
@@ -90,6 +99,7 @@ function RocksPage() {
   const [formError, setFormError] = useState<string | null>(null)
   const [editing, setEditing] = useState<RockFormState | null>(null)
   const [busy, setBusy] = useState(false)
+  const [statusHistory, setStatusHistory] = useState(data.statusHistory)
 
   function openCreate(ownerPersonId: string) {
     setFormError(null)
@@ -117,6 +127,8 @@ function RocksPage() {
       setRocks(result.value)
       setWarning(null)
     }
+    const history = await listStatusesFn({ data: { quarterId: qid } })
+    if (history.ok) setStatusHistory(history.value)
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -164,6 +176,44 @@ function RocksPage() {
     return isAdmin || (myPersonId != null && rock.ownerPersonId === myPersonId)
   }
 
+  /** The selected quarter is writable only if it hasn't ended (strict < today). */
+  function quarterWritable(quarterId: number | null): boolean {
+    if (quarterId == null) return false
+    const q = data.quarters.find((x) => x.id === quarterId)
+    if (!q) return false
+    return q.endDate >= (data.today ?? '')
+  }
+
+  async function handleSetStatus(
+    rockId: number,
+    status: RockStatusValue,
+    actual?: string,
+    comment?: string,
+  ) {
+    if (quarterId == null) return
+    setBusy(true)
+    setFormError(null)
+    const week = weekStart(data.today ?? new Date().toISOString().slice(0, 10))
+    const result = await setStatusFn({
+      data: {
+        rockId,
+        week,
+        status,
+        actual: status === 'measuring' ? actual : null,
+        comment: comment ?? null,
+      },
+    })
+    setBusy(false)
+    if (!result.ok) {
+      setFormError(statusErrorText(result.error))
+      return
+    }
+    await refresh(quarterId)
+  }
+
+  const writable = quarterWritable(quarterId)
+  const historyByRock = new Map(statusHistory.map((h) => [h.rockId, h]))
+
   async function handleSignOut() {
     await signOutFn()
     await navigate({ to: '/signin' })
@@ -182,19 +232,62 @@ function RocksPage() {
 
   function RockRow({ rock }: { rock: RockWithOwner }) {
     const measuring = rock.target != null
+    const history = historyByRock.get(rock.id)
+    const latest = history?.statuses[history.statuses.length - 1] ?? null
+    const flagged = latest?.twoConsecutiveOffTrack ?? false
     return (
-      <li className="flex items-start justify-between rounded border border-slate-200 bg-white px-3 py-2 text-sm">
+      <li
+        className={
+          'flex items-start justify-between rounded border bg-white px-3 py-2 text-sm ' +
+          (flagged ? 'border-2 border-red-500 ring-2 ring-red-200' : 'border-slate-200')
+        }
+      >
         <div>
           <span className="font-medium">{rock.statement}</span>
+          {flagged && (
+            <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700">
+              off-track 2 weeks in a row
+            </span>
+          )}
           {rock.detail && <span className="block text-xs text-slate-500">{rock.detail}</span>}
           {measuring && (
             <span className="mt-1 block text-xs text-slate-500">
               target: {rock.target} ({rock.direction === 'gte' ? 'higher is better' : 'lower is better'})
             </span>
           )}
+          {latest && (
+            <span className="mt-1 block text-xs">
+              this week:{' '}
+              <span
+                className={
+                  latest.status === 'on_track'
+                    ? 'text-green-700'
+                    : latest.status === 'off_track'
+                      ? 'text-red-700'
+                      : 'text-blue-700'
+                }
+              >
+                {latest.status === 'on_track'
+                  ? '✓ on track'
+                  : latest.status === 'off_track'
+                    ? '✗ off track'
+                    : `📊 measuring: ${latest.actual ?? '—'}`}
+              </span>
+              {latest.comment && <span className="text-slate-500"> — {latest.comment}</span>}
+            </span>
+          )}
+          {history && history.statuses.length > 0 && <StatusDots history={history} />}
         </div>
         <div className="ml-4 flex shrink-0 items-center gap-2 text-xs text-slate-500">
           {rock.ownerName && <span>{rock.ownerName}</span>}
+          {canEdit(rock) && writable && (
+            <StatusControls
+              rock={rock}
+              measuring={measuring}
+              busy={busy}
+              onSet={handleSetStatus}
+            />
+          )}
           {canEdit(rock) && (
             <button
               onClick={() => openEdit(rock)}
@@ -205,6 +298,28 @@ function RocksPage() {
           )}
         </div>
       </li>
+    )
+  }
+
+  /** Week-by-week colored dots (oldest → newest) with a title tooltip. */
+  function StatusDots({ history }: { history: { statuses: Array<{ week: string; status: string; actual: number | null; comment: string | null }> } }) {
+    return (
+      <span className="mt-1 flex gap-1" title="weekly status history">
+        {history.statuses.map((s) => (
+          <span
+            key={s.week}
+            title={`${s.week}: ${s.status}${s.actual != null ? ` (${s.actual})` : ''}${s.comment ? ` — ${s.comment}` : ''}`}
+            className={
+              'inline-block h-2.5 w-2.5 rounded-full ' +
+              (s.status === 'on_track'
+                ? 'bg-green-500'
+                : s.status === 'off_track'
+                  ? 'bg-red-500'
+                  : 'bg-blue-500')
+            }
+          />
+        ))}
+      </span>
     )
   }
 
@@ -335,7 +450,7 @@ function RocksPage() {
           <section className="mt-6">
             <div className="flex items-center justify-between">
               <h2 className="font-medium text-slate-700">Company rocks</h2>
-              {isAdmin && !editing && (
+              {isAdmin && !editing && writable && (
                 <button
                   onClick={() => openCreate('')}
                   className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
@@ -358,7 +473,7 @@ function RocksPage() {
           <section className="mt-8">
             <div className="flex items-center justify-between">
               <h2 className="font-medium text-slate-700">Personal rocks</h2>
-              {!editing && (
+              {!editing && writable && (
                 <button
                   onClick={() => openCreate(String(myPersonId ?? ''))}
                   disabled={!isAdmin && myPersonId == null}
@@ -382,4 +497,114 @@ function RocksPage() {
       )}
     </main>
   )
+}
+/**
+ * Per-rock weekly status controls (this week, computed from today): traffic
+ * lights + actual input for measuring rocks + optional one-line comment.
+ * Rendered only for users who can write the rock, in a writable quarter.
+ */
+function StatusControls(props: {
+  rock: RockWithOwner
+  measuring: boolean
+  busy: boolean
+  onSet: (rockId: number, status: RockStatusValue, actual?: string, comment?: string) => void
+}) {
+  const [showDetail, setShowDetail] = useState(false)
+  const [actual, setActual] = useState('')
+  const [comment, setComment] = useState('')
+
+  function set(status: RockStatusValue) {
+    if (status === 'measuring' && props.measuring) {
+      setShowDetail(true)
+      return
+    }
+    props.onSet(props.rock.id, status, actual, comment)
+    setShowDetail(false)
+  }
+
+  return (
+    <span className="flex flex-col items-end gap-1">
+      <span className="flex gap-1">
+        <button
+          disabled={props.busy}
+          onClick={() => set('on_track')}
+          className="rounded border border-green-600 px-1.5 py-0.5 text-green-700 hover:bg-green-50 disabled:opacity-40"
+          title="On track"
+        >
+          ✓
+        </button>
+        <button
+          disabled={props.busy}
+          onClick={() => set('off_track')}
+          className="rounded border border-red-600 px-1.5 py-0.5 text-red-700 hover:bg-red-50 disabled:opacity-40"
+          title="Off track"
+        >
+          ✗
+        </button>
+        {props.measuring && (
+          <button
+            disabled={props.busy}
+            onClick={() => set('measuring')}
+            className="rounded border border-blue-600 px-1.5 py-0.5 text-blue-700 hover:bg-blue-50 disabled:opacity-40"
+            title="Measuring (with actual)"
+          >
+            📊
+          </button>
+        )}
+      </span>
+      {showDetail && (
+        <span className="flex items-center gap-1">
+          <input
+            autoFocus
+            type="number"
+            step="any"
+            placeholder="actual"
+            value={actual}
+            onChange={(e) => setActual(e.target.value)}
+            className="w-20 rounded border border-slate-300 px-1.5 py-0.5"
+          />
+          <input
+            placeholder="note (optional)"
+            maxLength={200}
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            className="w-28 rounded border border-slate-300 px-1.5 py-0.5"
+          />
+          <button
+            disabled={props.busy}
+            onClick={() => {
+              props.onSet(props.rock.id, 'measuring', actual, comment)
+              setShowDetail(false)
+            }}
+            className="rounded bg-blue-600 px-1.5 py-0.5 text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            Save
+          </button>
+        </span>
+      )}
+    </span>
+  )
+}
+
+function statusErrorText(error: string): string {
+  switch (error) {
+    case 'forbidden':
+      return 'You can only set statuses on your own rocks.'
+    case 'invalid_status':
+      return 'Pick on track, off track, or measuring.'
+    case 'invalid_week':
+      return 'That week is not a valid date.'
+    case 'measuring_requires_target':
+      return 'Measuring needs a rock target — edit the rock to set one.'
+    case 'invalid_actual':
+      return 'Enter a finite number for the actual.'
+    case 'actual_not_allowed':
+      return 'Only measuring rocks carry a weekly actual.'
+    case 'comment_too_long':
+      return 'Comments are one line, max 200 characters.'
+    case 'quarter_read_only':
+      return 'That quarter has ended — statuses are read-only history.'
+    default:
+      return 'Something went wrong.'
+  }
 }

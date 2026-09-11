@@ -4,10 +4,10 @@
 
 **Blocked by:** 17: Rocks: create & manage.
 
-**Status:** ready-for-agent
+**Status:** done (review pending)
 
-- [ ] Owner updates own rock status weekly; admins can update any; strict overwrite per week
-- [ ] Statuses: on_track / off_track / measuring (measuring requires a target and captures `actual`)
-- [ ] Optional one-line comment per status
-- [ ] 2-consecutive-off-track rocks visually highlighted; status history queryable
-- [ ] Seam tests cover overwrite semantics, measuring validation, and the highlight query
+- [x] Owner updates own rock status weekly; admins can update any; strict overwrite per week
+- [x] Statuses: on_track / off_track / measuring (measuring requires a target and captures `actual`)
+- [x] Optional one-line comment per status
+- [x] 2-consecutive-off-track rocks visually highlighted; status history queryable
+- [x] Seam tests cover overwrite semantics, measuring validation, and the highlight query

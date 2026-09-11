@@ -4,6 +4,9 @@ import {
   createRock,
   updateRock,
   listRocks,
+  setStatus,
+  listStatusesForRocks,
+  listLatestStatuses,
   ROCK_CAP,
 } from '../src/server/rocks'
 import { createPerson, linkUserToPerson } from '../src/server/people'
@@ -322,5 +325,220 @@ describe('Rocks: create & manage (seam, ticket 17)', () => {
       assert.equal(result.value.personal.length, 1)
       assert.equal(result.value.personal[0].ownerName, 'Alice')
     }
+  })
+})
+describe('Rock weekly statuses (seam, ticket 18)', () => {
+  async function rockFor(
+    db: Parameters<typeof createRock>[0],
+    sqlite: DatabaseSync,
+    token: string,
+    statement: string,
+    opts?: { target?: number; direction?: 'gte' | 'lte'; ownerPersonId?: number | null },
+  ) {
+    const result = await createRock(db, token, {
+      statement,
+      quarterId: currentQuarterId(sqlite),
+      ownerPersonId: opts?.ownerPersonId ?? null,
+      target: opts?.target ?? null,
+      direction: opts?.direction ?? null,
+    })
+    if (!result.ok) throw new Error('rock fixture failed')
+    return result.value
+  }
+
+  it('setStatus round-trips; overwrite replaces (same row id) via UNIQUE(rock_id, week)', async () => {
+    const { db, sqlite } = await createTestDb()
+    const { token } = await signedInUser(db)
+    // Targeted rock so the measuring overwrite below is valid.
+    const rock = await rockFor(db, sqlite, token, 'ship the thing', { target: 10, direction: 'gte' })
+
+    const first = await setStatus(db, token, rock.id, '2026-03-25', {
+      status: 'on_track',
+      comment: 'moving',
+    })
+    assert.equal(first.ok, true)
+    if (!first.ok) throw new Error('setStatus failed')
+    assert.equal(first.value.week, '2026-03-23') // normalized to Monday
+    assert.equal(first.value.status, 'on_track')
+    assert.equal(first.value.actual, null)
+
+    // Overwrite the same week with measuring + actual.
+    const second = await setStatus(db, token, rock.id, '2026-03-27', {
+      status: 'measuring',
+      actual: 42,
+    })
+    assert.equal(second.ok, true)
+    if (!second.ok) throw new Error('setStatus overwrite failed')
+    assert.equal(second.value.id, first.value.id, 'overwrite must reuse the row')
+    assert.equal(second.value.status, 'measuring')
+    assert.equal(second.value.actual, 42)
+    // Old comment cleared by the overwrite (full-row replace, not merge).
+    assert.equal(second.value.comment, null)
+  })
+
+  it('measuring requires target+direction AND actual; actual on binary statuses rejected', async () => {
+    const { db, sqlite } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const binary = await rockFor(db, sqlite, token, 'binary rock')
+    const measuring = await rockFor(db, sqlite, token, 'numeric rock', {
+      target: 10,
+      direction: 'gte',
+    })
+
+    // Binary rock can't measure (no target).
+    assert.deepEqual(await setStatus(db, token, binary.id, '2026-03-25', { status: 'measuring', actual: 5 }), {
+      ok: false,
+      error: 'measuring_requires_target',
+    })
+    // Measuring rock without actual rejected.
+    assert.deepEqual(await setStatus(db, token, measuring.id, '2026-03-25', { status: 'measuring' }), {
+      ok: false,
+      error: 'invalid_actual',
+    })
+    // Actual on on_track rejected (not silently ignored).
+    assert.deepEqual(
+      await setStatus(db, token, measuring.id, '2026-03-25', { status: 'on_track', actual: 3 }),
+      { ok: false, error: 'actual_not_allowed' },
+    )
+    // Happy measuring path.
+    assert.equal(
+      (await setStatus(db, token, measuring.id, '2026-03-25', { status: 'measuring', actual: 10 })).ok,
+      true,
+    )
+  })
+
+  it('week normalization: any day snaps to its Monday; Sunday overwrites the same week', async () => {
+    const { db, sqlite } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const rock = await rockFor(db, sqlite, token, 'week keys')
+
+    const wed = await setStatus(db, token, rock.id, '2026-03-25', { status: 'on_track' })
+    if (!wed.ok) throw new Error('fixture failed')
+    assert.equal(wed.value.week, '2026-03-23')
+
+    // Sunday of the same week overwrites (not a second row).
+    const sun = await setStatus(db, token, rock.id, '2026-03-29', { status: 'off_track' })
+    if (!sun.ok) throw new Error('overwrite failed')
+    assert.equal(sun.value.week, '2026-03-23')
+    assert.equal(sun.value.id, wed.value.id)
+
+    const all = await listStatusesForRocks(db, token, rock.quarterId)
+    if (!all.ok) throw new Error('list failed')
+    const mine = all.value.find((h) => h.rockId === rock.id)
+    assert.equal(mine?.statuses.length, 1)
+  })
+
+  it('comment is one line capped at 200 chars', async () => {
+    const { db, sqlite } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const rock = await rockFor(db, sqlite, token, 'comment cap')
+
+    assert.deepEqual(
+      await setStatus(db, token, rock.id, '2026-03-25', { status: 'on_track', comment: 'two\nlines' }),
+      { ok: false, error: 'comment_too_long' },
+    )
+    assert.deepEqual(
+      await setStatus(db, token, rock.id, '2026-03-25', { status: 'on_track', comment: 'x'.repeat(201) }),
+      { ok: false, error: 'comment_too_long' },
+    )
+    assert.equal(
+      (await setStatus(db, token, rock.id, '2026-03-25', { status: 'on_track', comment: 'x'.repeat(200) })).ok,
+      true,
+    )
+  })
+
+  it('permissions: admin any, owner own, other member forbidden, unauth denied', async () => {
+    const { db, sqlite } = await createTestDb()
+    const { token, user } = await signedInUser(db) // admin
+    const ownerPerson = await createPerson(db, token, { fullName: 'Owner' })
+    const otherPerson = await createPerson(db, token, { fullName: 'Other' })
+    if (!ownerPerson.ok || !otherPerson.ok) throw new Error('people fixture failed')
+    const owner = await signedInUser(db, 'member')
+    const other = await signedInUser(db, 'member')
+    assert.equal((await linkUserToPerson(db, token, owner.user.id, ownerPerson.value.id)).ok, true)
+    assert.equal((await linkUserToPerson(db, token, other.user.id, otherPerson.value.id)).ok, true)
+
+    const rock = await rockFor(db, sqlite, token, 'owned rock', { ownerPersonId: ownerPerson.value.id })
+
+    // Owner can set their own rock's status.
+    assert.equal((await setStatus(db, owner.token, rock.id, '2026-03-25', { status: 'on_track' })).ok, true)
+    // Another member forbidden.
+    assert.deepEqual(await setStatus(db, other.token, rock.id, '2026-03-25', { status: 'off_track' }), {
+      ok: false,
+      error: 'forbidden',
+    })
+    // Admin any.
+    assert.equal((await setStatus(db, token, rock.id, '2026-03-25', { status: 'off_track' })).ok, true)
+    // Unauthenticated denied.
+    assert.deepEqual(await setStatus(db, undefined, rock.id, '2026-03-25', { status: 'on_track' }), {
+      ok: false,
+      error: 'unauthenticated',
+    })
+    void user
+  })
+
+  it('past-quarter statuses rejected as read-only; a quarter ending TODAY is writable', async () => {
+    const { db, sqlite } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const pastId = seedPastQuarter(sqlite)
+    const legacy = await rockFor(db, sqlite, token, 'past rock', { ownerPersonId: null })
+    sqlite.exec(`UPDATE rocks SET quarter_id = ${pastId} WHERE id = ${legacy.id}`)
+
+    assert.deepEqual(await setStatus(db, token, legacy.id, '2026-03-25', { status: 'on_track' }), {
+      ok: false,
+      error: 'quarter_read_only',
+    })
+
+    // Boundary: end_date = today is still writable (strict <).
+    const today = todayIso()
+    sqlite.exec(
+      `INSERT INTO quarters (label, start_date, end_date) VALUES ('2020 Q3', date('${today}', '-3 months'), '${today}')`,
+    )
+    const endingTodayId = (
+      sqlite.prepare("SELECT id FROM quarters WHERE label = '2020 Q3'").get() as { id: number }
+    ).id
+    const boundary = await rockFor(db, sqlite, token, 'boundary rock')
+    sqlite.exec(`UPDATE rocks SET quarter_id = ${endingTodayId} WHERE id = ${boundary.id}`)
+    assert.equal((await setStatus(db, token, boundary.id, today, { status: 'on_track' })).ok, true)
+  })
+
+  it('two-consecutive-off-track flag: pinned with literal weeks; adjacent-week only', async () => {
+    const { db, sqlite } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const flaggedRock = await rockFor(db, sqlite, token, 'flag me')
+    const calmRock = await rockFor(db, sqlite, token, 'calm')
+
+    // Flagged: W-2 (Mar 9) and W-1 (Mar 16) both off_track, nothing in W0.
+    await setStatus(db, token, flaggedRock.id, '2026-03-09', { status: 'off_track' })
+    await setStatus(db, token, flaggedRock.id, '2026-03-16', { status: 'off_track' })
+
+    // NOT flagged: two off_track but with a gap (Mar 2 and Mar 16 — not adjacent).
+    await setStatus(db, token, calmRock.id, '2026-03-02', { status: 'off_track' })
+    await setStatus(db, token, calmRock.id, '2026-03-16', { status: 'off_track' })
+
+    const result = await listLatestStatuses(db, token, flaggedRock.quarterId)
+    assert.equal(result.ok, true)
+    if (!result.ok) throw new Error('list failed')
+
+    const flagged = result.value.find((h) => h.rockId === flaggedRock.id)
+    assert.equal(flagged?.latestWeek, '2026-03-16')
+    assert.equal(flagged?.twoConsecutiveOffTrack, true)
+
+    const calm = result.value.find((h) => h.rockId === calmRock.id)
+    assert.equal(calm?.twoConsecutiveOffTrack, false)
+
+    // History-level flag: the Mar 16 entry is flagged; the Mar 9 entry is not.
+    const history = await listStatusesForRocks(db, token, flaggedRock.quarterId)
+    if (!history.ok) throw new Error('history failed')
+    const flaggedHistory = history.value.find((h) => h.rockId === flaggedRock.id)
+    const byWeek = new Map(flaggedHistory?.statuses.map((s) => [s.week, s.twoConsecutiveOffTrack]))
+    assert.equal(byWeek.get('2026-03-09'), false)
+    assert.equal(byWeek.get('2026-03-16'), true)
+
+    // Adding an on_track latest week clears the flag (W-1 on_track breaks the pair).
+    await setStatus(db, token, flaggedRock.id, '2026-03-23', { status: 'on_track' })
+    const after = await listLatestStatuses(db, token, flaggedRock.quarterId)
+    if (!after.ok) throw new Error('after failed')
+    assert.equal(after.value.find((h) => h.rockId === flaggedRock.id)?.twoConsecutiveOffTrack, false)
   })
 })

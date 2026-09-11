@@ -80,3 +80,18 @@ export function quarterBounds(
   const iso = (d: Date) => d.toISOString().slice(0, 10)
   return { startDate: iso(start), endDate: iso(end) }
 }
+/**
+ * Shared week-key normalizer: accepts only a valid ISO date string, returns
+ * that week's Monday (the single derived week key across modules — metrics
+ * entries, rock statuses). Extracted from metrics.ts in ticket 18 so both
+ * modules share one spelling of the concept.
+ */
+export function normalizeWeek(week: unknown): string | null {
+  if (typeof week !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(week)) return null
+  try {
+    assertValidDate(week)
+  } catch {
+    return null
+  }
+  return weekStart(week)
+}

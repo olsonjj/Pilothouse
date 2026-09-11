@@ -2,7 +2,8 @@ import type { Db } from './db'
 import { metricEntries, metrics, people, users, type Metric, type MetricEntry } from './schema'
 import { requireRole, getCurrentUser } from './auth'
 import { and, asc, desc, eq, gte, inArray, lt, sql } from 'drizzle-orm'
-import { assertValidDate, weekStart, formatWeekLabel } from './week'
+import { normalizeWeek } from './week'
+import { weekStart, formatWeekLabel } from './week'
 
 /**
  * Scorecard metric definitions (ticket 13). Admins manage; every signed-in
@@ -210,16 +211,6 @@ function normalizeActual(actual: unknown): number | null {
  * normalized to its week's Monday (so callers can pass any day of the week —
  * decided ticket 14; entries always land on derived week keys).
  */
-function normalizeWeek(week: unknown): string | null {
-  if (typeof week !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(week)) return null
-  try {
-    assertValidDate(week)
-  } catch {
-    return null
-  }
-  return weekStart(week)
-}
-
 /**
  * Enter (or overwrite) one metric's number for one week.
  *

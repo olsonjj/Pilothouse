@@ -6,6 +6,8 @@ import {
   createRock,
   updateRock,
   listRocks,
+  setStatus,
+  listStatusesForRocks,
   type RockInput,
 } from '../server/rocks'
 
@@ -60,4 +62,23 @@ export const updateRockFn = createServerFn({ method: 'POST' })
       target: data.target,
       direction: data.direction,
     })
+  })
+export const setStatusFn = createServerFn({ method: 'POST' })
+  .validator((d: unknown) =>
+    d as { rockId?: number; week?: string; status?: string; actual?: unknown; comment?: string | null },
+  )
+  .handler(async ({ data }) => {
+    const db = await getDb()
+    return setStatus(db, getCookie(SESSION_COOKIE), data.rockId ?? 0, data.week ?? '', {
+      status: data.status as 'on_track' | 'off_track' | 'measuring',
+      actual: data.actual,
+      comment: data.comment ?? null,
+    })
+  })
+
+export const listStatusesFn = createServerFn({ method: 'GET' })
+  .validator((d: unknown) => d as { quarterId?: number })
+  .handler(async ({ data }) => {
+    const db = await getDb()
+    return listStatusesForRocks(db, getCookie(SESSION_COOKIE), data?.quarterId ?? 0)
   })
