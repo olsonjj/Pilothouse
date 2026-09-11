@@ -11,7 +11,7 @@ with or endorsed by EOS Worldwide").
 
 **Blocked by:** None (post-25 scope addition).
 
-**Status:** done (review pending)
+**Status:** done (reviewer SIGN-OFF; meeting.tsx stub regression recovered in b27b706)
 
 - [x] Product renamed Pilothouse everywhere user-facing: package.json name,
       page titles, sign-in/home headings, cookie name
