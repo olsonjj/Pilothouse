@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ChartRouteImport } from './routes/chart'
 import { Route as IssuesRouteImport } from './routes/issues'
+import { Route as L10RouteImport } from './routes/l10'
 import { Route as PeopleRouteImport } from './routes/people'
 import { Route as RocksRouteImport } from './routes/rocks'
 import { Route as ScorecardRouteImport } from './routes/scorecard'
@@ -33,6 +34,11 @@ const ChartRoute = ChartRouteImport.update({
 const IssuesRoute = IssuesRouteImport.update({
   id: '/issues',
   path: '/issues',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const L10Route = L10RouteImport.update({
+  id: '/l10',
+  path: '/l10',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PeopleRoute = PeopleRouteImport.update({
@@ -75,6 +81,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/chart': typeof ChartRoute
   '/issues': typeof IssuesRoute
+  '/l10': typeof L10Route
   '/people': typeof PeopleRouteWithChildren
   '/rocks': typeof RocksRoute
   '/scorecard': typeof ScorecardRoute
@@ -87,6 +94,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/chart': typeof ChartRoute
   '/issues': typeof IssuesRoute
+  '/l10': typeof L10Route
   '/people': typeof PeopleRouteWithChildren
   '/rocks': typeof RocksRoute
   '/scorecard': typeof ScorecardRoute
@@ -100,6 +108,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/chart': typeof ChartRoute
   '/issues': typeof IssuesRoute
+  '/l10': typeof L10Route
   '/people': typeof PeopleRouteWithChildren
   '/rocks': typeof RocksRoute
   '/scorecard': typeof ScorecardRoute
@@ -114,6 +123,7 @@ export interface FileRouteTypes {
     | '/'
     | '/chart'
     | '/issues'
+    | '/l10'
     | '/people'
     | '/rocks'
     | '/scorecard'
@@ -126,6 +136,7 @@ export interface FileRouteTypes {
     | '/'
     | '/chart'
     | '/issues'
+    | '/l10'
     | '/people'
     | '/rocks'
     | '/scorecard'
@@ -138,6 +149,7 @@ export interface FileRouteTypes {
     | '/'
     | '/chart'
     | '/issues'
+    | '/l10'
     | '/people'
     | '/rocks'
     | '/scorecard'
@@ -151,6 +163,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ChartRoute: typeof ChartRoute
   IssuesRoute: typeof IssuesRoute
+  L10Route: typeof L10Route
   PeopleRoute: typeof PeopleRouteWithChildren
   RocksRoute: typeof RocksRoute
   ScorecardRoute: typeof ScorecardRoute
@@ -180,6 +193,13 @@ declare module '@tanstack/react-router' {
       path: '/issues'
       fullPath: '/issues'
       preLoaderRoute: typeof IssuesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/l10': {
+      id: '/l10'
+      path: '/l10'
+      fullPath: '/l10'
+      preLoaderRoute: typeof L10RouteImport
       parentRoute: typeof rootRouteImport
     }
     '/people': {
@@ -249,6 +269,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ChartRoute: ChartRoute,
   IssuesRoute: IssuesRoute,
+  L10Route: L10Route,
   PeopleRoute: PeopleRouteWithChildren,
   RocksRoute: RocksRoute,
   ScorecardRoute: ScorecardRoute,

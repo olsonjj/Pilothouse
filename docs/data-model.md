@@ -348,6 +348,25 @@ meetings are frozen.
 `UNIQUE(meeting_id, segment_key)`. Notes are last-write-wins textareas; actual
 minutes per segment live in `elapsed_seconds`.
 
+**Segment state machine (ticket 21, implemented):** planned minutes are NOT
+stored — they come from the fixed agenda constant in the meetings module
+(Segue 5 / Scorecard 5 / Rocks 5 / Headlines 5 / To-Dos 5 / IDS 60 /
+Conclude 5). Each segment row carries `entered_at` (when it became current —
+added column, documented delta) and `done_at` (set on advance; distinguishes a
+sub-second segment from an active one). Start creates all 7 rows in agenda
+order with the FIRST segment active. The active segment is the unique row with
+`entered_at != null AND done_at IS NULL`. Advance stamps
+`elapsed_seconds = now − entered_at` + `done_at`, and activates the next.
+Advancing `conclude` is rejected — concluding the meeting is ticket 25's
+explicit act, not a timer advance. One OPEN meeting per company at a time
+(app-enforced; `team_id` omitted — single-company delta). Open meetings
+hard-delete (meeting + segments); concluded meetings are frozen. Advisory
+facilitator: any signed-in user sets/clears it; no permissions attach.
+Meetings `team_id`/`date`: `date` is the meeting day. `issues.meeting_id` and
+`todos.source_meeting_id` remain plain ints (FK conversion deferred — the
+cross-module integrity is enforced at the seam; a SQLite FK addition would
+require table rebuilds).
+
 ### meeting_issues
 `id, meeting_id FK, issue_id FK, state CHECK('in_ids','solved_today','carried')`.
 `UNIQUE(meeting_id, issue_id)`. On conclude, non-solved rows flip to 'carried'

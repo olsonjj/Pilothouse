@@ -60,6 +60,9 @@ function Home() {
           <Link to="/vto" className="text-blue-600 hover:underline">
             V/TO
           </Link>
+          <Link to="/l10" className="text-blue-600 hover:underline">
+            L10
+          </Link>
         </nav>
         <button
           onClick={handleSignOut}

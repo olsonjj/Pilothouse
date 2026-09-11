@@ -545,3 +545,58 @@ export const rockStatuses = sqliteTable(
   ],
 )
 export type RockStatus = typeof rockStatuses.$inferSelect
+
+/**
+ * Level 10 meetings (ticket 21). One open meeting per company at a time
+ * (app-enforced; `team_id` omitted — same single-company delta as todos).
+ * Concluded meetings are frozen (ticket 25 concludes); open meetings are
+ * deletable. `date` is the meeting day (YYYY-MM-DD); `started_at` the ISO
+ * timestamp. Advisory facilitator: a label, no permissions attach (decided).
+ */
+export const meetings = sqliteTable(
+  'meetings',
+  {
+    ...mutableFields,
+    date: text('date').notNull(),
+    status: text('status').notNull().default('open'),
+    facilitatorPersonId: integer('facilitator_person_id').references(() => people.id),
+    startedAt: text('started_at').notNull(),
+    concludedAt: text('concluded_at'),
+    createdBy: integer('created_by')
+      .notNull()
+      .references(() => users.id),
+  },
+  (t) => [check('meetings_status_check', sql`${t.status} IN ('open', 'concluded')`)],
+)
+export type Meeting = typeof meetings.$inferSelect
+
+/**
+ * The 7 fixed agenda segments. Planned minutes live in code (SEGMENT_AGENDA
+ * in src/server/meetings.ts — the agenda is fixed, not per-row data);
+ * `elapsed_seconds` fills in on advance; `entered_at` is when the segment
+ * became current (delta vs data-model sketch — needed for the advisory
+ * countdown). Notes are last-write-wins textareas (ticket 22 renders them).
+ */
+export const meetingSegments = sqliteTable(
+  'meeting_segments',
+  {
+    ...mutableFields,
+    meetingId: integer('meeting_id')
+      .notNull()
+      .references(() => meetings.id),
+    segmentKey: text('segment_key').notNull(),
+    elapsedSeconds: integer('elapsed_seconds').notNull().default(0),
+    enteredAt: text('entered_at'),
+    /** Set on advance — distinguishes a sub-second segment from an active one. */
+    doneAt: text('done_at'),
+    notes: text('notes').notNull().default(''),
+  },
+  (t) => [
+    uniqueIndex('meeting_segments_meeting_key_idx').on(t.meetingId, t.segmentKey),
+    check(
+      'meeting_segments_key_check',
+      sql`${t.segmentKey} IN ('segue', 'scorecard', 'rocks', 'headlines', 'todos', 'ids', 'conclude')`,
+    ),
+  ],
+)
+export type MeetingSegment = typeof meetingSegments.$inferSelect
