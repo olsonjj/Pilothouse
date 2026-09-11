@@ -11,7 +11,7 @@ in nowhere (no auto-session).
 
 **Blocked by:** None beyond the completed build (01–25).
 
-**Status:** done (review pending)
+**Status:** done (reviewer sign-off; unauth pin trio + insert-catch mapping applied)
 
 - [x] Admin can create a user (email, name, initial password, role
       admin/member) from a User Management page; duplicate email rejected;

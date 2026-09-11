@@ -100,17 +100,32 @@ export async function createUser(
     return { ok: false, error: 'invalid_role' }
   }
 
+  try {
+    return await insertUser(db, input)
+  } catch (err) {
+    // A concurrent create that passed the pre-check above hits the
+    // users_email_unique index — surface the friendly error, not a 500.
+    const message = err instanceof Error ? err.message : String(err)
+    if (message.includes('users_email_unique')) return { ok: false, error: 'email_taken' }
+    throw err
+  }
+}
+
+async function insertUser(
+  db: Db,
+  input: { email: string; name: string; password: string; role: 'admin' | 'member' },
+): Promise<UserMgmtResult<User>> {
   const [user] = await db
     .insert(users)
     .values({
-      email,
-      name,
+      email: input.email,
+      name: input.name,
       passwordHash: hashPassword(input.password),
       role: input.role,
       updatedAt: new Date().toISOString(),
     })
     .returning()
-  return { ok: true, value: user! }
+  return { ok: true as const, value: user! }
 }
 
 /**

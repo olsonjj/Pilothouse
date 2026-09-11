@@ -229,5 +229,17 @@ describe('Admin user management (seam, ticket 26)', () => {
       error: 'forbidden',
     })
     assert.deepEqual(await setRole(db, member.token, 1, 'admin'), { ok: false, error: 'forbidden' })
+    // Unauthenticated denials (review P2 — pin all four entry points).
+    assert.deepEqual(await createUser(db, undefined, {
+      email: 'x@co.com', name: 'X', password: 'longenough1', role: 'member',
+    }), { ok: false, error: 'unauthenticated' })
+    assert.deepEqual(await resetPassword(db, undefined, 1, 'longenough1'), {
+      ok: false,
+      error: 'unauthenticated',
+    })
+    assert.deepEqual(await setRole(db, undefined, 1, 'admin'), {
+      ok: false,
+      error: 'unauthenticated',
+    })
   })
 })
