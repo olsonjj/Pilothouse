@@ -11,6 +11,7 @@ import {
   setFacilitator,
   listMeetings,
   getPreloadedData,
+  saveSegmentNotes,
 } from '../server/meetings'
 
 /** Thin cookie-layer wrappers around src/server/meetings.ts. */
@@ -62,3 +63,15 @@ export const getPreloadedDataFn = createServerFn({ method: 'GET' }).handler(asyn
   const db = await getDb()
   return getPreloadedData(db, getCookie(SESSION_COOKIE))
 })
+export const saveSegmentNotesFn = createServerFn({ method: 'POST' })
+  .validator((d: unknown) => d as { meetingId?: number; segmentId?: number; notes?: string })
+  .handler(async ({ data }) => {
+    const db = await getDb()
+    return saveSegmentNotes(
+      db,
+      getCookie(SESSION_COOKIE),
+      data.meetingId ?? 0,
+      data.segmentId ?? 0,
+      data.notes ?? '',
+    )
+  })

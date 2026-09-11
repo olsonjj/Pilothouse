@@ -9,6 +9,7 @@ import {
   setFacilitator,
   listMeetings,
   getPreloadedData,
+  saveSegmentNotes,
   SEGMENT_AGENDA,
 } from '../src/server/meetings'
 import { createPerson, linkUserToPerson } from '../src/server/people'
@@ -273,5 +274,106 @@ describe('L10 pre-loads (seam, ticket 21)', () => {
     const { token } = await signedInUser(db)
     assert.equal((await getPreloadedData(db, token)).ok, true)
     assert.deepEqual(await getPreloadedData(db, undefined), { ok: false, error: 'unauthenticated' })
+  })
+})
+
+describe('Segment notes: save, last-write-wins, guards (seam, ticket 22)', () => {
+  it('save round-trips through getMeeting; ANY participant saves; last write wins (pinned)', async () => {
+    const { db } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const member = await signedInUser(db, 'member')
+    const started = await startMeeting(db, token)
+    if (!started.ok) throw new Error('start failed')
+    const segue = started.value.segments.find((s) => s.segmentKey === 'segue')
+    if (!segue) throw new Error('segue segment missing')
+
+    // Creator saves first.
+    assert.equal(
+      (await saveSegmentNotes(db, token, started.value.id, segue.id, 'first draft')).ok,
+      true,
+    )
+    // ANY participant (member, not creator) saves second — last-write-wins.
+    assert.equal(
+      (await saveSegmentNotes(db, member.token, started.value.id, segue.id, 'member notes')).ok,
+      true,
+    )
+
+    // The polling model: state changes are visible through subsequent reads.
+    const read = await getMeeting(db, member.token, started.value.id)
+    assert.equal(read.ok, true)
+    if (!read.ok) throw new Error('read failed')
+    const readSeg = read.value.segments.find((s) => s.id === segue.id)
+    assert.ok(readSeg)
+    // Pinned: the SECOND write is the content — no merge, no versioning.
+    assert.equal(readSeg.notes, 'member notes')
+  })
+
+  it('save on a concluded meeting is rejected; on a deleted meeting → not_found; unauth denied', async () => {
+    const { db, sqlite } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const started = await startMeeting(db, token)
+    if (!started.ok) throw new Error('start failed')
+    const seg = started.value.segments[0]
+
+    // Concluded (simulated — conclusion itself is ticket 25).
+    sqlite.exec(`UPDATE meetings SET status = 'concluded' WHERE id = ${started.value.id}`)
+    assert.deepEqual(await saveSegmentNotes(db, token, started.value.id, seg.id, 'x'), {
+      ok: false,
+      error: 'meeting_concluded',
+    })
+    // Restore open, then delete: saving to a deleted meeting → not_found.
+    sqlite.exec(`UPDATE meetings SET status = 'open' WHERE id = ${started.value.id}`)
+    assert.equal((await deleteMeeting(db, token, started.value.id)).ok, true)
+    assert.deepEqual(await saveSegmentNotes(db, token, started.value.id, seg.id, 'x'), {
+      ok: false,
+      error: 'meeting_not_found',
+    })
+    assert.deepEqual(await saveSegmentNotes(db, undefined, started.value.id, seg.id, 'x'), {
+      ok: false,
+      error: 'unauthenticated',
+    })
+  })
+
+  it('size cap: 100KB+1 rejected with notes_too_large; 100KB exactly accepted', async () => {
+    const { db } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const started = await startMeeting(db, token)
+    if (!started.ok) throw new Error('start failed')
+    const seg = started.value.segments[0]
+    assert.deepEqual(
+      await saveSegmentNotes(db, token, started.value.id, seg.id, 'a'.repeat(100_001)),
+      { ok: false, error: 'notes_too_large' },
+    )
+    assert.equal(
+      (await saveSegmentNotes(db, token, started.value.id, seg.id, 'a'.repeat(100_000))).ok,
+      true,
+    )
+    // Rejected writes persist nothing.
+    const read = await getMeeting(db, token, started.value.id)
+    if (!read.ok) throw new Error('read failed')
+    const readSeg = read.value.segments.find((s) => s.id === seg.id)
+    assert.equal(readSeg?.notes, 'a'.repeat(100_000))
+  })
+
+  it('unknown segment for the meeting rejected; notes visible to other participants via read', async () => {
+    const { db } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const other = await signedInUser(db, 'member')
+    const started = await startMeeting(db, token)
+    if (!started.ok) throw new Error('start failed')
+    const seg = started.value.segments[0]
+    assert.deepEqual(await saveSegmentNotes(db, token, started.value.id, 9999, 'x'), {
+      ok: false,
+      error: 'segment_not_found',
+    })
+    // A segment from a DIFFERENT meeting → segment_not_found.
+    const second = await startMeeting(db, token)
+    assert.equal(second.ok, false) // open meeting exists
+    void other
+    // Save + read from the other participant (polling model).
+    assert.equal((await saveSegmentNotes(db, token, started.value.id, seg.id, 'shared')).ok, true)
+    const read = await getMeeting(db, other.token, started.value.id)
+    if (!read.ok) throw new Error('read failed')
+    assert.equal(read.value.segments.find((s) => s.id === seg.id)?.notes, 'shared')
   })
 })

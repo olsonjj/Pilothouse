@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { getCurrentUserFn, signOutFn } from '../functions/auth'
 import { listPeopleFn } from '../functions/people'
 import {
@@ -10,6 +10,7 @@ import {
   setFacilitatorFn,
   listMeetingsFn,
   getPreloadedDataFn,
+  saveSegmentNotesFn,
 } from '../functions/meetings'
 import type { MeetingWithSegments, SegmentView, MeetingSummary } from '../server/meetings'
 
@@ -37,6 +38,13 @@ function fmtClock(totalSeconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
+/** Drop one key from a records object (immutably). */
+function omit(obj: Record<number, string>, key: number): Record<number, string> {
+  const next = { ...obj }
+  delete next[key]
+  return next
+}
+
 /** Advisory countdown: planned minutes from segment entry; never locks anything. */
 function SegmentTimer(props: { segment: SegmentView; now: number }) {
   const { segment } = props
@@ -53,6 +61,48 @@ function SegmentTimer(props: { segment: SegmentView; now: number }) {
     <span className={'text-xs font-mono ' + (remaining < 0 ? 'text-red-600' : 'text-slate-600')}>
       {fmtClock(Math.max(0, remaining))} left {remaining < 0 ? '(over)' : ''}
     </span>
+  )
+}
+
+/**
+ * Per-segment autosaving notes (ticket 22): debounced 800ms after the last
+ * keystroke via saveSegmentNotes; last-write-wins — the poll applies other
+ * participants' notes whenever you are NOT editing this segment (skip-
+ * while-editing UX: a focused/dirty textarea is never clobbered mid-typing).
+ */
+const NOTES_DEBOUNCE_MS = 800
+
+function SegmentNotes(props: {
+  meetingId: number
+  segment: SegmentView
+  draft: string
+  editing: boolean
+  savedTick: number
+  onDraft: (segmentId: number, value: string) => void
+  onEditingChange: (segmentId: number | null) => void
+}) {
+  const [saved, setSaved] = useState(false)
+  useEffect(() => {
+    if (!props.savedTick) return
+    setSaved(true)
+    const t = setTimeout(() => setSaved(false), 1500)
+    return () => clearTimeout(t)
+  }, [props.savedTick])
+  return (
+    <div className="mt-2">
+      <textarea
+        value={props.draft}
+        placeholder="segment notes…"
+        onFocus={() => props.onEditingChange(props.segment.id)}
+        onBlur={() => props.onEditingChange(null)}
+        onChange={(e) => props.onDraft(props.segment.id, e.target.value)}
+        rows={2}
+        className="w-full rounded border border-slate-200 px-2 py-1 text-xs"
+      />
+      <span className="text-[10px] text-slate-400">
+        {saved ? 'saved' : props.editing ? 'editing…' : ''}
+      </span>
+    </div>
   )
 }
 
@@ -74,6 +124,8 @@ function errorText(error: string): string {
       return 'Concluding the meeting happens in the Conclude step (coming in ticket 25).'
     case 'person_not_found':
       return 'That person no longer exists.'
+    case 'notes_too_large':
+      return 'Notes are too large (100KB max).'
     default:
       return 'Something went wrong.'
   }
@@ -88,6 +140,32 @@ function L10Page() {
   const [now, setNow] = useState(() => Date.now())
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+
+  // Notes drafts + editing state (ticket 22). drafts[segmentId] holds local
+  // text; the poll never overwrites the segment being edited (skip-while-
+  // editing) — server notes apply whenever the segment is not being edited.
+  const [drafts, setDrafts] = useState<Record<number, string>>({})
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [savedTicks, setSavedTicks] = useState<Record<number, number>>({})
+  const saveTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({})
+  const saveInFlight = useRef(false)
+
+  // Polling (ticket 22): re-fetch the shared meeting state every 2.5s so all
+  // participants see each other's updates within a few seconds (no SSE/
+  // websockets — decided). Skipped while a notes save is in flight so the
+  // response can't clobber the just-saved value; getMeeting is cheap (summary
+  // + segments; pre-loads are NOT re-run per poll).
+  useEffect(() => {
+    if (!open) return
+    const t = setInterval(async () => {
+      if (saveInFlight.current) return
+      const result = await getOpenMeetingFn()
+      if (result.ok && result.value && result.value.id === open.id) {
+        setOpen(result.value)
+      }
+    }, 2500)
+    return () => clearInterval(t)
+  }, [open?.id, open?.status])
 
   // Advisory tick for countdowns (1s; purely presentational).
   useEffect(() => {
@@ -156,6 +234,27 @@ function L10Page() {
       if (result.ok) setOpen(result.value)
       return result
     })
+  }
+
+  function handleDraft(segmentId: number, value: string) {
+    setDrafts((d) => ({ ...d, [segmentId]: value }))
+    // Debounced autosave: 800ms after the last keystroke (ticket 22).
+    clearTimeout(saveTimers.current[segmentId])
+    saveTimers.current[segmentId] = setTimeout(() => {
+      void (async () => {
+        if (!open) return
+        saveInFlight.current = true
+        const result = await saveSegmentNotesFn({
+          data: { meetingId: open.id, segmentId, notes: value },
+        })
+        saveInFlight.current = false
+        if (result.ok) {
+          setSavedTicks((t) => ({ ...t, [segmentId]: Date.now() }))
+          // Clear the draft only if the user hasn't typed more since scheduling.
+          setDrafts((d) => (d[segmentId] === value ? omit(d, segmentId) : d))
+        }
+      })()
+    }, NOTES_DEBOUNCE_MS)
   }
 
   async function handleSignOut() {
@@ -239,7 +338,7 @@ function L10Page() {
               <li
                 key={s.id}
                 className={
-                  'flex items-center justify-between rounded border px-3 py-2 text-sm ' +
+                  'rounded border px-3 py-2 text-sm ' +
                   (s.active
                     ? 'border-blue-400 bg-blue-50'
                     : s.done
@@ -247,26 +346,37 @@ function L10Page() {
                       : 'border-slate-200 bg-white')
                 }
               >
-                <div>
-                  <span className="font-medium">
-                    {i + 1}. {s.label}
-                  </span>
-                  <span className="ml-2 text-xs text-slate-400">
-                    {s.done ? 'done' : s.active ? 'in progress' : 'upcoming'}
-                  </span>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="font-medium">
+                      {i + 1}. {s.label}
+                    </span>
+                    <span className="ml-2 text-xs text-slate-400">
+                      {s.done ? 'done' : s.active ? 'in progress' : 'upcoming'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <SegmentTimer segment={s} now={now} />
+                    {s.active && s.segmentKey !== 'conclude' && (
+                      <button
+                        onClick={() => handleAdvance(s)}
+                        disabled={busy}
+                        className="rounded bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700 disabled:opacity-50"
+                      >
+                        Advance
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <SegmentTimer segment={s} now={now} />
-                  {s.active && s.segmentKey !== 'conclude' && (
-                    <button
-                      onClick={() => handleAdvance(s)}
-                      disabled={busy}
-                      className="rounded bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700 disabled:opacity-50"
-                    >
-                      Advance
-                    </button>
-                  )}
-                </div>
+                <SegmentNotes
+                  meetingId={open.id}
+                  segment={s}
+                  draft={drafts[s.id] ?? s.notes}
+                  editing={editingId === s.id}
+                  savedTick={savedTicks[s.id] ?? 0}
+                  onDraft={handleDraft}
+                  onEditingChange={setEditingId}
+                />
               </li>
             ))}
           </ol>

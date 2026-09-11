@@ -49,6 +49,7 @@ export type MeetingError =
   | 'segment_not_found'
   | 'conclude_is_ticket_25'
   | 'person_not_found'
+  | 'notes_too_large'
 
 export type MeetingResult<T> = { ok: true; value: T } | { ok: false; error: MeetingError }
 
@@ -288,6 +289,46 @@ export async function advanceSegment(
     .where(eq(meetingSegments.id, next.id))
 
   return getMeeting(db, token, meetingId)
+}
+
+/**
+ * Per-segment meeting notes (ticket 22): any participant (any signed-in user —
+ * the meeting is shared) saves a segment's notes on OPEN meetings only.
+ * Last-write-wins: no merge, no versioning — the newest write is the content
+ * (decided). A 100KB cap bounds abuse without constraining real notes.
+ * Polling clients re-fetch via getMeeting (cheap: summary + segments only;
+ * pre-loads are a separate call and are NOT re-run per poll).
+ */
+export const SEGMENT_NOTES_MAX = 100_000
+
+export async function saveSegmentNotes(
+  db: Db,
+  token: string | undefined,
+  meetingId: number,
+  segmentId: number,
+  notes: string,
+): Promise<MeetingResult<true>> {
+  const auth = await getCurrentUser(db, token)
+  if (!auth.ok) return auth
+  if (typeof notes !== 'string' || notes.length > SEGMENT_NOTES_MAX) {
+    return { ok: false, error: 'notes_too_large' }
+  }
+  const loaded = await loadMeeting(db, meetingId)
+  if (!loaded) return { ok: false, error: 'meeting_not_found' }
+  if (loaded.meeting.status === 'concluded') return { ok: false, error: 'meeting_concluded' }
+  const segment = await db
+    .select({ id: meetingSegments.id })
+    .from(meetingSegments)
+    .where(and(eq(meetingSegments.id, segmentId), eq(meetingSegments.meetingId, meetingId)))
+    .get()
+  if (!segment) return { ok: false, error: 'segment_not_found' }
+  const now = nowIso()
+  await db
+    .update(meetingSegments)
+    .set({ notes, updatedAt: now })
+    .where(eq(meetingSegments.id, segmentId))
+  await db.update(meetings).set({ updatedAt: now }).where(eq(meetings.id, meetingId))
+  return { ok: true, value: true }
 }
 
 /** Open meetings only; hard delete of the meeting + its segments (v1). */

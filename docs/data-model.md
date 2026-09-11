@@ -346,7 +346,14 @@ meetings are frozen.
 `id, meeting_id FK, segment_key CHECK IN ('segue','scorecard','rocks','headlines',
 'todos','ids','conclude'), elapsed_seconds(int), notes(text)`.
 `UNIQUE(meeting_id, segment_key)`. Notes are last-write-wins textareas; actual
-minutes per segment live in `elapsed_seconds`.
+minutes per segment live in `elapsed_seconds`. Ticket 22 semantics: saves are
+any-participant on open meetings only, with a 100KB cap (`SEGMENT_NOTES_MAX`,
+abuse bound — rejected writes persist nothing). Polling clients re-fetch via
+`getMeeting` (cheap: summary + segments; pre-loads are a separate call and are
+NOT re-run per poll — no state-only variant needed). Client UX: debounced
+~800ms autosave, skip-while-editing (a focused/dirty textarea is never
+clobbered by the poll; other participants' notes apply when you're not
+editing), 2.5s poll interval.
 
 **Segment state machine (ticket 21, implemented):** planned minutes are NOT
 stored — they come from the fixed agenda constant in the meetings module
