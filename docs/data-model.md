@@ -217,7 +217,8 @@ window entries gets a null rate (rendered "—"). The rollup window is the 12
 most recent weeks INCLUDING the current week (entries land during their
 week) — documented delta vs ticket 12's to-do rate, which uses
 fully-elapsed weeks only (different discipline, different window). Owner
-and team rates aggregate only metrics that have window entries.
+and team rates aggregate only metrics that have window entries; rollups
+include retired metrics' in-window entries (history is judged, not hidden).
 
 ## Issues tables
 

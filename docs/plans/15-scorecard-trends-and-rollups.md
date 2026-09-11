@@ -4,7 +4,7 @@
 
 **Blocked by:** 14: Scorecard: weekly grid.
 
-**Status:** done (review pending)
+**Status:** done (reviewer sign-off; boundary pins verified flipping under off-by-one)
 
 - [x] Trend view shows the last 8–12 weeks per metric as colored bars
 - [x] Trailing-quarter on-track % per metric and per owner
