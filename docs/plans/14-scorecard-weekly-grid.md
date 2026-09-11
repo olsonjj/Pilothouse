@@ -4,10 +4,10 @@
 
 **Blocked by:** 13: Scorecard: metric definitions, 03: Quarters & week utility.
 
-**Status:** ready-for-agent
+**Status:** done (review pending)
 
-- [ ] Metric owner or admin enters one number per metric per week; re-entering overwrites
-- [ ] Traffic light derives from direction-aware comparison — never hand-set
-- [ ] Each entry stores `target_at_entry` so past weeks render correctly after re-targets
-- [ ] Week columns labeled via the shared week helper
-- [ ] Seam tests cover overwrite, direction logic, and re-target history
+- [x] Metric owner or admin enters one number per metric per week; re-entering overwrites
+- [x] Traffic light derives from direction-aware comparison — never hand-set
+- [x] Each entry stores `target_at_entry` so past weeks render correctly after re-targets
+- [x] Week columns labeled via the shared week helper
+- [x] Seam tests cover overwrite, direction logic, and re-target history

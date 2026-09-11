@@ -1,7 +1,14 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { createMetric, updateMetric, listMetrics } from '../src/server/metrics'
-import { createPerson } from '../src/server/people'
+import {
+  createMetric,
+  updateMetric,
+  listMetrics,
+  setEntry,
+  listEntriesForGrid,
+  listEntriesForMetric,
+} from '../src/server/metrics'
+import { createPerson, linkUserToPerson } from '../src/server/people'
 import { metrics } from '../src/server/schema'
 import { createTestDb, signedInUser } from './helpers'
 
@@ -198,5 +205,217 @@ describe('Scorecard metric definitions (seam, ticket 13)', () => {
     })
     assert.deepEqual(await listMetrics(db, undefined), { ok: false, error: 'unauthenticated' })
     assert.deepEqual(await listMetrics(db, undefined, true), { ok: false, error: 'unauthenticated' })
+  })
+})
+describe('Scorecard weekly entries + grid (seam, ticket 14)', () => {
+  it('setEntry round-trips; re-entry overwrites actual AND re-captures target_at_entry (re-target history basis)', async () => {
+    const { db } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const alice = await personFor(db, token, 'Alice')
+    const metric = await createMetric(db, token, { ...VALID, ownerPersonId: alice.id, target: 100 })
+    if (!metric.ok) throw new Error('fixture failed')
+
+    const first = await setEntry(db, token, metric.value.id, '2026-03-23', 120)
+    assert.equal(first.ok, true)
+    if (first.ok) {
+      assert.equal(first.value.week, '2026-03-23') // already a Monday
+      assert.equal(first.value.actual, 120)
+      assert.equal(first.value.targetAtEntry, 100)
+    }
+
+    // Overwrite in the same week.
+    const second = await setEntry(db, token, metric.value.id, '2026-03-25', 90)
+    assert.equal(second.ok, true)
+    if (second.ok) {
+      assert.equal(second.value.id, first.ok ? first.value.id : -1) // same row
+      assert.equal(second.value.week, '2026-03-23') // normalized to Monday
+      assert.equal(second.value.actual, 90)
+      assert.equal(second.value.targetAtEntry, 100)
+    }
+
+    // Re-target, then re-enter: the entry's basis becomes the NEW target.
+    assert.equal(
+      (await updateMetric(db, token, metric.value.id, {
+        ...VALID,
+        ownerPersonId: alice.id,
+        target: 80,
+      })).ok,
+      true,
+    )
+    const third = await setEntry(db, token, metric.value.id, '2026-03-26', 85)
+    assert.equal(third.ok, true)
+    if (third.ok) {
+      assert.equal(third.value.week, '2026-03-23')
+      assert.equal(third.value.actual, 85)
+      assert.equal(third.value.targetAtEntry, 80)
+      // pass derives against the NEW basis: 85 >= 80.
+    }
+    const grid = await listEntriesForGrid(db, token, 1, '2026-03-27')
+    assert.equal(grid.ok, true)
+    if (grid.ok) assert.equal(grid.value.metrics[0]!.cells[0]!.pass, true)
+  })
+
+  it('traffic lights derive direction-aware with inclusive boundaries (never hand-set)', async () => {
+    const { db } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const alice = await personFor(db, token, 'Alice')
+    const gte = await createMetric(db, token, { ...VALID, ownerPersonId: alice.id, target: 10 })
+    const lte = await createMetric(db, token, {
+      name: 'Defects',
+      ownerPersonId: alice.id,
+      target: 5,
+      direction: 'lte',
+    })
+    if (!gte.ok || !lte.ok) throw new Error('fixture failed')
+
+    // gte target 10: 10 → pass (boundary inclusive), 9.9 → fail.
+    assert.equal((await setEntry(db, token, gte.value.id, '2026-03-23', 10)).ok, true)
+    assert.equal((await setEntry(db, token, gte.value.id, '2026-03-30', 9.9)).ok, true)
+    // lte target 5: 5 → pass, 5.1 → fail.
+    assert.equal((await setEntry(db, token, lte.value.id, '2026-03-23', 5)).ok, true)
+    assert.equal((await setEntry(db, token, lte.value.id, '2026-03-30', 5.1)).ok, true)
+
+    const grid = await listEntriesForGrid(db, token, 2, '2026-04-03')
+    assert.equal(grid.ok, true)
+    if (!grid.ok) throw new Error('grid failed')
+    const gteRow = grid.value.metrics.find((m) => m.id === gte.value.id)!
+    const lteRow = grid.value.metrics.find((m) => m.id === lte.value.id)!
+    assert.deepEqual(gteRow.cells.map((c) => c.pass), [true, false])
+    assert.deepEqual(lteRow.cells.map((c) => c.pass), [true, false])
+    // Not hand-set: cells carry entry ids + basis for provenance.
+    assert.equal(gteRow.cells[0]!.targetAtEntry, 10)
+    assert.ok(gteRow.cells[0]!.entryId != null)
+  })
+
+  it('week normalization: mid-week dates land on their Monday (pinned)', async () => {
+    const { db } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const alice = await personFor(db, token, 'Alice')
+    const metric = await createMetric(db, token, { ...VALID, ownerPersonId: alice.id })
+    if (!metric.ok) throw new Error('fixture failed')
+    const wed = await setEntry(db, token, metric.value.id, '2026-03-25', 1) // Wed
+    assert.equal(wed.ok, true)
+    if (wed.ok) assert.equal(wed.value.week, '2026-03-23')
+    const sun = await setEntry(db, token, metric.value.id, '2026-03-29', 2) // Sun
+    assert.equal(sun.ok, true)
+    if (sun.ok) assert.equal(sun.value.week, '2026-03-23') // same week → overwrite
+    // Bad weeks rejected without persisting.
+    assert.deepEqual(await setEntry(db, token, metric.value.id, '2026-3-5', 1), {
+      ok: false,
+      error: 'invalid_week',
+    })
+    assert.deepEqual(await setEntry(db, token, metric.value.id, '2026-02-30', 1), {
+      ok: false,
+      error: 'invalid_week',
+    })
+  })
+
+  it('permission matrix: admin any; owner own; member non-owner forbidden; unauth denied', async () => {
+    const { db } = await createTestDb()
+    const admin = await signedInUser(db)
+    const alice = await personFor(db, admin.token, 'Alice')
+    const member = await signedInUser(db, 'member')
+    const metric = await createMetric(db, admin.token, { ...VALID, ownerPersonId: alice.id })
+    if (!metric.ok) throw new Error('fixture failed')
+
+    // Owner (linked to Alice) can enter their own metric.
+    const aliceUser = await signedInUser(db)
+    assert.equal((await linkUserToPerson(db, admin.token, aliceUser.user.id, alice.id)).ok, true)
+    assert.equal(
+      (await setEntry(db, aliceUser.token, metric.value.id, '2026-03-23', 7)).ok,
+      true,
+    )
+    // Non-owner member forbidden.
+    assert.deepEqual(await setEntry(db, member.token, metric.value.id, '2026-03-23', 7), {
+      ok: false,
+      error: 'forbidden',
+    })
+    // Unauthenticated denied.
+    assert.deepEqual(await setEntry(db, undefined, metric.value.id, '2026-03-23', 7), {
+      ok: false,
+      error: 'unauthenticated',
+    })
+    // Admin can enter any metric (admin fixture is unlinked ≠ owner).
+    assert.equal((await setEntry(db, admin.token, metric.value.id, '2026-03-30', 8)).ok, true)
+  })
+
+  it('inactive metrics reject entries; retired metrics keep readable history', async () => {
+    const { db } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const alice = await personFor(db, token, 'Alice')
+    const metric = await createMetric(db, token, { ...VALID, ownerPersonId: alice.id })
+    if (!metric.ok) throw new Error('fixture failed')
+    assert.equal((await setEntry(db, token, metric.value.id, '2026-03-23', 3)).ok, true)
+    // Retire.
+    assert.equal(
+      (await updateMetric(db, token, metric.value.id, {
+        ...VALID,
+        ownerPersonId: alice.id,
+        active: false,
+      })).ok,
+      true,
+    )
+    assert.deepEqual(await setEntry(db, token, metric.value.id, '2026-03-30', 4), {
+      ok: false,
+      error: 'metric_inactive',
+    })
+    // History still readable, and the grid (active-only) drops the metric.
+    const history = await listEntriesForMetric(db, token, metric.value.id)
+    assert.equal(history.ok, true)
+    if (history.ok) assert.equal(history.value.length, 1)
+    const grid = await listEntriesForGrid(db, token, 4, '2026-04-03')
+    assert.equal(grid.ok, true)
+    if (grid.ok) assert.equal(grid.value.metrics.length, 0)
+  })
+
+  it('grid shape: 8 weeks × active metrics, null cells for missing entries, oldest→newest columns', async () => {
+    const { db } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const alice = await personFor(db, token, 'Alice')
+    const a = await createMetric(db, token, { ...VALID, ownerPersonId: alice.id })
+    const b = await createMetric(db, token, {
+      name: 'Other',
+      ownerPersonId: alice.id,
+      target: 1,
+    })
+    if (!a.ok || !b.ok) throw new Error('fixture failed')
+    // a gets an entry 3 weeks back; b has none.
+    assert.equal((await setEntry(db, token, a.value.id, '2026-03-06', 55)).ok, true)
+    const grid = await listEntriesForGrid(db, token, 8, '2026-03-27')
+    assert.equal(grid.ok, true)
+    if (!grid.ok) throw new Error('grid failed')
+    assert.equal(grid.value.weeks.length, 8)
+    assert.equal(grid.value.weeks[0]!.monday, '2026-02-02') // Mon of week -7
+    assert.equal(grid.value.weeks[7]!.monday, '2026-03-23') // current week's Mon
+    assert.equal(grid.value.weeks[7]!.label, 'Week of Mar 23')
+    const rowA = grid.value.metrics.find((m) => m.id === a.value.id)!
+    const rowB = grid.value.metrics.find((m) => m.id === b.value.id)!
+    assert.equal(rowA.cells.filter((c) => c.actual != null).length, 1)
+    // Entry week 2026-03-02 = index 4 (weeks run 02-02 … 03-23).
+    assert.equal(rowA.cells[4]!.actual, 55)
+    assert.equal(rowA.cells[4]!.pass, false) // 55 >= 50000 fails
+    assert.equal(rowB.cells.filter((c) => c.actual != null).length, 0)
+    assert.ok(rowB.cells.every((c) => c.pass === null))
+  })
+
+  it('entry validation: non-finite actual rejected without persisting; unknown metric not_found', async () => {
+    const { db } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const alice = await personFor(db, token, 'Alice')
+    const metric = await createMetric(db, token, { ...VALID, ownerPersonId: alice.id })
+    if (!metric.ok) throw new Error('fixture failed')
+    assert.deepEqual(await setEntry(db, token, metric.value.id, '2026-03-23', 'abc'), {
+      ok: false,
+      error: 'invalid_actual',
+    })
+    assert.deepEqual(await setEntry(db, token, metric.value.id, '2026-03-23', Infinity), {
+      ok: false,
+      error: 'invalid_actual',
+    })
+    assert.deepEqual(await setEntry(db, token, 999, '2026-03-23', 1), {
+      ok: false,
+      error: 'not_found',
+    })
+    assert.deepEqual(await listEntriesForMetric(db, token, 999), { ok: false, error: 'not_found' })
   })
 })

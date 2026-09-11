@@ -357,3 +357,36 @@ export const metrics = sqliteTable(
   ],
 )
 export type Metric = typeof metrics.$inferSelect
+
+/**
+ * Weekly metric entries (ticket 14). One row per metric per week
+ * (UNIQUE(metric_id, week)); re-entering overwrites the actual and re-captures
+ * target_at_entry. Column naming delta vs data-model.md's sketch
+ * (`value`/`entered_by`/`entered_at` -> `actual`/`entry_by` + base fields):
+ * the module API speaks "actual vs target"; entered_at is covered by
+ * created_at/updated_at (a re-entry IS the update). `week` is always the
+ * Monday ISO date of the entry's week (derived via weekStart, never stored
+ * raw). Entry permissions: admins any metric; the metric's owner their own
+ * (specs/scorecard.md "owner (or any admin) enters"; member access rule
+ * "own assigned metrics").
+ */
+export const metricEntries = sqliteTable(
+  'metric_entries',
+  {
+    ...mutableFields,
+    metricId: integer('metric_id')
+      .notNull()
+      .references(() => metrics.id),
+    /** Monday ISO date of the entry week (derived week key, never stored raw). */
+    week: text('week').notNull(),
+    /** The number the owner entered this week. */
+    actual: real('actual').notNull(),
+    /** The metric's target in force when this entry was written. */
+    targetAtEntry: real('target_at_entry').notNull(),
+    entryBy: integer('entry_by')
+      .notNull()
+      .references(() => users.id),
+  },
+  (t) => [uniqueIndex('metric_entries_metric_week_unique_idx').on(t.metricId, t.week)],
+)
+export type MetricEntry = typeof metricEntries.$inferSelect

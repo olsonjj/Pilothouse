@@ -7,23 +7,32 @@ import {
   listAllMetricsFn,
   createMetricFn,
   updateMetricFn,
+  listGridFn,
+  setEntryFn,
 } from '../functions/metrics'
-import type { MetricWithOwner } from '../server/metrics'
+import type { MetricWithOwner, MetricGrid } from '../server/metrics'
 
 export const Route = createFileRoute('/scorecard')({
   loader: async () => {
     // listAllMetricsFn (with retired rows) is admin-only; members get the
     // active-only public list via the fallback.
-    const [me, people, allMetrics] = await Promise.all([
+    const [me, people, allMetrics, grid] = await Promise.all([
       getCurrentUserFn(),
       listPeopleFn(),
       listAllMetricsFn(),
+      listGridFn(),
     ])
     const isAdmin = me.ok && me.user.role === 'admin'
     const list = allMetrics.ok
       ? allMetrics.value
       : ((await listMetricsFn()) as { ok: true; value: MetricWithOwner[] }).value
-    return { me: me.ok ? me.user : null, isAdmin, people: people.ok ? people.value : [], list }
+    return {
+      me: me.ok ? me.user : null,
+      isAdmin,
+      people: people.ok ? people.value : [],
+      list,
+      grid: grid.ok ? grid.value : null,
+    }
   },
   component: ScorecardPage,
 })
@@ -76,6 +85,7 @@ function ScorecardPage() {
   const isAdmin = data.isAdmin
 
   const [metrics, setMetrics] = useState<MetricWithOwner[]>(data.list)
+  const [grid, setGrid] = useState<MetricGrid | null>(data.grid)
   const [form, setForm] = useState<MetricFormState | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -83,6 +93,21 @@ function ScorecardPage() {
   async function refresh() {
     const result = isAdmin ? await listAllMetricsFn() : await listMetricsFn()
     if (result.ok) setMetrics(result.value)
+    const gridResult = await listGridFn()
+    if (gridResult.ok) setGrid(gridResult.value)
+  }
+
+  async function handleEntrySave(metricId: number, monday: string, raw: string) {
+    if (raw === '') return
+    setBusy(true)
+    setFormError(null)
+    const result = await setEntryFn({ data: { metricId, week: monday, actual: raw } })
+    setBusy(false)
+    if (!result.ok) {
+      setFormError(errorText(result.error))
+      return
+    }
+    await refresh()
   }
 
   async function handleSignOut() {
@@ -185,8 +210,18 @@ function ScorecardPage() {
         )}
       </div>
       <p className="mt-1 text-sm text-slate-500">
-        Weekly pulse metrics. Weekly entries and the grid arrive with the next release.
+        Weekly pulse metrics. The grid below covers the last 8 weeks.
       </p>
+
+      {grid && grid.metrics.length > 0 && (
+        <WeeklyGrid
+          grid={grid}
+          mePersonId={data.me?.personId ?? null}
+          isAdmin={isAdmin}
+          busy={busy}
+          onSave={handleEntrySave}
+        />
+      )}
 
       {formError && <p className="mt-2 text-sm text-red-600">{formError}</p>}
 
@@ -341,5 +376,110 @@ function ScorecardPage() {
         </tbody>
       </table>
     </main>
+  )
+}
+function cellClass(pass: boolean | null): string {
+  if (pass === true) return 'bg-green-100 text-green-800'
+  if (pass === false) return 'bg-red-100 text-red-700'
+  return 'text-slate-300'
+}
+
+/**
+ * The weekly grid (ticket 14): metric rows × week columns, traffic lights
+ * derived server-side. Editable inline by admins and the metric's owner
+ * (server enforces — the UI only enables inputs).
+ */
+function WeeklyGrid(props: {
+  grid: MetricGrid
+  mePersonId: number | null
+  isAdmin: boolean
+  busy: boolean
+  onSave: (metricId: number, monday: string, raw: string) => void
+}) {
+  const [editing, setEditing] = useState<{ metricId: number; monday: string; value: string } | null>(
+    null,
+  )
+  return (
+    <div className="mt-6 overflow-x-auto rounded border border-slate-200 bg-white shadow-sm">
+      <h2 className="border-b border-slate-200 px-4 py-3 font-medium">Weekly grid</h2>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-slate-200 text-left text-slate-500">
+            <th className="sticky left-0 bg-white px-4 py-2 font-medium">Metric</th>
+            {props.grid.weeks.map((w) => (
+              <th key={w.monday} className="px-2 py-2 text-center text-xs font-medium">
+                {w.label.replace('Week of ', '')}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {props.grid.metrics.map((m) => {
+            const canEdit = props.isAdmin || props.mePersonId === m.ownerPersonId
+            return (
+              <tr key={m.id} className="border-b border-slate-100 last:border-0">
+                <td className="sticky left-0 bg-white px-4 py-2">
+                  <div className="font-medium">{m.name}</div>
+                  <div className="text-xs text-slate-500">
+                    {(m.direction === 'gte' ? '≥ ' : '≤ ') + m.target}
+                    {m.unit ? ` ${m.unit}` : ''} · {m.ownerName}
+                  </div>
+                </td>
+                {m.cells.map((cell, i) => {
+                  const monday = props.grid.weeks[i]!.monday
+                  const isEditing =
+                    editing?.metricId === m.id && editing.monday === monday
+                  return (
+                    <td
+                      key={monday}
+                      className={'px-2 py-2 text-center ' + cellClass(cell.pass)}
+                    >
+                      {isEditing ? (
+                        <input
+                          autoFocus
+                          disabled={props.busy}
+                          defaultValue={editing!.value}
+                          onBlur={(e) => {
+                            setEditing(null)
+                            props.onSave(m.id, monday, e.target.value)
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              setEditing(null)
+                              props.onSave(m.id, monday, e.currentTarget.value)
+                            }
+                            if (e.key === 'Escape') setEditing(null)
+                          }}
+                          className="w-16 rounded border border-blue-400 px-1 py-0.5 text-center text-xs"
+                        />
+                      ) : (
+                        <button
+                          disabled={!canEdit || props.busy}
+                          onClick={() =>
+                            canEdit &&
+                            setEditing({
+                              metricId: m.id,
+                              monday,
+                              value: cell.actual == null ? '' : String(cell.actual),
+                            })
+                          }
+                          className={
+                            'w-full px-1 py-0.5 text-center text-xs ' +
+                            (canEdit ? 'cursor-pointer hover:underline' : 'cursor-default')
+                          }
+                          title={canEdit ? 'Click to enter / edit' : 'Read-only'}
+                        >
+                          {cell.actual == null ? '–' : cell.actual}
+                        </button>
+                      )}
+                    </td>
+                  )
+                })}
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
   )
 }

@@ -192,9 +192,18 @@ targets are REAL with **any finite value allowed, including 0 and negatives**
 `includeInactive` is admin-gated (ticket-07 rule).
 
 ### metric_entries
-`id, metric_id FK, week (date, a Monday), value(real), target_at_entry(real),
-entered_by, entered_at`. `UNIQUE(metric_id, week)` — weekly overwrite.
-`target_at_entry` renders history correctly after re-targets.
+`id, metric_id FK, week (date, a Monday), actual(real), target_at_entry(real),
+entry_by FK→users, created_at, updated_at` (ticket 14 naming: `actual`/`entry_by`;
+`entered_at` is covered by created_at/updated_at since a re-entry IS the
+update). `UNIQUE(metric_id, week)` — weekly overwrite. Re-entry overwrites
+`actual` AND re-captures `target_at_entry` from the current target (the
+history basis is "the target in force when the number was last written";
+a re-target changes how past weeks render — decided). Week inputs accept
+any day and normalize to that week's Monday via `weekStart`. Entry
+permissions: admin any metric, the metric's owner their own. TOCTOU note:
+target capture is read-then-write without a transaction (proxy driver has
+no verified transaction wrapper); single-process SQLite makes the race
+vanishingly unlikely and self-healing on the next overwrite.
 
 ## Issues tables
 
