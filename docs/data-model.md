@@ -223,12 +223,12 @@ re-attach to the new quarter as new rows or keep the row and re-point
 | column | type | notes |
 | --- | --- | --- |
 | id | int pk | |
-| team_id | int FK→teams | |
+| team_id | int FK→teams | omitted in v1 (single company; no teams table) — add with team scoping |
 | title | text | one line only |
 | assignee_person_id | int FK→people | exactly one |
-| created_by | int FK→people | |
-| source_meeting_id | int FK→meetings, nullable | |
-| issue_source_id | int FK→issues, nullable | solving an issue creates to-dos |
+| created_by | int FK→**users** | implemented as the login account (ticket 11): any signed-in user can create, linked or not; switch to people-FK only if creation ever requires a linked person |
+| source_meeting_id | int FK→meetings, nullable | plain int until meetings table exists (ticket 21) |
+| issue_source_id | int FK→issues, nullable | plain int until issues table exists (ticket 16) |
 | created_at | text | |
 | due_date | text (date) | created_at + 7 days (decided) |
 | status | text CHECK('open','done','dropped') | |

@@ -286,3 +286,41 @@ export const vtoVersions = sqliteTable('vto_versions', {
 ],
 )
 export type PeopleAnalyzerScore = typeof peopleAnalyzerScores.$inferSelect
+
+/**
+ * To-dos (ticket 11): the 7-day action items. One line, one assignee; the due
+ * date is FIXED at creation (+7 days, decided docs/specs/todos.md). `team_id`
+ * from data-model.md is omitted (single company; teams table doesn't exist —
+ * documented delta, add with team scoping if ever needed). The source columns
+ * (`source_meeting_id`, `issue_source_id`) are plain nullable ints for now —
+ * their referenced tables (meetings, issues) land in tickets 16/21, at which
+ * point FKs can be added. Names follow data-model.md: `completed_at`,
+ * `drop_reason` (required when dropped, seam-enforced).
+ */
+export const todos = sqliteTable(
+  'todos',
+  {
+    ...mutableFields,
+    title: text('title').notNull(),
+    assigneePersonId: integer('assignee_person_id')
+      .notNull()
+      .references(() => people.id),
+    /** Creator (contract: FK→users — any signed-in user can create, linked or not). */
+    createdBy: integer('created_by')
+      .notNull()
+      .references(() => users.id),
+    /** Date (YYYY-MM-DD), fixed at creation: created date + 7 days. */
+    dueDate: text('due_date').notNull(),
+    /** open / done / dropped. */
+    status: text('status').notNull().default('open'),
+    /** Set when status flips to done (immutable record thereafter). */
+    completedAt: text('completed_at'),
+    /** Required (non-empty) when status is 'dropped'. */
+    dropReason: text('drop_reason'),
+    /** Provenance (tickets 16/21+): FKs added when the target tables exist. */
+    sourceMeetingId: integer('source_meeting_id'),
+    issueSourceId: integer('issue_source_id'),
+  },
+  (t) => [check('todos_status_check', sql`${t.status} IN ('open', 'done', 'dropped')`)],
+)
+export type Todo = typeof todos.$inferSelect

@@ -22,7 +22,12 @@ export function verifyPassword(password: string, stored: string): boolean {
   return actual.length === expected.length && timingSafeEqual(actual, expected)
 }
 
-export type PublicUser = Pick<User, 'id' | 'email' | 'name' | 'role'>
+/**
+ * Public user shape handed to views and server modules. `personId` (null =
+ * unlinked) is exposed since ticket 11: to-dos filter "my" rows by the linked
+ * person and record creators by user id.
+ */
+export type PublicUser = Pick<User, 'id' | 'email' | 'name' | 'role' | 'personId'>
 
 export type SignInResult =
   | { ok: true; sessionToken: string; user: PublicUser }
@@ -42,7 +47,13 @@ export type RoleCheckResult =
  * fallback for not-yet-linked accounts (e.g. the seeded owner).
  */
 function toPublic(user: User, personName?: string | null): PublicUser {
-  return { id: user.id, email: user.email, name: personName ?? user.name, role: user.role }
+  return {
+    id: user.id,
+    email: user.email,
+    name: personName ?? user.name,
+    role: user.role,
+    personId: user.personId,
+  }
 }
 
 async function linkedPersonName(db: Db, user: User): Promise<string | null> {
