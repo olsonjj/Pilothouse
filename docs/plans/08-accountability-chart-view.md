@@ -4,11 +4,11 @@
 
 **Blocked by:** 04: Seats & assignments.
 
-**Status:** ready-for-agent
+**Status:** done (delivered within ticket 04's scope — chart view, seat detail, empty-seat styling all shipped and reviewed there)
 
-- [ ] Chart renders seats in reporting-line layout (tree depth expected ≤3)
-- [ ] Empty seats are visually distinct
-- [ ] Seat detail shows responsibilities, current occupant(s), and assignment history
-- [ ] Person detail shows their seat(s) and assignment dates
-- [ ] A person holding two seats renders in both places
-- [ ] Readable by all signed-in users
+- [x] Chart renders seats in reporting-line layout (tree depth expected ≤3)
+- [x] Empty seats are visually distinct
+- [x] Seat detail shows responsibilities, current occupant(s), and assignment history
+- [x] Person detail shows their seat(s) and assignment dates
+- [x] A person holding two seats renders in both places
+- [x] Readable by all signed-in users
