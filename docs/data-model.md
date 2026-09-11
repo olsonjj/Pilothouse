@@ -48,6 +48,16 @@ decision in `overview.md` and the specs — no open questions remain.
 
 Sessions: `sessions` (id = random token, user_id FK, expires_at). Standard.
 
+**User management (ticket 26):** admins create logins (email + name + initial
+password + role) and reset passwords from a `/users` page. Decisions: no
+delete path for users (permanent records, referenced by sessions/issues/
+to-dos/ratings); no self-service password change (local, trusted team —
+admins set/reset); a reset deletes ALL of that user's sessions (forced
+re-login everywhere); an admin cannot change their OWN role (last-admin
+lockout guard); no auto-session on create; email matching is CASE-SENSITIVE,
+matching the plain UNIQUE index (unlike the people-email NOCASE handling);
+password minimum 8 characters (seam-pinned boundary).
+
 ### people
 | column | type | notes |
 | --- | --- | --- |

@@ -38,7 +38,12 @@ function Home() {
             ? `${data.period.value.quarter.label} · ${data.period.value.weekLabel}`
             : 'No current quarter'}
         </p>
-        <nav className="mt-6 flex gap-4 text-sm">
+        <nav className="mt-6 flex flex-wrap gap-4 text-sm">
+          {user.role === 'admin' && (
+            <Link to="/users" className="text-blue-600 hover:underline">
+              Users
+            </Link>
+          )}
           <Link to="/people" className="text-blue-600 hover:underline">
             People
           </Link>

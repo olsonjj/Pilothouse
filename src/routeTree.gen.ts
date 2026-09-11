@@ -18,6 +18,7 @@ import { Route as RocksRouteImport } from './routes/rocks'
 import { Route as ScorecardRouteImport } from './routes/scorecard'
 import { Route as SigninRouteImport } from './routes/signin'
 import { Route as TodosRouteImport } from './routes/todos'
+import { Route as UsersRouteImport } from './routes/users'
 import { Route as VtoRouteImport } from './routes/vto'
 import { Route as PeopleAnalyzerRouteImport } from './routes/people/analyzer'
 
@@ -66,6 +67,11 @@ const TodosRoute = TodosRouteImport.update({
   path: '/todos',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UsersRoute = UsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const VtoRoute = VtoRouteImport.update({
   id: '/vto',
   path: '/vto',
@@ -87,6 +93,7 @@ export interface FileRoutesByFullPath {
   '/scorecard': typeof ScorecardRoute
   '/signin': typeof SigninRoute
   '/todos': typeof TodosRoute
+  '/users': typeof UsersRoute
   '/vto': typeof VtoRoute
   '/people/analyzer': typeof PeopleAnalyzerRoute
 }
@@ -100,6 +107,7 @@ export interface FileRoutesByTo {
   '/scorecard': typeof ScorecardRoute
   '/signin': typeof SigninRoute
   '/todos': typeof TodosRoute
+  '/users': typeof UsersRoute
   '/vto': typeof VtoRoute
   '/people/analyzer': typeof PeopleAnalyzerRoute
 }
@@ -114,6 +122,7 @@ export interface FileRoutesById {
   '/scorecard': typeof ScorecardRoute
   '/signin': typeof SigninRoute
   '/todos': typeof TodosRoute
+  '/users': typeof UsersRoute
   '/vto': typeof VtoRoute
   '/people/analyzer': typeof PeopleAnalyzerRoute
 }
@@ -129,6 +138,7 @@ export interface FileRouteTypes {
     | '/scorecard'
     | '/signin'
     | '/todos'
+    | '/users'
     | '/vto'
     | '/people/analyzer'
   fileRoutesByTo: FileRoutesByTo
@@ -142,6 +152,7 @@ export interface FileRouteTypes {
     | '/scorecard'
     | '/signin'
     | '/todos'
+    | '/users'
     | '/vto'
     | '/people/analyzer'
   id:
@@ -155,6 +166,7 @@ export interface FileRouteTypes {
     | '/scorecard'
     | '/signin'
     | '/todos'
+    | '/users'
     | '/vto'
     | '/people/analyzer'
   fileRoutesById: FileRoutesById
@@ -169,6 +181,7 @@ export interface RootRouteChildren {
   ScorecardRoute: typeof ScorecardRoute
   SigninRoute: typeof SigninRoute
   TodosRoute: typeof TodosRoute
+  UsersRoute: typeof UsersRoute
   VtoRoute: typeof VtoRoute
 }
 
@@ -237,6 +250,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TodosRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/users': {
+      id: '/users'
+      path: '/users'
+      fullPath: '/users'
+      preLoaderRoute: typeof UsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/vto': {
       id: '/vto'
       path: '/vto'
@@ -275,6 +295,7 @@ const rootRouteChildren: RootRouteChildren = {
   ScorecardRoute: ScorecardRoute,
   SigninRoute: SigninRoute,
   TodosRoute: TodosRoute,
+  UsersRoute: UsersRoute,
   VtoRoute: VtoRoute,
 }
 export const routeTree = rootRouteImport
