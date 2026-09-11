@@ -10,6 +10,7 @@ import {
 import { getCurrentQuarter } from '../src/server/quarters'
 import { quarters } from '../src/server/schema'
 import { createTestDb, signedInUser } from './helpers'
+import { todayIso, weekStart } from '../src/server/week'
 
 /** Pins the week-aligned age math across month/year/leap boundaries. */
 describe('ageWeeksSince (pure regression guard — pinned literal cases)', () => {
@@ -21,6 +22,9 @@ describe('ageWeeksSince (pure regression guard — pinned literal cases)', () =>
     assert.equal(ageWeeksSince('2026-02-24', '2026-03-25'), 4) // month boundary
     assert.equal(ageWeeksSince('2025-12-30', '2026-03-25'), 12) // year boundary
     assert.equal(ageWeeksSince('2024-02-27', '2024-03-26'), 4) // leap year
+    // Week-alignment discriminator: Fri → Mon crosses a Monday boundary with
+    // only 3 elapsed days — a naive floor(days/7) bucket would say 0.
+    assert.equal(ageWeeksSince('2026-03-13', '2026-03-16'), 1)
   })
 })
 
@@ -160,9 +164,12 @@ describe('Issues: core lists (seam, ticket 16)', () => {
     // Manual sort_order: 'third' jumps the queue; 'first'/'second' tie on 0
     // and fall back to created_at.
     sqlite.exec(`UPDATE issues SET sort_order = 1 WHERE id = ${i3.value.id}`)
-    // Re-anchor created_at for a pinned age: added ~2 weeks before today.
-    const twoWeeksAgo = new Date(Date.now() - 15 * 86400000).toISOString()
-    sqlite.exec(`UPDATE issues SET created_at = '${twoWeeksAgo}' WHERE id = ${i1.value.id}`)
+    // Re-anchor created_at for a pinned age: added exactly 2 Monday-weeks
+    // before today (Monday-anchored so the pin holds on any run day).
+    const twoWeeksAgoMonday = new Date(
+      Date.parse(weekStart(todayIso())) - 14 * 86400000,
+    ).toISOString()
+    sqlite.exec(`UPDATE issues SET created_at = '${twoWeeksAgoMonday}' WHERE id = ${i1.value.id}`)
 
     const result = await listIssues(db, token, { classification: 'long_term' })
     assert.equal(result.ok, true)

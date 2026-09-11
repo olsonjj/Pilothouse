@@ -4,7 +4,7 @@
 
 **Blocked by:** 02: People & account linking.
 
-**Status:** done (review pending)
+**Status:** done (reviewer sign-off; Monday-anchored aging pin + RPC strictness applied)
 
 - [x] Any member adds one-line issues to the team list, choosing long- or short-term
 - [x] Issues display age (weeks since added)

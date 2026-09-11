@@ -32,8 +32,9 @@ export const addIssueFn = createServerFn({ method: 'POST' })
     const db = await getDb()
     const input: IssueInput = {
       title: data.title ?? '',
-      classification:
-        data.classification === 'short_term' ? 'short_term' : 'long_term',
+      // Strict passthrough: garbage classifications must reach the seam's
+      // validation (invalid_classification), not be silently coerced.
+      classification: data.classification as IssueInput['classification'],
       quarterId: data.quarterId ?? null,
     }
     return addIssue(db, getCookie(SESSION_COOKIE), input)
@@ -62,8 +63,10 @@ export const resolveIssueFn = createServerFn({ method: 'POST' })
   .validator((d: unknown) => d as { issueId?: number; outcome?: string; note?: string })
   .handler(async ({ data }) => {
     const db = await getDb()
+    // Strict passthrough: garbage outcomes must reach the seam's validation
+    // (note_required/invalid path), not be silently coerced to 'solved'.
     return resolveIssue(db, getCookie(SESSION_COOKIE), data.issueId ?? 0, {
-      outcome: data.outcome === 'dropped' ? 'dropped' : 'solved',
+      outcome: data.outcome as 'solved' | 'dropped',
       note: data.note ?? '',
     })
   })
