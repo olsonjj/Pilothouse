@@ -5,7 +5,7 @@ import { assertValidDate, todayIso } from './week'
 import { and, asc, eq, isNull, sql } from 'drizzle-orm'
 
 /**
- * Seats & assignments domain module (ticket 04): the Accountability Chart's
+ * Seats & assignments domain module (ticket 04): the Org Chart's
  * data. Admins manage seats and assignments; every signed-in user views.
  * History is append-only — reassignment sets `endedAt`, never deletes rows.
  * The small-company caps (≤2 active seats per person, one active occupant per

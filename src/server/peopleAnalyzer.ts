@@ -12,7 +12,7 @@ import { requireRole } from './auth'
 import { and, asc, eq, isNull, sql } from 'drizzle-orm'
 
 /**
- * Employee Assessment (ticket 10; formerly People Analyzer). Per-person, per-quarter +/−/−− scoring against
+ * Employee Assessment (ticket 10). Per-person, per-quarter +/−/−− scoring against
  * each core value, plus the GWC summary column rolled up from active seat
  * assignments. ADMIN-ONLY view AND edit (decided: scores are sensitive —
  * data-model.md access rules; everyone sees everything EXCEPT these scores).

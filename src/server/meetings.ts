@@ -575,7 +575,7 @@ export async function getPreloadedData(
 // twice queues one row. Push helpers are two-step (issue create, then queue
 // insert) without a transaction — the proxy driver has no verified
 // transaction wrapper; a crash between steps leaves an unqueued issue, which
-// the team can push again (self-healing, same reasoning as V/TO saves).
+// the team can push again (self-healing, same reasoning as Company-page saves).
 // ---------------------------------------------------------------------------
 
 export type PushOutcome = {

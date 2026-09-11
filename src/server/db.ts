@@ -103,7 +103,7 @@ export function getDb(): Promise<Db> {
       // Idempotent quarter seed (current + next calendar year); cheap enough
       // to run on every init, so new years roll over without manual steps.
       await ensureCurrentYearQuarters(created.db)
-      // Idempotent V/TO version backfill (ticket 06): copies a pre-ticket-06
+      // Idempotent company-page version backfill (ticket 06): copies a pre-ticket-06
       // live vto row into the first version, if no version exists yet.
       await backfillVtoFirstVersion(created.db)
       // Scheduled snapshot job; disabled during tests.

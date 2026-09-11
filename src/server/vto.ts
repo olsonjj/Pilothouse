@@ -4,7 +4,7 @@ import { requireRole, getCurrentUser } from './auth'
 import { desc, eq, sql } from 'drizzle-orm'
 
 /**
- * Company module (tickets 05+06; formerly V/TO): the single live version of the eight questions
+ * Company module (tickets 05+06): the single live version of the eight questions
  * plus an append-only snapshot history (vto_versions). Everyone signed in can
  * read; only admins save/restore/list versions. Each save upserts the live row
  * (id 1) AND inserts a snapshot (author + published_at). Restores copy a
