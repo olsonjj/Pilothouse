@@ -8,6 +8,7 @@ import {
 } from '../src/server/rocks'
 import { createPerson, linkUserToPerson } from '../src/server/people'
 import { createTestDb, signedInUser } from './helpers'
+import { todayIso } from '../src/server/week'
 import { DatabaseSync } from 'node:sqlite'
 import type { Db } from '../src/server/db'
 
@@ -203,6 +204,17 @@ describe('Rocks: create & manage (seam, ticket 17)', () => {
       ok: false,
       error: 'quarter_read_only',
     })
+
+    // BOUNDARY PIN: a quarter ending TODAY is still writable (strict <).
+    const today = todayIso()
+    sqlite.exec(
+      `INSERT INTO quarters (label, start_date, end_date) VALUES ('2020 Q2', date('${today}', '-3 months'), '${today}')`,
+    )
+    const endingTodayId = (
+      sqlite.prepare("SELECT id FROM quarters WHERE label = '2020 Q2'").get() as { id: number }
+    ).id
+    const boundary = await createRock(db, token, { statement: 'last day rock', quarterId: endingTodayId })
+    assert.equal(boundary.ok, true)
   })
 
   it('update: admin any rock, member own only; quarter immutable; co-occurrence merged', async () => {

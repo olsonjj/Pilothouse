@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real, check, uniqueIndex } from 'drizzle-orm/sqlite-core'
+import { sqliteTable, text, integer, real, check, uniqueIndex, type AnySQLiteColumn } from 'drizzle-orm/sqlite-core'
 import { sql } from 'drizzle-orm'
 
 /**
@@ -489,7 +489,10 @@ export const rocks = sqliteTable(
       .references(() => quarters.id),
     target: real('target'),
     direction: text('direction'),
-    carriedOverFromRockId: integer('carried_over_from_rock_id'),
+    /** Self-FK set only by ticket 19's explicit carry-over. */
+    carriedOverFromRockId: integer('carried_over_from_rock_id').references(
+      (): AnySQLiteColumn => rocks.id,
+    ),
     /** 0/1/null; set only at quarter end (ticket 19). */
     completed: integer('completed'),
     completedAt: text('completed_at'),

@@ -14,6 +14,7 @@ CREATE TABLE `rocks` (
 	`created_by` integer NOT NULL,
 	FOREIGN KEY (`owner_person_id`) REFERENCES `people`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`quarter_id`) REFERENCES `quarters`(`id`) ON UPDATE no action ON DELETE no action,
+	FOREIGN KEY (`carried_over_from_rock_id`) REFERENCES `rocks`(`id`) ON UPDATE no action ON DELETE no action,
 	FOREIGN KEY (`created_by`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE no action,
 	CONSTRAINT "rocks_target_direction_check" CHECK(("rocks"."target" IS NULL AND "rocks"."direction" IS NULL) OR ("rocks"."target" IS NOT NULL AND "rocks"."direction" IS NOT NULL)),
 	CONSTRAINT "rocks_direction_check" CHECK("rocks"."direction" IS NULL OR "rocks"."direction" IN ('gte', 'lte')),
