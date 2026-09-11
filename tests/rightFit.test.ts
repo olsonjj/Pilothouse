@@ -26,7 +26,7 @@ async function gwcFixture() {
   return { db, sqlite, dir, token, person: person.value, seat: seat.value, assignmentId: assignment.value.id }
 }
 
-describe('GWC ratings (seam, ticket 09)', () => {
+describe('Right Fit ratings (seam, ticket 09)', () => {
   it('admin sets GWC on an active assignment; getSeat occupants round-trip it', async () => {
     const { db, token, assignmentId, seat } = await gwcFixture()
     const result = await setGwc(db, token, assignmentId, {

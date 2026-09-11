@@ -50,7 +50,7 @@ async function personFor(
   return person.value
 }
 
-describe('L10 lifecycle: start, segments, advance, delete (seam, ticket 21)', () => {
+describe('Weekly Meeting lifecycle: start, segments, advance, delete (seam, ticket 21)', () => {
   it('startMeeting creates the meeting + exactly 7 segments in agenda order (pinned names + minutes)', async () => {
     const { db } = await createTestDb()
     const { token } = await signedInUser(db)
@@ -223,7 +223,7 @@ describe('L10 lifecycle: start, segments, advance, delete (seam, ticket 21)', ()
   })
 })
 
-describe('L10 pre-loads (seam, ticket 21)', () => {
+describe('Weekly Meeting pre-loads (seam, ticket 21)', () => {
   it('pre-loads previous-week scorecard, current rock statuses, last-week to-dos', async () => {
     const { db, sqlite } = await createTestDb()
     const { token } = await signedInUser(db)
@@ -664,7 +664,7 @@ describe('Meeting issue queue: push, dedup, remove (seam, ticket 23)', () => {
   })
 })
 
-describe('IDS: pull long-term issues + solve in-session (seam, ticket 24)', () => {
+describe('Issues segment: pull long-term issues + solve in-session (seam, ticket 24)', () => {
   it('pull round-trip: long-term unresolved pulled; resolved/short-term rejected; duplicate idempotent; bulk results pinned', async () => {
     const { db } = await createTestDb()
     const { token } = await signedInUser(db)

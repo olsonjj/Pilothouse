@@ -38,7 +38,7 @@ async function adminToken(db: Awaited<ReturnType<typeof createTestDb>>['db']) {
   return result.sessionToken
 }
 
-describe('vto read', () => {
+describe('company read', () => {
   it('getVto on an empty document returns defaults, not an error', async () => {
     const { db } = await createTestDb()
     const token = await adminToken(db)
@@ -59,7 +59,7 @@ describe('vto read', () => {
   })
 })
 
-describe('vto update', () => {
+describe('company update', () => {
   it('admin save round-trips every field through the live row', async () => {
     const { db } = await createTestDb()
     const token = await adminToken(db)
@@ -175,7 +175,7 @@ describe('vto update', () => {
     if (result.ok) assert.deepEqual(result.value.marketingThreeUniques, [])
   })
 })
-describe('vto version history (ticket 06)', () => {
+describe('company version history (ticket 06)', () => {
   it('each save creates a new version with author and published_at; publishedAt tracks the newest', async () => {
     const { db } = await createTestDb()
     const { token, user } = await signedInUser(db)

@@ -57,7 +57,7 @@ function seedPastQuarter(sqlite: DatabaseSync): number {
   return row.id
 }
 
-describe('Rocks: create & manage (seam, ticket 17)', () => {
+describe('Goals: create & manage (seam, ticket 17)', () => {
   it('admin creates a company rock (owner null) — round-trips with owner name', async () => {
     const { db, sqlite } = await createTestDb()
     const { token } = await signedInUser(db)
@@ -332,7 +332,7 @@ describe('Rocks: create & manage (seam, ticket 17)', () => {
     }
   })
 })
-describe('Rock weekly statuses (seam, ticket 18)', () => {
+describe('Goal weekly statuses (seam, ticket 18)', () => {
   async function rockFor(
     db: Parameters<typeof createRock>[0],
     sqlite: DatabaseSync,

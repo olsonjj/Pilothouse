@@ -24,7 +24,7 @@ async function analyzerFixture(db: Db, token: string) {
   return { personId: person.value.id, valueId: value.value.id }
 }
 
-describe('people analyzer scoring', () => {
+describe('employee assessment scoring', () => {
   it('admin sets a score; re-entering the triple overwrites (one row per triple)', async () => {
     const { db } = await createTestDb()
     const { token } = await signedInUser(db) // admin

@@ -33,7 +33,7 @@ const VALID = {
   unit: '$',
 }
 
-describe('Scorecard metric definitions (seam, ticket 13)', () => {
+describe('Data: metric definitions (seam, ticket 13)', () => {
   it('admin CRUD round-trips; members see the active-only list', async () => {
     const { db } = await createTestDb()
     const { token } = await signedInUser(db)
@@ -210,7 +210,7 @@ describe('Scorecard metric definitions (seam, ticket 13)', () => {
     assert.deepEqual(await listMetrics(db, undefined, true), { ok: false, error: 'unauthenticated' })
   })
 })
-describe('Scorecard weekly entries + grid (seam, ticket 14)', () => {
+describe('Data: weekly entries + grid (seam, ticket 14)', () => {
   it('setEntry round-trips; re-entry overwrites actual AND re-captures target_at_entry (re-target history basis)', async () => {
     const { db } = await createTestDb()
     const { token } = await signedInUser(db)
