@@ -790,6 +790,20 @@ describe('IDS: pull long-term issues + solve in-session (seam, ticket 24)', () =
       }),
       { ok: false, error: 'issue_not_in_queue' },
     )
+    // CRASH-WINDOW PIN (ticket-24 review): simulate the documented crash —
+    // resolution exists but the queue row lags in in_ids. A second solve
+    // must be rejected by the write-once resolution AND the row must stay
+    // in_ids (ticket 25's conclude handles lingering in_ids as carried).
+    const crashRow = pulled.value.meetingIssueId
+    sqliteExec(sqlite, `UPDATE meeting_issues SET state = 'in_ids' WHERE id = ${crashRow}`)
+    assert.deepEqual(
+      await solveMeetingIssue(db, token, started.value.id, crashRow, { note: 'crash retry', todos: [] }),
+      { ok: false, error: 'already_resolved' },
+    )
+    const lagged = (await listMeetingIssues(db, token, started.value.id)).value.find(
+      (r) => r.meetingIssueId === crashRow,
+    )
+    assert.equal(lagged?.state, 'in_ids')
 
     // Concluded meeting guard.
     sqliteExec(sqlite, `UPDATE meetings SET status = 'concluded' WHERE id = ${started.value.id}`)

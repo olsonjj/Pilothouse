@@ -84,6 +84,9 @@ export type MeetingError =
   | 'already_resolved'
 
 export type MeetingResult<T> = { ok: true; value: T } | { ok: false; error: MeetingError }
+/** solveMeetingIssue forwards resolveIssue's write-once errors (note_required/not_found/already_resolved). */
+export type SolveError = MeetingError | Extract<IssueError, 'note_required' | 'not_found' | 'already_resolved' | 'issue_resolved'>
+export type SolveResult = { ok: true; value: { issueId: number; todoIds: number[] } } | { ok: false; error: SolveError }
 
 export type SegmentView = {
   id: number
@@ -870,7 +873,7 @@ export async function solveMeetingIssue(
   meetingId: number,
   meetingIssueId: number,
   input: SolveInput,
-): Promise<MeetingResult<{ issueId: number; todoIds: number[] }>> {
+): Promise<SolveResult> {
   const auth = await getCurrentUser(db, token)
   if (!auth.ok) return auth
   const open = await openMeetingById(db, meetingId)
@@ -903,7 +906,7 @@ export async function solveMeetingIssue(
     note: input.note,
     meetingId,
   })
-  if (!resolved.ok) return { ok: false, error: resolved.error as MeetingError }
+  if (!resolved.ok) return { ok: false, error: resolved.error as SolveError }
 
   // 2) The assigned to-dos (validated above; creation is now infallible).
   const todoIds: number[] = []
