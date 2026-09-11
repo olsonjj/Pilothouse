@@ -172,7 +172,7 @@ async function listFor(
     .from(todos)
     .innerJoin(people, eq(people.id, todos.assigneePersonId))
     .where(where)
-    .orderBy(asc(todos.dueDate))
+    .orderBy(asc(todos.dueDate), asc(todos.id))
   return {
     ok: true,
     value: rows.map((r) => ({

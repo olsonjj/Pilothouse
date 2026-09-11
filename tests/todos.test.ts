@@ -12,6 +12,16 @@ import { createPerson, linkUserToPerson } from '../src/server/people'
 import { todayIso } from '../src/server/week'
 import { createTestDb, signedInUser } from './helpers'
 
+describe('dueDateFrom (pure regression guard — pinned literal cases)', () => {
+  it('adds exactly 7 calendar days across month/year/leap boundaries', () => {
+    assert.equal(dueDateFrom('2025-01-28'), '2025-02-04') // month boundary
+    assert.equal(dueDateFrom('2025-12-28'), '2026-01-04') // year boundary
+    assert.equal(dueDateFrom('2024-02-23'), '2024-03-01') // leap year
+    assert.equal(dueDateFrom('2025-02-22'), '2025-03-01') // non-leap Feb
+    assert.equal(dueDateFrom('2025-07-25'), '2025-08-01') // month boundary
+  })
+})
+
 /**
  * Links a signed-in account to a fresh person (the common fixture: every
  * user acts as a person). Returns the person row.

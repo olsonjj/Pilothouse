@@ -279,8 +279,12 @@ tables (derived), no auth beyond users+sessions.
 
 - **admin:** edit V/TO, seats/assignments, GWC, People Analyzer scores; set
   company rocks; edit all metrics; everything members can do.
-- **member:** update own rock statuses, own to-dos, own assigned metrics;
-  add issues; create/attend meetings; create to-dos for anyone.
+- **member:** update own rock statuses, own assigned metrics; add issues;
+  create/attend meetings; create to-dos for anyone. (Ticket 11 decision:
+  completing/dropping a to-do is any-member too — to-dos are team-visible
+  commitments, not private items; the spec's drop-reason honesty argument
+  doesn't depend on who drops. "Own to-dos" bounds what members must be able
+  to do, not a limit.)
 - Everyone: view everything except other people's People Analyzer scores.
 
 ## Build-order note
