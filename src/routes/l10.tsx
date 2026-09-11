@@ -11,8 +11,14 @@ import {
   listMeetingsFn,
   getPreloadedDataFn,
   saveSegmentNotesFn,
+  pushRedCellFn,
+  pushOffTrackRockFn,
+  pushMissedTodoFn,
+  pushHeadlineFn,
+  listMeetingIssuesFn,
+  removeMeetingIssueFn,
 } from '../functions/meetings'
-import type { MeetingWithSegments, SegmentView, MeetingSummary } from '../server/meetings'
+import type { MeetingWithSegments, SegmentView, MeetingSummary, MeetingIssueView } from '../server/meetings'
 
 export const Route = createFileRoute('/l10')({
   loader: async () => {
@@ -149,6 +155,9 @@ function L10Page() {
   const [savedTicks, setSavedTicks] = useState<Record<number, number>>({})
   const saveTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({})
   const saveInFlight = useRef(false)
+  // IDS queue (ticket 23): polled with the meeting; headline input state.
+  const [meetingIssues, setMeetingIssues] = useState<MeetingIssueView[]>([])
+  const [headline, setHeadline] = useState('')
 
   // Polling (ticket 22): re-fetch the shared meeting state every 2.5s so all
   // participants see each other's updates within a few seconds (no SSE/
@@ -163,6 +172,9 @@ function L10Page() {
       if (result.ok && result.value && result.value.id === open.id) {
         setOpen(result.value)
       }
+      // IDS queue rides the same poll (cheap aliased join).
+      const queue = await listMeetingIssuesFn({ data: { meetingId: open.id } })
+      if (queue.ok) setMeetingIssues(queue.value)
     }, 2500)
     return () => clearInterval(t)
   }, [open?.id, open?.status])
@@ -176,7 +188,12 @@ function L10Page() {
   // Pre-loaded segment data refreshes with the open meeting.
   useEffect(() => {
     let cancelled = false
-    if (open) getPreloadedDataFn().then((r) => !cancelled && setPreloaded(r))
+    if (open) {
+      getPreloadedDataFn().then((r) => !cancelled && setPreloaded(r))
+      listMeetingIssuesFn({ data: { meetingId: open.id } }).then((q) => {
+        if (!cancelled && q.ok) setMeetingIssues(q.value)
+      })
+    }
     return () => {
       cancelled = true
     }
@@ -260,6 +277,43 @@ function L10Page() {
   async function handleSignOut() {
     await signOutFn()
     await navigate({ to: '/signin' })
+  }
+
+  // --- Ticket 23: one-click pushes + queue management. All participants can
+  // push/remove; the queue re-polls so everyone sees pushes within seconds.
+  async function push(action: () => Promise<{ ok: boolean; error?: string }>) {
+    const ok = await run(action)
+    if (open) {
+      const q = await listMeetingIssuesFn({ data: { meetingId: open.id } })
+      if (q.ok) setMeetingIssues(q.value)
+    }
+    return ok
+  }
+
+  async function handlePushRedCell(entryId: number) {
+    if (!open) return
+    await push(() => pushRedCellFn({ data: { meetingId: open.id, entryId } }))
+  }
+
+  async function handlePushRock(rockId: number) {
+    if (!open) return
+    await push(() => pushOffTrackRockFn({ data: { meetingId: open.id, rockId } }))
+  }
+
+  async function handlePushTodo(todoId: number) {
+    if (!open) return
+    await push(() => pushMissedTodoFn({ data: { meetingId: open.id, todoId } }))
+  }
+
+  async function handlePushHeadline() {
+    if (!open || headline.trim() === '') return
+    const ok = await push(() => pushHeadlineFn({ data: { meetingId: open.id, title: headline } }))
+    if (ok) setHeadline('')
+  }
+
+  async function handleRemoveMeetingIssue(issueId: number) {
+    if (!open) return
+    await push(() => removeMeetingIssueFn({ data: { meetingId: open.id, issueId } }))
   }
 
   const pre = preloaded?.ok ? preloaded.value : null
@@ -405,6 +459,16 @@ function L10Page() {
                         >
                           {m.actual ?? '—'}
                         </span>
+                        {open && m.pass === false && m.entryId != null && (
+                          <button
+                            onClick={() => handlePushRedCell(m.entryId!)}
+                            disabled={busy}
+                            title="Make this an issue"
+                            className="shrink-0 rounded border border-red-300 px-1.5 py-0.5 text-[10px] text-red-600 hover:bg-red-50 disabled:opacity-50"
+                          >
+                            Make issue
+                          </button>
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -432,6 +496,17 @@ function L10Page() {
                         >
                           {r.latestStatus ?? 'unreported'}
                         </span>
+                        {open &&
+                          (r.latestStatus === 'off_track' || r.twoConsecutiveOffTrack) && (
+                            <button
+                              onClick={() => handlePushRock(r.id)}
+                              disabled={busy}
+                              title="Make this an issue"
+                              className="shrink-0 rounded border border-red-300 px-1.5 py-0.5 text-[10px] text-red-600 hover:bg-red-50 disabled:opacity-50"
+                            >
+                              Make issue
+                            </button>
+                          )}
                       </li>
                     ))}
                   </ul>
@@ -449,13 +524,25 @@ function L10Page() {
                       {pre.todos.done} done · {pre.todos.open} open · {pre.todos.dropped} dropped
                     </p>
                     <ul className="mt-1 space-y-1">
-                      {pre.todos.items.map((t, i) => (
-                        <li key={i} className="flex items-center justify-between gap-2">
+                      {pre.todos.items.map((t) => (
+                        <li key={t.id} className="flex items-center justify-between gap-2">
                           <span className={'truncate ' + (t.status === 'done' ? 'line-through text-slate-400' : '')}>
                             {t.title}
                           </span>
-                          <span className={t.status === 'open' ? 'font-semibold text-red-600' : 'text-slate-400'}>
-                            {t.assigneeName}
+                          <span className="flex items-center gap-1">
+                            <span className={t.status === 'open' ? 'font-semibold text-red-600' : 'text-slate-400'}>
+                              {t.assigneeName}
+                            </span>
+                            {open && t.status !== 'done' && (
+                              <button
+                                onClick={() => handlePushTodo(t.id)}
+                                disabled={busy}
+                                title="Make this an issue"
+                                className="shrink-0 rounded border border-red-300 px-1.5 py-0.5 text-[10px] text-red-600 hover:bg-red-50 disabled:opacity-50"
+                              >
+                                Make issue
+                              </button>
+                            )}
                           </span>
                         </li>
                       ))}
@@ -463,6 +550,64 @@ function L10Page() {
                   </>
                 )}
               </div>
+            </div>
+          )}
+
+          {/* IDS queue (ticket 23): pushed issues + the headline composer. */}
+          {open && (
+            <div className="mt-4 rounded border border-slate-200 bg-white p-3 text-xs">
+              <div className="flex items-center justify-between">
+                <h3 className="font-medium text-slate-700">IDS queue ({meetingIssues.length})</h3>
+                <div className="flex items-center gap-2">
+                  <input
+                    value={headline}
+                    onChange={(e) => setHeadline(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && void handlePushHeadline()}
+                    placeholder="Headline…"
+                    className="w-56 rounded border border-slate-300 px-2 py-1"
+                  />
+                  <button
+                    onClick={handlePushHeadline}
+                    disabled={busy || headline.trim() === ''}
+                    className="rounded bg-slate-700 px-2 py-1 text-white hover:bg-slate-800 disabled:opacity-50"
+                  >
+                    Add headline as issue
+                  </button>
+                </div>
+              </div>
+              {meetingIssues.length === 0 ? (
+                <p className="mt-2 text-slate-400">
+                  Nothing queued yet — push red cells, off-track rocks, or missed to-dos above.
+                </p>
+              ) : (
+                <ul className="mt-2 space-y-1">
+                  {meetingIssues.map((mi) => (
+                    <li key={mi.meetingIssueId} className="flex items-center justify-between gap-2">
+                      <span className="truncate">
+                        {mi.title}{' '}
+                        <span className="text-slate-400">
+                          ({mi.origin === 'manual' ? 'headline/manual' : mi.origin.replace('from_', '')})
+                        </span>
+                      </span>
+                      <span className="flex items-center gap-2">
+                        <span className={mi.status === 'resolved' ? 'text-slate-400 line-through' : ''}>
+                          {mi.state === 'in_ids' ? 'in IDS' : mi.state}
+                        </span>
+                        {mi.state === 'in_ids' && (
+                          <button
+                            onClick={() => handleRemoveMeetingIssue(mi.issueId)}
+                            disabled={busy}
+                            title="Remove from queue (issue itself persists)"
+                            className="rounded border border-slate-300 px-1.5 py-0.5 text-[10px] text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
         </section>

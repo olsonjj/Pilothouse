@@ -1,10 +1,28 @@
 import type { Db } from './db'
-import { meetings, meetingSegments, people, users, type Meeting } from './schema'
+import {
+  meetingIssues,
+  meetings,
+  meetingSegments,
+  people,
+  rocks,
+  users,
+  issueResolutions,
+  issues,
+  type Meeting,
+} from './schema'
 import { getCurrentUser } from './auth'
-import { and, desc, eq, isNull, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, isNull, sql } from 'drizzle-orm'
 import { todayIso, weekStart, formatWeekLabel } from './week'
+import {
+  addIssue,
+  issueFromRock,
+  issueFromScorecardEntry,
+  issueFromTodo,
+  unresolvedIssueIds,
+} from './issues'
+import type { IssueError } from './issues'
 import { listEntriesForGrid } from './metrics'
-import { listLatestStatuses, listRocks } from './rocks'
+import { listLatestStatuses, listRocks, type StatusError } from './rocks'
 import { listTodosByWeek } from './todos'
 
 /**
@@ -50,6 +68,15 @@ export type MeetingError =
   | 'conclude_is_ticket_25'
   | 'person_not_found'
   | 'notes_too_large'
+  | 'issue_not_found'
+  | 'issue_not_long_term'
+  | 'issue_resolved'
+  | 'issue_not_in_queue'
+  | 'not_red'
+  | 'not_off_track'
+  | 'todo_not_missed'
+  | 'title_required'
+  | 'invalid_date'
 
 export type MeetingResult<T> = { ok: true; value: T } | { ok: false; error: MeetingError }
 
@@ -419,6 +446,8 @@ export type PreloadedData = {
       target: number
       pass: boolean | null
       actual: number | null
+      /** metric_entries.id for the previous-week cell (null = no entry — nothing to push). */
+      entryId: number | null
     }>
     /** The previous week's Monday key (null when the grid has <2 weeks). */
     previousWeekMonday: string | null
@@ -437,7 +466,7 @@ export type PreloadedData = {
     open: number
     done: number
     dropped: number
-    items: Array<{ title: string; assigneeName: string; status: string; dueDate: string }>
+    items: Array<{ id: number; title: string; assigneeName: string; status: string; dueDate: string }>
   } | null
 }
 
@@ -469,6 +498,7 @@ export async function getPreloadedData(
               target: m.target,
               pass: cells ? cells.pass : null,
               actual: cells ? cells.actual : null,
+              entryId: cells ? cells.entryId : null,
             }
           }),
           previousWeekMonday: prev?.monday ?? null,
@@ -513,6 +543,7 @@ export async function getPreloadedData(
         done: bucket.todos.filter((t) => t.status === 'done').length,
         dropped: bucket.todos.filter((t) => t.status === 'dropped').length,
         items: bucket.todos.map((t) => ({
+          id: t.id,
           title: t.title,
           assigneeName: t.assigneeName,
           status: t.status,
@@ -524,4 +555,228 @@ export async function getPreloadedData(
   return { ok: true, value: { scorecard, rocks: rockRows, todos } }
 }
 
+// ---------------------------------------------------------------------------
+// Ticket 23: the meeting's issue queue + one-click push from pre-loaded data.
+// meeting_issues UNIQUE(meeting_id, issue_id) = in-meeting dedup; a duplicate
+// push is IDEMPOTENT (ok:true, alreadyQueued) — pushing the same red cell
+// twice queues one row. Push helpers are two-step (issue create, then queue
+// insert) without a transaction — the proxy driver has no verified
+// transaction wrapper; a crash between steps leaves an unqueued issue, which
+// the team can push again (self-healing, same reasoning as V/TO saves).
+// ---------------------------------------------------------------------------
+
+export type PushOutcome = {
+  issueId: number
+  meetingIssueId: number
+  /** true = the issue was ALREADY in this meeting's queue (idempotent re-push). */
+  alreadyQueued: boolean
+}
+
+/**
+ * Push helpers can fail with EITHER spelling: meeting-layer errors
+ * (meeting_concluded, …) or the underlying issue-creation errors passed
+ * through (not_red, todo_not_missed, title_required, …). Callers match on
+ * the literal; documented in data-model.md (ticket 23).
+ */
+export type PushError = MeetingError | IssueError | StatusError
+export type PushResult = { ok: true; value: PushOutcome } | { ok: false; error: PushError }
+
+/** Open meeting or reject — every queue mutation requires it. */
+async function openMeetingById(db: Db, meetingId: number) {
+  const meeting = await db.select().from(meetings).where(eq(meetings.id, meetingId)).get()
+  if (!meeting) return { ok: false as const, error: 'meeting_not_found' as const }
+  if (meeting.status === 'concluded')
+    return { ok: false as const, error: 'meeting_concluded' as const }
+  return { ok: true as const, meeting }
+}
+
+/**
+ * Queue an EXISTING issue for this meeting's IDS. Any participant; the
+ * meeting must be open; the issue must be long-term and unresolved.
+ */
+export async function pushToMeeting(
+  db: Db,
+  token: string | undefined,
+  meetingId: number,
+  issueId: number,
+): Promise<PushResult> {
+  const auth = await getCurrentUser(db, token)
+  if (!auth.ok) return auth
+  const open = await openMeetingById(db, meetingId)
+  if (!open.ok) return open
+  const issue = await db.select().from(issues).where(eq(issues.id, issueId)).get()
+  if (!issue) return { ok: false, error: 'issue_not_found' }
+  if (issue.classification !== 'long_term') return { ok: false, error: 'issue_not_long_term' }
+  const unresolved = await unresolvedIssueIds(db, [issueId])
+  if (!unresolved.has(issueId)) return { ok: false, error: 'issue_resolved' }
+  const existing = await db
+    .select()
+    .from(meetingIssues)
+    .where(and(eq(meetingIssues.meetingId, meetingId), eq(meetingIssues.issueId, issueId)))
+    .get()
+  if (existing)
+    return {
+      ok: true,
+      value: { issueId, meetingIssueId: existing.id, alreadyQueued: true },
+    }
+  const [row] = await db
+    .insert(meetingIssues)
+    .values({ meetingId, issueId, state: 'in_ids' })
+    .returning()
+  return { ok: true, value: { issueId, meetingIssueId: row!.id, alreadyQueued: false } }
+}
+
+/**
+ * One-click: red scorecard cell → issue (origin from_scorecard, source =
+ * entry id) → queue. Reuses ticket 20's issueFromScorecardEntry (green cell →
+ * 'not_red'; both steps reject before either writes).
+ */
+export async function pushRedCell(
+  db: Db,
+  token: string | undefined,
+  meetingId: number,
+  entryId: number,
+): Promise<PushResult> {
+  const created = await issueFromScorecardEntry(db, token, entryId)
+  if (!created.ok) return created
+  return pushToMeeting(db, token, meetingId, created.value.id)
+}
+
+/**
+ * One-click: off-track rock → issue (origin from_rock, source = rock id) →
+ * queue. ONLY explicitly off-track rocks push (latest weekly status
+ * off_track, or the 2-consecutive flag): pushing an on-track rock is a
+ * mistake → 'not_off_track'. Measuring rocks are not pushable in v1 — their
+ * status is a number, not a verdict (documented).
+ */
+export async function pushOffTrackRock(
+  db: Db,
+  token: string | undefined,
+  meetingId: number,
+  rockId: number,
+): Promise<PushResult> {
+  const auth = await getCurrentUser(db, token)
+  if (!auth.ok) return auth
+  const rock = await db.select().from(rocks).where(eq(rocks.id, rockId)).get()
+  if (!rock) return { ok: false, error: 'issue_not_found' }
+  const statuses = await listLatestStatuses(db, token, rock.quarterId)
+  if (!statuses.ok) return statuses
+  const st = statuses.value.find((s) => s.rockId === rockId)
+  const offTrack = st !== undefined && (st.latestStatus === 'off_track' || st.twoConsecutiveOffTrack)
+  if (!offTrack) return { ok: false, error: 'not_off_track' }
+  const created = await issueFromRock(db, token, rockId)
+  if (!created.ok) return created
+  return pushToMeeting(db, token, meetingId, created.value.id)
+}
+
+/**
+ * One-click: missed to-do → issue (origin from_todo, source = todo id) →
+ * queue. Done to-dos are not misses ('todo_not_missed' via ticket 20); open
+ * AND dropped to-dos push (the room decides).
+ */
+export async function pushMissedTodo(
+  db: Db,
+  token: string | undefined,
+  meetingId: number,
+  todoId: number,
+): Promise<PushResult> {
+  const created = await issueFromTodo(db, token, todoId)
+  if (!created.ok) return created
+  return pushToMeeting(db, token, meetingId, created.value.id)
+}
+
+/**
+ * One-click: typed headline → manual issue → queue. Headlines are free text
+ * with no source row, so the issue's origin is the default 'manual'
+ * (documented; origin 'from_meeting' stays unused in v1).
+ */
+export async function pushHeadline(
+  db: Db,
+  token: string | undefined,
+  meetingId: number,
+  title: string,
+): Promise<PushResult> {
+  const created = await addIssue(db, token, { title, classification: 'long_term' })
+  if (!created.ok) return created
+  return pushToMeeting(db, token, meetingId, created.value.id)
+}
+
+export type MeetingIssueView = {
+  meetingIssueId: number
+  issueId: number
+  state: string
+  title: string
+  origin: string
+  status: 'open' | 'resolved'
+  pushedAt: string
+}
+
+/**
+ * The meeting's IDS queue, oldest push first. Signed-in readable (any
+ * participant — and the team outside the meeting too). Join columns are
+ * SQL-aliased uniquely (node:sqlite proxy constraint, see db.ts).
+ */
+export async function listMeetingIssues(
+  db: Db,
+  token: string | undefined,
+  meetingId: number,
+): Promise<MeetingResult<MeetingIssueView[]>> {
+  const auth = await getCurrentUser(db, token)
+  if (!auth.ok) return auth
+  const meeting = await db.select().from(meetings).where(eq(meetings.id, meetingId)).get()
+  if (!meeting) return { ok: false, error: 'meeting_not_found' }
+  const rows = await db
+    .select({
+      meetingIssueId: sql<number>`"meeting_issues"."id"`.as('mi_id'),
+      state: sql<string>`"meeting_issues"."state"`.as('mi_state'),
+      pushedAt: sql<string>`"meeting_issues"."created_at"`.as('mi_pushed_at'),
+      issueId: sql<number>`"issues"."id"`.as('i_id'),
+      title: sql<string>`"issues"."title"`.as('i_title'),
+      origin: sql<string>`"issues"."origin"`.as('i_origin'),
+      resolutionId: sql<number | null>`"issue_resolutions"."id"`.as('r_id'),
+    })
+    .from(meetingIssues)
+    .innerJoin(issues, eq(issues.id, meetingIssues.issueId))
+    .leftJoin(issueResolutions, eq(issueResolutions.issueId, issues.id))
+    .where(eq(meetingIssues.meetingId, meetingId))
+    .orderBy(asc(meetingIssues.createdAt), asc(meetingIssues.id))
+  return {
+    ok: true,
+    value: rows.map((r) => ({
+      meetingIssueId: Number(r.meetingIssueId),
+      issueId: Number(r.issueId),
+      state: r.state,
+      title: r.title,
+      origin: r.origin,
+      status: r.resolutionId == null ? 'open' : 'resolved',
+      pushedAt: r.pushedAt,
+    })),
+  }
+}
+
+/**
+ * Remove an issue from the meeting's queue (the queue is editable by any
+ * participant). Only 'in_ids' rows remove — 'solved_today'/'carried' rows
+ * are conclude-state (ticket 25). The issue itself persists (issues are
+ * never deleted).
+ */
+export async function removeMeetingIssue(
+  db: Db,
+  token: string | undefined,
+  meetingId: number,
+  issueId: number,
+): Promise<MeetingResult<PushOutcome>> {
+  const auth = await getCurrentUser(db, token)
+  if (!auth.ok) return auth
+  const open = await openMeetingById(db, meetingId)
+  if (!open.ok) return open
+  const row = await db
+    .select()
+    .from(meetingIssues)
+    .where(and(eq(meetingIssues.meetingId, meetingId), eq(meetingIssues.issueId, issueId)))
+    .get()
+  if (!row || row.state !== 'in_ids') return { ok: false, error: 'issue_not_in_queue' }
+  await db.delete(meetingIssues).where(eq(meetingIssues.id, row.id))
+  return { ok: true, value: { issueId, meetingIssueId: row.id, alreadyQueued: false } }
+}
 export { formatWeekLabel, weekStart }

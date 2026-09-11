@@ -502,7 +502,11 @@ export async function issueFromTodo(
 }
 
 /** An issue is unresolved when no write-once resolution row exists. */
-async function unresolvedIssueIds(db: Db, ids: number[]): Promise<Set<number>> {
+/**
+ * Which of `ids` have no write-once resolution row (exported for ticket 23's
+ * meeting-queue push guard — pushing a resolved issue is a mistake).
+ */
+export async function unresolvedIssueIds(db: Db, ids: number[]): Promise<Set<number>> {
   if (ids.length === 0) return new Set()
   const rows = await db
     .select({ issueId: issueResolutions.issueId })

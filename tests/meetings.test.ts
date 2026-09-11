@@ -10,14 +10,27 @@ import {
   listMeetings,
   getPreloadedData,
   saveSegmentNotes,
+  pushToMeeting,
+  pushRedCell,
+  pushOffTrackRock,
+  pushMissedTodo,
+  pushHeadline,
+  listMeetingIssues,
+  removeMeetingIssue,
   SEGMENT_AGENDA,
 } from '../src/server/meetings'
 import { createPerson, linkUserToPerson } from '../src/server/people'
 import { setEntry, createMetric } from '../src/server/metrics'
 import { createRock, setStatus } from '../src/server/rocks'
 import { createTodo, completeTodo } from '../src/server/todos'
+import { addIssue, resolveIssue } from '../src/server/issues'
 import { createTestDb, signedInUser } from './helpers'
 import { todayIso, weekStart } from '../src/server/week'
+
+/** Seam-level direct-SQL seeding helper (node:sqlite via the test db). */
+function sqliteExec(sqlite: { exec(sql: string): void }, sql: string): void {
+  sqlite.exec(sql)
+}
 
 async function personFor(
   db: Parameters<typeof linkUserToPerson>[0],
@@ -385,5 +398,246 @@ describe('Segment notes: save, last-write-wins, guards (seam, ticket 22)', () =>
     const read = await getMeeting(db, other.token, second.value.id)
     if (!read.ok) throw new Error('read failed')
     assert.equal(read.value.segments.find((s) => s.id === seg2.id)?.notes, 'shared')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Ticket 23: the meeting's IDS queue — one-click pushes with provenance.
+// ---------------------------------------------------------------------------
+
+describe('Meeting issue queue: push, dedup, remove (seam, ticket 23)', () => {
+  it('pushToMeeting round-trips via listMeetingIssues; duplicate push is idempotent; ordered by push time', async () => {
+    const { db } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const started = await startMeeting(db, token)
+    if (!started.ok) throw new Error('start failed')
+    const a = await addIssue(db, token, { title: 'Issue A', classification: 'long_term' })
+    const b = await addIssue(db, token, { title: 'Issue B', classification: 'long_term' })
+    if (!a.ok || !b.ok) throw new Error('fixture failed')
+
+    const first = await pushToMeeting(db, token, started.value.id, a.value.id)
+    assert.equal(first.ok, true)
+    if (first.ok) assert.equal(first.value.alreadyQueued, false)
+    const second = await pushToMeeting(db, token, started.value.id, b.value.id)
+    assert.equal(second.ok, true)
+
+    // Duplicate push: idempotent ok (alreadyQueued), still ONE row.
+    const dup = await pushToMeeting(db, token, started.value.id, a.value.id)
+    assert.equal(dup.ok, true)
+    if (dup.ok) assert.equal(dup.value.alreadyQueued, true)
+
+    const queue = await listMeetingIssues(db, token, started.value.id)
+    assert.equal(queue.ok, true)
+    if (!queue.ok) throw new Error('list failed')
+    assert.equal(queue.value.length, 2) // deduped
+    assert.deepEqual(queue.value.map((mi) => mi.title), ['Issue A', 'Issue B']) // push order
+    assert.deepEqual(queue.value.map((mi) => mi.origin), ['manual', 'manual'])
+    assert.deepEqual(queue.value.map((mi) => mi.status), ['open', 'open'])
+    assert.deepEqual(queue.value.map((mi) => mi.state), ['in_ids', 'in_ids'])
+    // Join alignment: meetingIssueId ↔ title pairing is coherent.
+    const dupRow = queue.value.find((mi) => mi.title === 'Issue A')
+    if (dup && first.ok) assert.equal(dupRow?.meetingIssueId, first.value.meetingIssueId)
+  })
+
+  it('pushToMeeting guards: unauth denied; concluded meeting rejected; short-term and resolved issues rejected', async () => {
+    const { db, sqlite } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const started = await startMeeting(db, token)
+    if (!started.ok) throw new Error('start failed')
+
+    assert.equal((await pushToMeeting(db, undefined, started.value.id, 1)).ok, false)
+
+    const shortIssue = await addIssue(db, token, { title: 'short', classification: 'short_term' })
+    if (!shortIssue.ok) throw new Error('fixture failed')
+    assert.deepEqual(await pushToMeeting(db, token, started.value.id, shortIssue.value.id), {
+      ok: false,
+      error: 'issue_not_long_term',
+    })
+
+    const longIssue = await addIssue(db, token, { title: 'long', classification: 'long_term' })
+    if (!longIssue.ok) throw new Error('fixture failed')
+    assert.equal((await resolveIssue(db, token, longIssue.value.id, { outcome: 'solved', note: 'done' })).ok, true)
+    assert.deepEqual(await pushToMeeting(db, token, started.value.id, longIssue.value.id), {
+      ok: false,
+      error: 'issue_resolved',
+    })
+
+    // Concluded meeting (simulate ticket-25 state): push rejected.
+    sqliteExec(sqlite, `UPDATE meetings SET status = 'concluded' WHERE id = ${started.value.id}`)
+    assert.deepEqual(await pushToMeeting(db, token, started.value.id, longIssue.value.id), {
+      ok: false,
+      error: 'meeting_concluded',
+    })
+  })
+
+  it('pushRedCell: red cell queues from_scorecard issue with entry source; green cell rejected (not_red)', async () => {
+    const { db } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const started = await startMeeting(db, token)
+    if (!started.ok) throw new Error('start failed')
+    const monday = weekStart(todayIso())
+    const metric = await createMetric(db, token, {
+      name: 'Calls',
+      ownerPersonId: (await personFor(db, token, 'Owner')).id,
+      target: 10,
+      direction: 'gte',
+      unit: null,
+    })
+    if (!metric.ok) throw new Error('metric fixture failed')
+    const entry = await setEntry(db, token, metric.value.id, monday, 3) // 3 < 10 = red
+    if (!entry.ok) throw new Error('entry fixture failed')
+
+    const pushed = await pushRedCell(db, token, started.value.id, entry.value.id)
+    assert.equal(pushed.ok, true)
+    const queue = await listMeetingIssues(db, token, started.value.id)
+    if (!queue.ok) throw new Error('list failed')
+    assert.equal(queue.value.length, 1)
+    assert.equal(queue.value[0].origin, 'from_scorecard')
+    assert.match(queue.value[0].title, /Red metric: Calls/)
+
+    // Fix the number to green; re-push path via issueFromScorecardEntry → not_red.
+    const green = await setEntry(db, token, metric.value.id, monday, 12)
+    if (!green.ok) throw new Error('entry fixture failed')
+    assert.deepEqual(await pushRedCell(db, token, started.value.id, green.value.id), {
+      ok: false,
+      error: 'not_red',
+    })
+  })
+
+  it('pushOffTrackRock: off-track rock queues from_rock issue with rock source; on-track rejected (not_off_track)', async () => {
+    const { db, sqlite } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const started = await startMeeting(db, token)
+    if (!started.ok) throw new Error('start failed')
+    const owner = await personFor(db, token, 'Alice')
+    const quarterRow = sqlite
+      .prepare("SELECT id FROM quarters WHERE start_date <= ? AND end_date >= ?")
+      .get(todayIso(), todayIso()) as { id: number }
+    const rock = await createRock(db, token, {
+      statement: 'Ship the thing',
+      ownerPersonId: owner.id,
+      quarterId: quarterRow.id,
+    })
+    if (!rock.ok) throw new Error('rock fixture failed')
+
+    // On-track (no status yet) → not_off_track.
+    assert.deepEqual(await pushOffTrackRock(db, token, started.value.id, rock.value.id), {
+      ok: false,
+      error: 'not_off_track',
+    })
+    // Mark off-track; now pushable with origin + source pinned.
+    const monday = weekStart(todayIso())
+    assert.equal(
+      (await setStatus(db, token, rock.value.id, monday, { status: 'off_track' })).ok,
+      true,
+    )
+    const pushed = await pushOffTrackRock(db, token, started.value.id, rock.value.id)
+    assert.equal(pushed.ok, true)
+    const queue = await listMeetingIssues(db, token, started.value.id)
+    if (!queue.ok) throw new Error('list failed')
+    assert.equal(queue.value[0].origin, 'from_rock')
+    assert.match(queue.value[0].title, /Rock off track: Ship the thing/)
+    // Provenance pinned to the exact source rock (via the issues table read).
+    const src = sqlite
+      .prepare('SELECT origin_source_id FROM issues WHERE id = ?')
+      .get(queue.value[0].issueId) as { origin_source_id: number }
+    assert.equal(src.origin_source_id, rock.value.id)
+  })
+
+  it('pushMissedTodo: open/dropped todo queues from_todo issue; done todo rejected (todo_not_missed)', async () => {
+    const { db, sqlite } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const started = await startMeeting(db, token)
+    if (!started.ok) throw new Error('start failed')
+    const assignee = await personFor(db, token, 'Assignee')
+    const openTodo = await createTodo(db, token, { title: 'Send invoice', assigneePersonId: assignee.id })
+    const doneTodo = await createTodo(db, token, { title: 'Filed taxes', assigneePersonId: assignee.id })
+    if (!openTodo.ok || !doneTodo.ok) throw new Error('fixture failed')
+    assert.equal((await completeTodo(db, token, doneTodo.value.id)).ok, true)
+
+    // Done → todo_not_missed (ticket 20 guard, through the push helper).
+    assert.deepEqual(await pushMissedTodo(db, token, started.value.id, doneTodo.value.id), {
+      ok: false,
+      error: 'todo_not_missed',
+    })
+    // Open → queues with origin + source.
+    const pushed = await pushMissedTodo(db, token, started.value.id, openTodo.value.id)
+    assert.equal(pushed.ok, true)
+    const queue = await listMeetingIssues(db, token, started.value.id)
+    if (!queue.ok) throw new Error('list failed')
+    assert.equal(queue.value[0].origin, 'from_todo')
+    const src = sqlite
+      .prepare('SELECT origin_source_id FROM issues WHERE id = ?')
+      .get(queue.value[0].issueId) as { origin_source_id: number }
+    assert.equal(src.origin_source_id, openTodo.value.id)
+  })
+
+  it('pushHeadline: typed text becomes a manual issue in the queue; empty title rejected', async () => {
+    const { db } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const started = await startMeeting(db, token)
+    if (!started.ok) throw new Error('start failed')
+    assert.deepEqual(await pushHeadline(db, token, started.value.id, '   '), {
+      ok: false,
+      error: 'title_required',
+    })
+    const pushed = await pushHeadline(db, token, started.value.id, 'New hire starts Monday')
+    assert.equal(pushed.ok, true)
+    const queue = await listMeetingIssues(db, token, started.value.id)
+    if (!queue.ok) throw new Error('list failed')
+    assert.equal(queue.value.length, 1)
+    assert.equal(queue.value[0].title, 'New hire starts Monday')
+    assert.equal(queue.value[0].origin, 'manual')
+  })
+
+  it('removeMeetingIssue: unqueues (issue persists); only in_ids rows; concluded meeting guarded', async () => {
+    const { db, sqlite } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const started = await startMeeting(db, token)
+    if (!started.ok) throw new Error('start failed')
+    const issue = await addIssue(db, token, { title: 'queued then freed', classification: 'long_term' })
+    if (!issue.ok) throw new Error('fixture failed')
+    assert.equal((await pushToMeeting(db, token, started.value.id, issue.value.id)).ok, true)
+
+    // Concluded meeting: removal guarded.
+    sqliteExec(sqlite, `UPDATE meetings SET status = 'concluded' WHERE id = ${started.value.id}`)
+    assert.deepEqual(await removeMeetingIssue(db, token, started.value.id, issue.value.id), {
+      ok: false,
+      error: 'meeting_concluded',
+    })
+    sqliteExec(sqlite, `UPDATE meetings SET status = 'open' WHERE id = ${started.value.id}`)
+
+    const removed = await removeMeetingIssue(db, token, started.value.id, issue.value.id)
+    assert.equal(removed.ok, true)
+    const queue = await listMeetingIssues(db, token, started.value.id)
+    if (!queue.ok) throw new Error('list failed')
+    assert.equal(queue.value.length, 0)
+    // The issue itself persists (issues are never deleted).
+    const still = sqlite.prepare('SELECT COUNT(*) c FROM issues WHERE id = ?').get(issue.value.id) as { c: number }
+    assert.equal(still.c, 1)
+    // Removing a non-queued issue → issue_not_in_queue.
+    assert.deepEqual(await removeMeetingIssue(db, token, started.value.id, issue.value.id), {
+      ok: false,
+      error: 'issue_not_in_queue',
+    })
+  })
+
+  it('unknown meeting: push/list/remove all rejected (meeting_not_found)', async () => {
+    const { db } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const issue = await addIssue(db, token, { title: 'x', classification: 'long_term' })
+    if (!issue.ok) throw new Error('fixture failed')
+    assert.deepEqual(await pushToMeeting(db, token, 9999, issue.value.id), {
+      ok: false,
+      error: 'meeting_not_found',
+    })
+    assert.deepEqual(await listMeetingIssues(db, token, 9999), {
+      ok: false,
+      error: 'meeting_not_found',
+    })
+    assert.deepEqual(await removeMeetingIssue(db, token, 9999, issue.value.id), {
+      ok: false,
+      error: 'meeting_not_found',
+    })
   })
 })

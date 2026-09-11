@@ -275,13 +275,26 @@ include retired metrics' in-window entries (history is judged, not hidden).
 Ticket-20 provenance + carry decisions: origin issues are long_term in the
 CURRENT quarter (where IDS works), regardless of the source row's quarter;
 duplicates are allowed (the room may push the same red cell twice — the L10's
-meeting_issues UNIQUE handles in-meeting dedup at ticket 23); red-cell pushes
+meeting_issues UNIQUE handles in-meeting dedup); red-cell pushes
 verify pass via the metric's current direction (metrics.derivePass) and reject
 green cells ('not_red'); completed to-dos are not misses ('todo_not_missed').
 Quarter-end carry = the lean keep-row (quarter_id updated in place); the
 from-quarter must be ENDED (strict `<`, same freeze boundary — a quarter
 ending today is not yet carryable) and the target quarter must NOT be ended;
 bulk carry returns the count and leaves resolved rows as history.
+
+Ticket-23 queue decisions: a duplicate push to the same meeting is
+IDEMPOTENT — it returns ok (alreadyQueued) instead of an error, and the
+UNIQUE index keeps exactly one row (the room never sees a push error for
+pushing twice). Rock pushes verify the rock's LATEST weekly status is
+off_track (or the 2-consecutive flag) and reject otherwise ('not_off_track');
+measuring rocks are not pushable in v1 — their status is a number, not a
+verdict. Headlines are free text with no source row, so a headline pushes as
+a 'manual' issue (origin 'from_meeting' stays unused in v1 — documented).
+Push helpers are two-step (issue create → queue insert) without a
+transaction; a crash between steps self-heals by pushing again. Queue
+removal (any participant) deletes only 'in_ids' rows; 'solved_today'/'carried'
+rows are conclude-state (ticket 25), and the issue itself always persists.
 
 Status is derived: open until an `issue_resolutions` row exists.
 

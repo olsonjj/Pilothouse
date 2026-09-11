@@ -600,3 +600,32 @@ export const meetingSegments = sqliteTable(
   ],
 )
 export type MeetingSegment = typeof meetingSegments.$inferSelect
+
+/**
+ * Meeting issues (ticket 23): the meeting's IDS queue — a many-to-many
+ * between meetings and issues. `state` starts 'in_ids'; ticket 25's conclude
+ * flips non-solved rows to 'carried' (and solve-in-IDS sets 'solved_today').
+ * UNIQUE(meeting_id, issue_id) is the in-meeting dedup: pushing the same red
+ * cell twice queues ONE row (duplicate push = idempotent ok).
+ */
+export const meetingIssues = sqliteTable(
+  'meeting_issues',
+  {
+    ...mutableFields,
+    meetingId: integer('meeting_id')
+      .notNull()
+      .references(() => meetings.id),
+    issueId: integer('issue_id')
+      .notNull()
+      .references(() => issues.id),
+    state: text('state').notNull().default('in_ids'),
+  },
+  (t) => [
+    uniqueIndex('meeting_issues_meeting_issue_idx').on(t.meetingId, t.issueId),
+    check(
+      'meeting_issues_state_check',
+      sql`${t.state} IN ('in_ids', 'solved_today', 'carried')`,
+    ),
+  ],
+)
+export type MeetingIssue = typeof meetingIssues.$inferSelect
