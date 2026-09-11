@@ -8,7 +8,10 @@ top to bottom; each case has steps and the expected result.*
 
 - [x] Start the app: `pnpm dev` (serves at http://localhost:3250; port 3000 is
       taken by the dev default script — use `node_modules/.bin/vite dev --port 3250`).
-- [x] Sign in as the owner: `owner@pilothouse.local` / `pilothouse-owner-dev`.
+- [x] Sign in as the owner. **On a fresh install:** `owner@pilothouse.local` /
+      `pilothouse-owner-dev`. **On the original dev instance (pre-rename DB):**
+      `owner@openeos.local` / `openeos-owner-dev` — the seed rename only affects
+      fresh databases; existing account rows keep their original email.
 - [x] **Create a second (member) account** — there is deliberately no signup UI
       (accounts come from the seed; adding a creation UI was never a ticket).
       Run this, then restart the dev server so it seeds nothing weird:
@@ -16,12 +19,12 @@ top to bottom; each case has steps and the expected result.*
       ```sql
       -- sqlite3 data/pilothouse.db
       INSERT INTO users (email, password_hash, name, role, created_at, updated_at)
-      VALUES ('member@openeos.local',
+      VALUES ('member@pilothouse.local',
         '<copy the owner's password_hash value and reuse it — same password>',
         'QA Member', 'member', datetime('now'), datetime('now'));
       ```
 
-      Sign out, sign in as `member@openeos.local` (same password as owner) to
+      Sign out, sign in as `member@pilothouse.local` (same password as owner) to
       confirm it works, then sign back in as owner.
 - [x] Optional but recommended: create a second person ("QA Member") and link
       it to the member account (People page, admin) so permission tests below
