@@ -239,7 +239,17 @@ Status is derived: open until an `issue_resolutions` row exists.
 
 ### issue_resolutions
 `id, issue_id FK, meeting_id FK→meetings nullable, outcome CHECK('solved','dropped'),
-note, resolved_by, resolved_at`. Carry-forward is explicit: an unresolved
+note, resolved_by, resolved_at`. Implemented (ticket 16): immutable
+(no updated_at, never edited/deleted), `UNIQUE(issue_id)` makes the
+write-once rule structural; `note` is required for BOTH outcomes (solved
+captures the decision, dropped captures the reason — same honesty rule as
+dropped to-dos); `meeting_id` is a plain nullable int until the meetings
+table lands (ticket 21). `issues` naming delta: `added_by`/`added_at` →
+`created_by`→users + base `created_at` (login account acts, linked or not);
+`sort_order` exists but v1 keeps it at 0 (creation order via the
+created_at tie-break; no reorder API). Long-term issues default to the
+current quarter when no quarter is passed; short-term issues reject a
+quarter (their context is the derived week). Carry-forward is explicit: an unresolved
 long-term issue at quarter end prompts carry-or-drop (UI behavior; carried items
 re-attach to the new quarter as new rows or keep the row and re-point
 `quarter_id` — implementation detail, decide at build: lean keep-row + update

@@ -4,11 +4,11 @@
 
 **Blocked by:** 02: People & account linking.
 
-**Status:** ready-for-agent
+**Status:** done (review pending)
 
-- [ ] Any member adds one-line issues to the team list, choosing long- or short-term
-- [ ] Issues display age (weeks since added)
-- [ ] Resolve as solved (with a note) or dropped; status is derived from resolution rows
-- [ ] Manual sort order preserved
-- [ ] Origin field exists (defaults manual) but other origins come later
-- [ ] Seam tests cover add, resolve, drop, and derived status
+- [x] Any member adds one-line issues to the team list, choosing long- or short-term
+- [x] Issues display age (weeks since added)
+- [x] Resolve as solved (with a note) or dropped; status is derived from resolution rows
+- [x] Manual sort order preserved
+- [x] Origin field exists (defaults manual) but other origins come later
+- [x] Seam tests cover add, resolve, drop, and derived status

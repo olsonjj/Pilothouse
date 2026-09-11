@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ChartRouteImport } from './routes/chart'
+import { Route as IssuesRouteImport } from './routes/issues'
 import { Route as PeopleRouteImport } from './routes/people'
 import { Route as ScorecardRouteImport } from './routes/scorecard'
 import { Route as SigninRouteImport } from './routes/signin'
@@ -26,6 +27,11 @@ const IndexRoute = IndexRouteImport.update({
 const ChartRoute = ChartRouteImport.update({
   id: '/chart',
   path: '/chart',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IssuesRoute = IssuesRouteImport.update({
+  id: '/issues',
+  path: '/issues',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PeopleRoute = PeopleRouteImport.update({
@@ -62,6 +68,7 @@ const PeopleAnalyzerRoute = PeopleAnalyzerRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/chart': typeof ChartRoute
+  '/issues': typeof IssuesRoute
   '/people': typeof PeopleRouteWithChildren
   '/scorecard': typeof ScorecardRoute
   '/signin': typeof SigninRoute
@@ -72,6 +79,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/chart': typeof ChartRoute
+  '/issues': typeof IssuesRoute
   '/people': typeof PeopleRouteWithChildren
   '/scorecard': typeof ScorecardRoute
   '/signin': typeof SigninRoute
@@ -83,6 +91,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/chart': typeof ChartRoute
+  '/issues': typeof IssuesRoute
   '/people': typeof PeopleRouteWithChildren
   '/scorecard': typeof ScorecardRoute
   '/signin': typeof SigninRoute
@@ -95,6 +104,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/chart'
+    | '/issues'
     | '/people'
     | '/scorecard'
     | '/signin'
@@ -105,6 +115,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/chart'
+    | '/issues'
     | '/people'
     | '/scorecard'
     | '/signin'
@@ -115,6 +126,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/chart'
+    | '/issues'
     | '/people'
     | '/scorecard'
     | '/signin'
@@ -126,6 +138,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ChartRoute: typeof ChartRoute
+  IssuesRoute: typeof IssuesRoute
   PeopleRoute: typeof PeopleRouteWithChildren
   ScorecardRoute: typeof ScorecardRoute
   SigninRoute: typeof SigninRoute
@@ -147,6 +160,13 @@ declare module '@tanstack/react-router' {
       path: '/chart'
       fullPath: '/chart'
       preLoaderRoute: typeof ChartRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/issues': {
+      id: '/issues'
+      path: '/issues'
+      fullPath: '/issues'
+      preLoaderRoute: typeof IssuesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/people': {
@@ -208,6 +228,7 @@ const PeopleRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ChartRoute: ChartRoute,
+  IssuesRoute: IssuesRoute,
   PeopleRoute: PeopleRouteWithChildren,
   ScorecardRoute: ScorecardRoute,
   SigninRoute: SigninRoute,

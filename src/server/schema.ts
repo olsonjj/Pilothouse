@@ -390,3 +390,79 @@ export const metricEntries = sqliteTable(
   (t) => [uniqueIndex('metric_entries_metric_week_unique_idx').on(t.metricId, t.week)],
 )
 export type MetricEntry = typeof metricEntries.$inferSelect
+
+/**
+ * Team Issues List (ticket 16): one-line problem statements, classified
+ * long-term (quarter) or short-term (week). `team_id` omitted (single
+ * company, documented delta like todos/metrics). Status is DERIVED: open
+ * until an issue_resolutions row exists — the issues row itself is never
+ * status-bearing. Origin provenance (origin/origin_source_id) exists now;
+ * only 'manual' is written in this ticket (others activate in ticket 20).
+ * added_by/added_at are implemented as created_by→users + base created_at
+ * (naming delta vs data-model.md, same as todos' created_by decision).
+ * sort_order defaults to 0 — v1 ordering is creation order via the
+ * created_at tie-break; no reorder API yet (specs/issues.md v1 note).
+ */
+export const issues = sqliteTable(
+  'issues',
+  {
+    ...mutableFields,
+    title: text('title').notNull(),
+    /** 'long_term' = quarter list; 'short_term' = week list (derived weeks). */
+    classification: text('classification').notNull(),
+    /** Quarter context for long_term issues; always null for short_term. */
+    quarterId: integer('quarter_id').references(() => quarters.id),
+    origin: text('origin').notNull().default('manual'),
+    originSourceId: integer('origin_source_id'),
+    /** Creator (FK→users, works for unlinked accounts — todos decision). */
+    createdBy: integer('created_by')
+      .notNull()
+      .references(() => users.id),
+    /** Manual ordering field (v1: always 0; created_at breaks ties). */
+    sortOrder: integer('sort_order').notNull().default(0),
+  },
+  (t) => [
+    check(
+      'issues_classification_check',
+      sql`${t.classification} IN ('long_term', 'short_term')`,
+    ),
+    check(
+      'issues_origin_check',
+      sql`${t.origin} IN ('manual', 'from_rock', 'from_scorecard', 'from_todo', 'from_meeting')`,
+    ),
+  ],
+)
+export type Issue = typeof issues.$inferSelect
+
+/**
+ * Write-once resolution records (ticket 16). The row IS the state: an issue
+ * is open until a resolution exists; solved/dropped is the outcome here.
+ * Immutable per data-model.md — no updated_at, never edited or deleted.
+ * Note is required for BOTH outcomes: solved needs the decision captured,
+ * dropped needs the reason (same honesty rule as dropped to-dos).
+ * meeting_id stays a plain nullable int until the meetings table lands
+ * (ticket 21/24), then becomes an FK.
+ */
+export const issueResolutions = sqliteTable(
+  'issue_resolutions',
+  {
+    ...baseFields,
+    issueId: integer('issue_id')
+      .notNull()
+      .references(() => issues.id),
+    meetingId: integer('meeting_id'),
+    /** 'solved' (decided) or 'dropped' (no longer an issue / expired). */
+    outcome: text('outcome').notNull(),
+    /** Required non-empty for both outcomes (decision note / drop reason). */
+    note: text('note').notNull(),
+    resolvedBy: integer('resolved_by')
+      .notNull()
+      .references(() => users.id),
+    resolvedAt: text('resolved_at').notNull(),
+  },
+  (t) => [
+    uniqueIndex('issue_resolutions_issue_unique_idx').on(t.issueId),
+    check('issue_resolutions_outcome_check', sql`${t.outcome} IN ('solved', 'dropped')`),
+  ],
+)
+export type IssueResolution = typeof issueResolutions.$inferSelect

@@ -48,6 +48,9 @@ function Home() {
           <Link to="/scorecard" className="text-blue-600 hover:underline">
             Scorecard
           </Link>
+          <Link to="/issues" className="text-blue-600 hover:underline">
+            Issues
+          </Link>
           <Link to="/chart" search={{ seat: null }} className="text-blue-600 hover:underline">
             Chart
           </Link>
