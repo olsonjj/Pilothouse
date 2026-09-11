@@ -4,7 +4,7 @@
 
 **Blocked by:** 17: Rocks: create & manage.
 
-**Status:** done (review pending)
+**Status:** done (reviewer sign-off; normalizeWeek extraction verified single-home)
 
 - [x] Owner updates own rock status weekly; admins can update any; strict overwrite per week
 - [x] Statuses: on_track / off_track / measuring (measuring requires a target and captures `actual`)
