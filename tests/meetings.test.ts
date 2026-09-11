@@ -17,13 +17,17 @@ import {
   pushHeadline,
   listMeetingIssues,
   removeMeetingIssue,
+  pullLongTermIssues,
+  solveMeetingIssue,
   SEGMENT_AGENDA,
 } from '../src/server/meetings'
 import { createPerson, linkUserToPerson } from '../src/server/people'
 import { setEntry, createMetric } from '../src/server/metrics'
 import { createRock, setStatus } from '../src/server/rocks'
-import { createTodo, completeTodo } from '../src/server/todos'
+import { createTodo, completeTodo, dueDateFrom } from '../src/server/todos'
 import { addIssue, resolveIssue } from '../src/server/issues'
+import { issueResolutions, todos as todosTable } from '../src/server/schema'
+import { eq } from 'drizzle-orm'
 import { createTestDb, signedInUser } from './helpers'
 import { todayIso, weekStart } from '../src/server/week'
 
@@ -653,5 +657,184 @@ describe('Meeting issue queue: push, dedup, remove (seam, ticket 23)', () => {
       ok: false,
       error: 'meeting_not_found',
     })
+  })
+})
+
+describe('IDS: pull long-term issues + solve in-session (seam, ticket 24)', () => {
+  it('pull round-trip: long-term unresolved pulled; resolved/short-term rejected; duplicate idempotent; bulk results pinned', async () => {
+    const { db } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const started = await startMeeting(db, token)
+    if (!started.ok) throw new Error('start failed')
+
+    const lt = await addIssue(db, token, { title: 'long', classification: 'long_term' })
+    const st = await addIssue(db, token, { title: 'short', classification: 'short_term' })
+    const res = await addIssue(db, token, { title: 'resolved', classification: 'long_term' })
+    if (!lt.ok || !st.ok || !res.ok) throw new Error('fixture failed')
+    assert.equal(
+      (await resolveIssue(db, token, res.value.id, { outcome: 'solved', note: 'before' })).ok,
+      true,
+    )
+
+    // Bulk: the good one pulls; short_term and resolved reject inline.
+    const bulk = await pullLongTermIssues(db, token, started.value.id, [
+      lt.value.id,
+      st.value.id,
+      res.value.id,
+    ])
+    assert.equal(bulk.ok, true)
+    if (!bulk.ok) throw new Error('bulk failed')
+    assert.deepEqual(bulk.value, [
+      { issueId: lt.value.id, ok: true, meetingIssueId: bulk.value[0]!.meetingIssueId, alreadyQueued: false },
+      { issueId: st.value.id, ok: false, error: 'issue_not_long_term' },
+      { issueId: res.value.id, ok: false, error: 'issue_resolved' },
+    ])
+
+    // Duplicate pull of the good one: idempotent alreadyQueued, no second row.
+    const dup = await pullLongTermIssues(db, token, started.value.id, [lt.value.id])
+    assert.equal(dup.ok, true)
+    if (!dup.ok) throw new Error('dup failed')
+    assert.equal(dup.value[0]?.alreadyQueued, true)
+    assert.equal(dup.value[0]?.meetingIssueId, bulk.value[0]?.meetingIssueId)
+    const queue = await listMeetingIssues(db, token, started.value.id)
+    if (!queue.ok) throw new Error('queue failed')
+    assert.equal(queue.value.length, 1)
+  })
+
+  it('solve round-trip: state flips, resolution row has note + meeting link, to-dos carry source_meeting_id + 7-day due', async () => {
+    const { db } = await createTestDb()
+    const { token, user } = await signedInUser(db)
+    const started = await startMeeting(db, token)
+    if (!started.ok) throw new Error('start failed')
+    const alice = await personFor(db, token, 'Alice')
+    const issue = await addIssue(db, token, { title: 'ids problem', classification: 'long_term' })
+    if (!issue.ok) throw new Error('fixture failed')
+    const pulled = await pushToMeeting(db, token, started.value.id, issue.value.id)
+    if (!pulled.ok) throw new Error('push failed')
+
+    const solved = await solveMeetingIssue(db, token, started.value.id, pulled.value.meetingIssueId, {
+      note: 'We decided: split the work',
+      todos: [
+        { title: 'do the thing', assigneePersonId: alice.id },
+        { title: 'follow up', assigneePersonId: alice.id },
+      ],
+    })
+    assert.equal(solved.ok, true)
+    if (!solved.ok) throw new Error('solve failed')
+    assert.equal(solved.value.issueId, issue.value.id)
+    assert.equal(solved.value.todoIds.length, 2)
+
+    // Queue row flipped to solved_today.
+    const queue = await listMeetingIssues(db, token, started.value.id)
+    if (!queue.ok) throw new Error('queue failed')
+    assert.equal(queue.value[0]?.state, 'solved_today')
+
+    // Resolution row: note + meeting link + write-once uniqueness.
+    const resRow = await db
+      .select()
+      .from(issueResolutions)
+      .where(eq(issueResolutions.issueId, issue.value.id))
+      .get()
+    assert.equal(resRow?.outcome, 'solved')
+    assert.equal(resRow?.note, 'We decided: split the work')
+    assert.equal(resRow?.meetingId, started.value.id)
+    assert.equal(resRow?.resolvedBy, user.id)
+
+    // To-dos: source_meeting_id + assignee + fixed 7-day due.
+    const created = await db
+      .select()
+      .from(todosTable)
+      .where(eq(todosTable.sourceMeetingId, started.value.id))
+      .all()
+    assert.equal(created.length, 2)
+    assert.deepEqual(
+      created.map((t) => t.assigneePersonId),
+      [alice.id, alice.id],
+    )
+    // 7-day due: due_date = dueDateFrom(today) — the shared fixed rule.
+    assert.equal(created[0]?.dueDate, dueDateFrom(todayIso()))
+    assert.equal(created[1]?.dueDate, dueDateFrom(todayIso()))
+  })
+
+  it('solve guards: non-in_ids rejected; concluded meeting rejected; empty note rejected; double-solve rejected write-once', async () => {
+    const { db, sqlite } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const started = await startMeeting(db, token)
+    if (!started.ok) throw new Error('start failed')
+    const issue = await addIssue(db, token, { title: 'x', classification: 'long_term' })
+    if (!issue.ok) throw new Error('fixture failed')
+    const pulled = await pushToMeeting(db, token, started.value.id, issue.value.id)
+    if (!pulled.ok) throw new Error('push failed')
+
+    // Empty note → resolveIssue's note_required (surfaced through the seam).
+    assert.deepEqual(
+      await solveMeetingIssue(db, token, started.value.id, pulled.value.meetingIssueId, {
+        note: '',
+        todos: [],
+      }),
+      { ok: false, error: 'note_required' },
+    )
+
+    const ok = await solveMeetingIssue(db, token, started.value.id, pulled.value.meetingIssueId, {
+      note: 'done',
+      todos: [],
+    })
+    assert.equal(ok.ok, true)
+
+    // Double-solve: the row is solved_today → issue_not_in_queue; the
+    // write-once resolution underneath is what makes a second solve impossible.
+    assert.deepEqual(
+      await solveMeetingIssue(db, token, started.value.id, pulled.value.meetingIssueId, {
+        note: 'again',
+        todos: [],
+      }),
+      { ok: false, error: 'issue_not_in_queue' },
+    )
+
+    // Concluded meeting guard.
+    sqliteExec(sqlite, `UPDATE meetings SET status = 'concluded' WHERE id = ${started.value.id}`)
+    assert.deepEqual(
+      await solveMeetingIssue(db, token, started.value.id, pulled.value.meetingIssueId, {
+        note: 'post-conclude',
+        todos: [],
+      }),
+      { ok: false, error: 'meeting_concluded' },
+    )
+  })
+
+  it('unknown ids rejected; unauthenticated denied; member participates', async () => {
+    const { db } = await createTestDb()
+    const { token } = await signedInUser(db)
+    const member = await signedInUser(db, 'member')
+    const started = await startMeeting(db, token)
+    if (!started.ok) throw new Error('start failed')
+    const issue = await addIssue(db, token, { title: 'x', classification: 'long_term' })
+    if (!issue.ok) throw new Error('fixture failed')
+
+    // Unknown meeting-issue id.
+    assert.deepEqual(
+      await solveMeetingIssue(db, token, started.value.id, 9999, { note: 'n', todos: [] }),
+      { ok: false, error: 'issue_not_in_queue' },
+    )
+    // Unknown issue id in a bulk pull.
+    const pull = await pullLongTermIssues(db, token, started.value.id, [issue.value.id, 424242])
+    assert.equal(pull.ok, true)
+    if (!pull.ok) throw new Error('pull failed')
+    assert.equal(pull.value[0]?.ok, true)
+    assert.equal(pull.value[1]?.ok, false)
+    assert.equal(pull.value[1]?.error, 'issue_not_found')
+
+    // Unauthenticated denied on both.
+    assert.equal((await pullLongTermIssues(db, undefined, started.value.id, [])).ok, false)
+    assert.equal(
+      (await solveMeetingIssue(db, undefined, started.value.id, 1, { note: 'n', todos: [] })).ok,
+      false,
+    )
+
+    // Member (any participant) can pull and solve.
+    const memberPull = await pullLongTermIssues(db, member.token, started.value.id, [issue.value.id])
+    assert.equal(memberPull.ok, true)
+    if (!memberPull.ok) throw new Error('member pull failed')
+    assert.equal(memberPull.value[0]?.alreadyQueued, true)
   })
 })

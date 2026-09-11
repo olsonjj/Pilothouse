@@ -17,7 +17,11 @@ import {
   pushHeadlineFn,
   listMeetingIssuesFn,
   removeMeetingIssueFn,
+  pullLongTermIssuesFn,
+  solveMeetingIssueFn,
 } from '../functions/meetings'
+import { listIssuesFn } from '../functions/issues'
+import { getCurrentPeriodFn } from '../functions/quarters'
 import type { MeetingWithSegments, SegmentView, MeetingSummary, MeetingIssueView } from '../server/meetings'
 
 export const Route = createFileRoute('/l10')({
@@ -316,6 +320,63 @@ function L10Page() {
     await push(() => removeMeetingIssueFn({ data: { meetingId: open.id, issueId } }))
   }
 
+  // --- Ticket 24: IDS pull + solve.
+  const [pullables, setPullables] = useState<Array<{ id: number; title: string }>>([])
+  const [pullSelection, setPullSelection] = useState<Record<number, boolean>>({})
+  const [showPull, setShowPull] = useState(false)
+  const [solvingId, setSolvingId] = useState<number | null>(null)
+  const [solveNote, setSolveNote] = useState('')
+  const [solveTodos, setSolveTodos] = useState<Array<{ title: string; assigneePersonId: number | null }>>([])
+
+  async function openPullPanel() {
+    if (!open) return
+    // Unresolved long-term issues in the meeting's quarter (the team list IDS
+    // pulls from). Current quarter via getCurrentPeriodFn — the room works
+    // where the meeting is.
+    setShowPull(true)
+    const [period, all] = await Promise.all([getCurrentPeriodFn(), listIssuesFn()])
+    const quarterId = period.ok ? period.value.quarter?.id : null
+    if (!all.ok || quarterId == null) {
+      setPullables([])
+      return
+    }
+    setPullables(
+      all.value.filter((i) => i.status === 'open' && i.classification === 'long_term' && i.quarterId === quarterId),
+    )
+  }
+
+  async function handlePull() {
+    if (!open) return
+    const ids = Object.entries(pullSelection).filter(([, v]) => v).map(([k]) => Number(k))
+    if (ids.length === 0) return
+    const ok = await push(() => pullLongTermIssuesFn({ data: { meetingId: open.id, issueIds: ids } }))
+    if (ok) {
+      setPullSelection({})
+      setShowPull(false)
+    }
+  }
+
+  function openSolvePanel(mi: MeetingIssueView) {
+    setSolvingId(mi.meetingIssueId)
+    setSolveNote('')
+    setSolveTodos([{ title: '', assigneePersonId: null }])
+  }
+
+  async function handleSolve() {
+    if (!open || solvingId == null) return
+    const ok = await push(() =>
+      solveMeetingIssueFn({
+        data: {
+          meetingId: open.id,
+          meetingIssueId: solvingId,
+          note: solveNote,
+          todos: solveTodos.filter((t) => t.title.trim() !== '' && t.assigneePersonId != null),
+        },
+      }),
+    )
+    if (ok) setSolvingId(null)
+  }
+
   const pre = preloaded?.ok ? preloaded.value : null
 
   return (
@@ -559,6 +620,13 @@ function L10Page() {
               <div className="flex items-center justify-between">
                 <h3 className="font-medium text-slate-700">IDS queue ({meetingIssues.length})</h3>
                 <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => (showPull ? setShowPull(false) : void openPullPanel())}
+                    disabled={busy}
+                    className="rounded border border-slate-300 px-2 py-1 text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                  >
+                    Pull from long-term list
+                  </button>
                   <input
                     value={headline}
                     onChange={(e) => setHeadline(e.target.value)}
@@ -575,6 +643,36 @@ function L10Page() {
                   </button>
                 </div>
               </div>
+              {showPull && (
+                <div className="mt-2 rounded border border-slate-200 bg-slate-50 p-2">
+                  <p className="text-[10px] text-slate-500">Unresolved long-term issues (current quarter):</p>
+                  {pullables.length === 0 ? (
+                    <p className="mt-1 text-slate-400">Nothing to pull — the long-term list is clear.</p>
+                  ) : (
+                    <ul className="mt-1 space-y-1">
+                      {pullables.map((p) => (
+                        <li key={p.id} className="flex items-center gap-2">
+                          <label className="flex flex-1 items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={pullSelection[p.id] === true}
+                              onChange={(e) => setPullSelection({ ...pullSelection, [p.id]: e.target.checked })}
+                            />
+                            <span className="truncate">{p.title}</span>
+                          </label>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <button
+                    onClick={handlePull}
+                    disabled={busy || !Object.values(pullSelection).some(Boolean)}
+                    className="mt-2 rounded bg-blue-600 px-2 py-1 text-white hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    Pull selected
+                  </button>
+                </div>
+              )}
               {meetingIssues.length === 0 ? (
                 <p className="mt-2 text-slate-400">
                   Nothing queued yet — push red cells, off-track rocks, or missed to-dos above.
@@ -582,28 +680,109 @@ function L10Page() {
               ) : (
                 <ul className="mt-2 space-y-1">
                   {meetingIssues.map((mi) => (
-                    <li key={mi.meetingIssueId} className="flex items-center justify-between gap-2">
-                      <span className="truncate">
-                        {mi.title}{' '}
-                        <span className="text-slate-400">
-                          ({mi.origin === 'manual' ? 'headline/manual' : mi.origin.replace('from_', '')})
+                    <li key={mi.meetingIssueId} className="rounded border border-slate-100 px-2 py-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate">
+                          {mi.title}{' '}
+                          <span className="text-slate-400">
+                            ({mi.origin === 'manual' ? 'headline/manual' : mi.origin.replace('from_', '')})
+                          </span>
                         </span>
-                      </span>
-                      <span className="flex items-center gap-2">
-                        <span className={mi.status === 'resolved' ? 'text-slate-400 line-through' : ''}>
-                          {mi.state === 'in_ids' ? 'in IDS' : mi.state}
+                        <span className="flex items-center gap-2">
+                          <span className={mi.status === 'resolved' ? 'text-slate-400 line-through' : ''}>
+                            {mi.state === 'in_ids' ? 'in IDS' : mi.state}
+                          </span>
+                          {mi.state === 'in_ids' && (
+                            <>
+                              <button
+                                onClick={() => (solvingId === mi.meetingIssueId ? setSolvingId(null) : openSolvePanel(mi))}
+                                disabled={busy}
+                                title="Solve: capture resolution + assign to-dos"
+                                className="rounded bg-green-600 px-1.5 py-0.5 text-[10px] text-white hover:bg-green-700 disabled:opacity-50"
+                              >
+                                Solve
+                              </button>
+                              <button
+                                onClick={() => handleRemoveMeetingIssue(mi.issueId)}
+                                disabled={busy}
+                                title="Remove from queue (issue itself persists)"
+                                className="rounded border border-slate-300 px-1.5 py-0.5 text-[10px] text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+                              >
+                                Remove
+                              </button>
+                            </>
+                          )}
                         </span>
-                        {mi.state === 'in_ids' && (
-                          <button
-                            onClick={() => handleRemoveMeetingIssue(mi.issueId)}
-                            disabled={busy}
-                            title="Remove from queue (issue itself persists)"
-                            className="rounded border border-slate-300 px-1.5 py-0.5 text-[10px] text-slate-500 hover:bg-slate-50 disabled:opacity-50"
-                          >
-                            Remove
-                          </button>
-                        )}
-                      </span>
+                      </div>
+                      {solvingId === mi.meetingIssueId && (
+                        <div className="mt-2 border-t border-slate-100 pt-2">
+                          <textarea
+                            value={solveNote}
+                            onChange={(e) => setSolveNote(e.target.value)}
+                            placeholder="Resolution (what was decided)…"
+                            rows={2}
+                            className="w-full rounded border border-slate-300 px-2 py-1"
+                          />
+                          {solveTodos.map((t, i) => (
+                            <div key={i} className="mt-1 flex items-center gap-2">
+                              <input
+                                value={t.title}
+                                onChange={(e) =>
+                                  setSolveTodos(solveTodos.map((s, j) => (j === i ? { ...s, title: e.target.value } : s)))
+                                }
+                                placeholder="New to-do…"
+                                className="flex-1 rounded border border-slate-300 px-2 py-1"
+                              />
+                              <select
+                                value={t.assigneePersonId ?? ''}
+                                onChange={(e) =>
+                                  setSolveTodos(
+                                    solveTodos.map((s, j) =>
+                                      j === i ? { ...s, assigneePersonId: e.target.value ? Number(e.target.value) : null } : s,
+                                    ),
+                                  )
+                                }
+                                className="rounded border border-slate-300 px-2 py-1"
+                              >
+                                <option value="">Assign to…</option>
+                                {data.people.map((p) => (
+                                  <option key={p.id} value={p.id}>
+                                    {p.fullName}
+                                  </option>
+                                ))}
+                              </select>
+                              <button
+                                onClick={() => setSolveTodos(solveTodos.filter((_, j) => j !== i))}
+                                className="text-slate-400 hover:text-slate-600"
+                                title="Remove to-do row"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ))}
+                          <div className="mt-1 flex items-center gap-2">
+                            <button
+                              onClick={() => setSolveTodos([...solveTodos, { title: '', assigneePersonId: null }])}
+                              className="text-[10px] text-blue-600 hover:underline"
+                            >
+                              + add to-do
+                            </button>
+                            <button
+                              onClick={() => void handleSolve()}
+                              disabled={busy || solveNote.trim() === ''}
+                              className="rounded bg-green-600 px-2 py-1 text-white hover:bg-green-700 disabled:opacity-50"
+                            >
+                              Solve issue
+                            </button>
+                            <button
+                              onClick={() => setSolvingId(null)}
+                              className="rounded border border-slate-300 px-2 py-1 text-slate-500 hover:bg-slate-50"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </li>
                   ))}
                 </ul>

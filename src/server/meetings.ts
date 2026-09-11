@@ -18,12 +18,14 @@ import {
   issueFromRock,
   issueFromScorecardEntry,
   issueFromTodo,
+  resolveIssue,
   unresolvedIssueIds,
 } from './issues'
 import type { IssueError } from './issues'
 import { listEntriesForGrid } from './metrics'
 import { listLatestStatuses, listRocks, type StatusError, type RockError } from './rocks'
-import { listTodosByWeek } from './todos'
+import { listTodosByWeek, type TodoInput } from './todos'
+import { createTodo } from './todos'
 
 /**
  * Level 10 meeting lifecycle (ticket 21). One OPEN meeting per company at a
@@ -77,6 +79,9 @@ export type MeetingError =
   | 'todo_not_missed'
   | 'title_required'
   | 'invalid_date'
+  | 'invalid_assignee'
+  | 'todo_title_required'
+  | 'already_resolved'
 
 export type MeetingResult<T> = { ok: true; value: T } | { ok: false; error: MeetingError }
 
@@ -791,4 +796,130 @@ export async function removeMeetingIssue(
   await db.delete(meetingIssues).where(eq(meetingIssues.id, row.id))
   return { ok: true, value: { issueId, meetingIssueId: row.id, alreadyQueued: false } }
 }
+
+/* ------------------------------------------------------------------ */
+/* IDS (ticket 24): pull long-term issues + solve in-session           */
+/* ------------------------------------------------------------------ */
+
+export type PullOutcome = {
+  issueId: number
+  ok: boolean
+  meetingIssueId?: number
+  alreadyQueued?: boolean
+  error?: string
+}
+
+/**
+ * Pull LONG-TERM issues from the team's list into this meeting's IDS queue
+ * (any participant; the meeting must be open). Each id rides pushToMeeting
+ * semantics: long-term only, unresolved only, duplicate pull = idempotent
+ * alreadyQueued (the ticket-23 dedup decision). Short-term issues age in
+ * their week list and are never pulled. Bulk = per-issue results — one bad
+ * id never blocks the others.
+ */
+export async function pullLongTermIssues(
+  db: Db,
+  token: string | undefined,
+  meetingId: number,
+  issueIds: number[],
+): Promise<MeetingResult<PullOutcome[]>> {
+  const auth = await getCurrentUser(db, token)
+  if (!auth.ok) return auth
+  const open = await openMeetingById(db, meetingId)
+  if (!open.ok) return open
+  const results: PullOutcome[] = []
+  for (const issueId of issueIds) {
+    const pushed = await pushToMeeting(db, token, meetingId, issueId)
+    if (pushed.ok) {
+      results.push({
+        issueId,
+        ok: true,
+        meetingIssueId: pushed.value.meetingIssueId,
+        alreadyQueued: pushed.value.alreadyQueued,
+      })
+    } else {
+      results.push({ issueId, ok: false, error: pushed.error })
+    }
+  }
+  return { ok: true, value: results }
+}
+
+export type SolveTodoInput = Pick<TodoInput, 'title' | 'assigneePersonId'>
+
+export type SolveInput = {
+  note: string
+  todos: SolveTodoInput[]
+}
+
+/**
+ * Solve an in-IDS issue: capture the resolution note and create the assigned
+ * to-dos (7-day due via the shared rule), then flip the queue row to
+ * 'solved_today'. Any participant; the meeting must be open; the row must
+ * still be 'in_ids' (solved_today/carried rows are conclude-state).
+ *
+ * OPERATION ORDER (crash-safety, documented in data-model.md): validate
+ * to-do inputs → resolveIssue FIRST (write-once: a crash after this leaves
+ * the issue correctly solved, which conclude/queue reads handle) → create
+ * to-dos → flip the queue row LAST. A crash mid-way never leaves the queue
+ * row solved while the issue is open — the harmless direction is the queue
+ * row lagging (still in_ids), never the opposite.
+ */
+export async function solveMeetingIssue(
+  db: Db,
+  token: string | undefined,
+  meetingId: number,
+  meetingIssueId: number,
+  input: SolveInput,
+): Promise<MeetingResult<{ issueId: number; todoIds: number[] }>> {
+  const auth = await getCurrentUser(db, token)
+  if (!auth.ok) return auth
+  const open = await openMeetingById(db, meetingId)
+  if (!open.ok) return open
+  const row = await db
+    .select()
+    .from(meetingIssues)
+    .where(eq(meetingIssues.id, meetingIssueId))
+    .get()
+  if (!row || row.meetingId !== meetingId) return { ok: false, error: 'issue_not_in_queue' }
+  if (row.state !== 'in_ids') return { ok: false, error: 'issue_not_in_queue' }
+  const issue = await db.select().from(issues).where(eq(issues.id, row.issueId)).get()
+  if (!issue) return { ok: false, error: 'issue_not_found' }
+
+  // Pre-validate to-do inputs (titles + assignees) so a solve never lands
+  // half-created: everything that can fail validation fails BEFORE the
+  // write-once resolution.
+  const createdTodoInputs: TodoInput[] = []
+  for (const t of input.todos ?? []) {
+    const title = t.title?.trim() ?? ''
+    if (!title) return { ok: false, error: 'todo_title_required' }
+    const assignee = await db.select({ id: people.id }).from(people).where(eq(people.id, t.assigneePersonId)).get()
+    if (!assignee) return { ok: false, error: 'invalid_assignee' }
+    createdTodoInputs.push({ title, assigneePersonId: t.assigneePersonId, sourceMeetingId: meetingId })
+  }
+
+  // 1) The write-once resolution (rejects a second solve via already_resolved).
+  const resolved = await resolveIssue(db, token, row.issueId, {
+    outcome: 'solved',
+    note: input.note,
+    meetingId,
+  })
+  if (!resolved.ok) return { ok: false, error: resolved.error as MeetingError }
+
+  // 2) The assigned to-dos (validated above; creation is now infallible).
+  const todoIds: number[] = []
+  for (const t of createdTodoInputs) {
+    const created = await createTodo(db, token, t)
+    if (created.ok) todoIds.push(created.value.id)
+  }
+
+  // 3) Flip the queue row LAST (crash before this = harmless lag; conclude
+  //    treats lingering in_ids rows as carried, ticket 25).
+  await db
+    .update(meetingIssues)
+    .set({ state: 'solved_today', updatedAt: new Date().toISOString() })
+    .where(eq(meetingIssues.id, row.id))
+
+  return { ok: true, value: { issueId: row.issueId, todoIds } }
+}
+
 export { formatWeekLabel, weekStart }

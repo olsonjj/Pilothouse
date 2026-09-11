@@ -18,6 +18,8 @@ import { and, asc, eq, gte, lt, sql, type SQL } from 'drizzle-orm'
 export type TodoInput = {
   title: string
   assigneePersonId: number
+  /** Set by ticket 24's solve-in-IDS: the to-do was created by solving an issue in this meeting. */
+  sourceMeetingId?: number
 }
 
 export type TodoView = Todo & {
@@ -77,6 +79,7 @@ export async function createTodo(
       assigneePersonId: input.assigneePersonId,
       createdBy: creator,
       dueDate: dueDateFrom(todayIso()),
+      sourceMeetingId: input.sourceMeetingId ?? null,
     })
     .returning()
   return { ok: true, value: todo! }

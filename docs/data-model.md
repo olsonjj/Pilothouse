@@ -305,7 +305,10 @@ note, resolved_by, resolved_at`. Implemented (ticket 16): immutable
 write-once rule structural; `note` is required for BOTH outcomes (solved
 captures the decision, dropped captures the reason — same honesty rule as
 dropped to-dos); `meeting_id` is a plain nullable int until the meetings
-table lands (ticket 21). `issues` naming delta: `added_by`/`added_at` →
+table lands (ticket 21). Ticket 24 wiring: `resolveIssue` accepts an
+optional `meetingId` input and stores it on the row — solving an issue in
+an L10's IDS records the solving meeting (the "resolution row references
+this meeting" promise is now real). `issues` naming delta: `added_by`/`added_at` →
 `created_by`→users + base `created_at` (login account acts, linked or not);
 `sort_order` exists but v1 keeps it at 0 (creation order via the
 created_at tie-break; no reorder API). Long-term issues default to the
@@ -326,7 +329,7 @@ re-attach to the new quarter as new rows or keep the row and re-point
 | title | text | one line only |
 | assignee_person_id | int FK→people | exactly one |
 | created_by | int FK→**users** | implemented as the login account (ticket 11): any signed-in user can create, linked or not; switch to people-FK only if creation ever requires a linked person |
-| source_meeting_id | int FK→meetings, nullable | plain int until meetings table exists (ticket 21) |
+| source_meeting_id | int FK→meetings, nullable | plain int until meetings table exists (ticket 21); ticket 24 wiring: `TodoInput.sourceMeetingId` (optional) is set by the IDS solve flow — solving an issue creates its assigned to-dos linked to the meeting |
 | issue_source_id | int FK→issues, nullable | plain int until issues table exists (ticket 16) |
 | created_at | text | |
 | due_date | text (date) | created_at + 7 days (decided) |
@@ -392,6 +395,15 @@ require table rebuilds).
 `id, meeting_id FK, issue_id FK, state CHECK('in_ids','solved_today','carried')`.
 `UNIQUE(meeting_id, issue_id)`. On conclude, non-solved rows flip to 'carried'
 and the issues return to the long-term list (per spec).
+
+**IDS operations (ticket 24):** `pullLongTermIssues` reuses pushToMeeting
+semantics per id (long-term only, unresolved only, duplicate = idempotent
+alreadyQueued) and returns per-issue results — one bad id never blocks the
+bulk. `solveMeetingIssue` flips `in_ids → solved_today` and follows the
+**crash-safety order**: validate to-do inputs → resolveIssue FIRST (write-once;
+a crash leaves the issue correctly solved) → create to-dos → flip the queue
+row LAST. The harmless crash direction is a queue row lagging in in_ids
+(conclude treats lingering in_ids as carried); never the opposite.
 
 ### meeting_ratings
 `id, meeting_id FK, person_id FK, score(int CHECK 1..10)`.

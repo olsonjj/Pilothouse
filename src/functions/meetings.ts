@@ -19,6 +19,8 @@ import {
   pushHeadline,
   listMeetingIssues,
   removeMeetingIssue,
+  pullLongTermIssues,
+  solveMeetingIssue,
 } from '../server/meetings'
 
 /** Thin cookie-layer wrappers around src/server/meetings.ts. */
@@ -130,4 +132,23 @@ export const removeMeetingIssueFn = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     const db = await getDb()
     return removeMeetingIssue(db, getCookie(SESSION_COOKIE), data.meetingId ?? 0, data.issueId ?? 0)
+  })
+
+export const pullLongTermIssuesFn = createServerFn({ method: 'POST' })
+  .validator((d: unknown) => d as { meetingId?: number; issueIds?: number[] })
+  .handler(async ({ data }) => {
+    const db = await getDb()
+    return pullLongTermIssues(db, getCookie(SESSION_COOKIE), data.meetingId ?? 0, data.issueIds ?? [])
+  })
+
+export const solveMeetingIssueFn = createServerFn({ method: 'POST' })
+  .validator((d: unknown) =>
+    d as { meetingId?: number; meetingIssueId?: number; note?: string; todos?: Array<{ title?: string; assigneePersonId?: number }> },
+  )
+  .handler(async ({ data }) => {
+    const db = await getDb()
+    return solveMeetingIssue(db, getCookie(SESSION_COOKIE), data.meetingId ?? 0, data.meetingIssueId ?? 0, {
+      note: data.note ?? '',
+      todos: (data.todos ?? []).map((t) => ({ title: t.title ?? '', assigneePersonId: t.assigneePersonId ?? 0 })),
+    })
   })

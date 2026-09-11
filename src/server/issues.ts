@@ -226,12 +226,15 @@ export type IssueResolutionView = {
  * Write-once resolution: solved (decision note) or dropped (reason). Both
  * require a non-empty note — a solved issue without a captured decision and
  * a dropped issue without a reason both defeat the "kept forever" archive.
+ * `input.meetingId` (ticket 24): set when the issue was solved in an L10's
+ * IDS — the resolution row then references that meeting (data-model:
+ * "resolution rows reference the solving meeting").
  */
 export async function resolveIssue(
   db: Db,
   token: string | undefined,
   issueId: number,
-  input: { outcome: IssueOutcome; note: string },
+  input: { outcome: IssueOutcome; note: string; meetingId?: number },
 ): Promise<IssueResult<IssueResolutionView>> {
   const auth = await getCurrentUser(db, token)
   if (!auth.ok) return auth
@@ -254,6 +257,7 @@ export async function resolveIssue(
       issueId,
       outcome: input.outcome,
       note,
+      meetingId: input.meetingId ?? null,
       resolvedBy: auth.user.id,
       resolvedAt: new Date().toISOString(),
     })
