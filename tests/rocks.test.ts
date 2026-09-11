@@ -755,6 +755,25 @@ describe('Ticket 19: scoring, rates, carry-over (seam)', () => {
       ok: false,
       error: 'quarter_not_ended',
     })
+    // BOUNDARY PIN: a source quarter ending TODAY is not ended (strict <) —
+    // flips under a `>` off-by-one in carryOverRock's source check.
+    const today2 = todayIso()
+    sqlite.exec(
+      `INSERT INTO quarters (label, start_date, end_date) VALUES ('2099 Q2', date('${today2}', '-3 months'), '${today2}')`,
+    )
+    const endingTodayId = (
+      sqlite.prepare("SELECT id FROM quarters WHERE label = '2099 Q2'").get() as { id: number }
+    ).id
+    const endsToday = await createRock(db, token, {
+      statement: 'ends today',
+      ownerPersonId: alice.id,
+      quarterId: endingTodayId,
+    })
+    if (!endsToday.ok) throw new Error('fixture failed')
+    assert.deepEqual(await carryOverRock(db, token, endsToday.value.id, currentId), {
+      ok: false,
+      error: 'quarter_not_ended',
+    })
     // Target in the past rejected.
     assert.deepEqual(await carryOverRock(db, token, sourceId, endedId), {
       ok: false,

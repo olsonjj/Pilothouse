@@ -4,7 +4,7 @@
 
 **Blocked by:** 18: Rocks: weekly status.
 
-**Status:** done (review pending)
+**Status:** done (reviewer sign-off; carry-source end-today boundary pin added)
 
 - [x] Admin scores every rock in the ending quarter complete/incomplete
 - [x] Completion % computed per person and per team for the quarter
