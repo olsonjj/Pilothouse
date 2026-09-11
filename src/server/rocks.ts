@@ -7,7 +7,7 @@ import { normalizeWeek } from './week'
 /**
  * Rocks domain module (ticket 17): quarter-scoped 3–7 priorities.
  *
- * Permissions (docs/specs/rocks.md + data-model.md access rules, ticket-17
+ * Permissions (docs/specs/goals.md + data-model.md access rules, ticket-17
  * decision): admins create company rocks (owner NULL) and personal rocks for
  * anyone; members create personal rocks for THEMSELVES only (a member's rock
  * must be owned by their linked person). Editing follows the same rule: admin
@@ -349,7 +349,7 @@ function normalizeActualNumber(actual: unknown): number | null {
 
 /**
  * Set (or overwrite) one rock's status for one week. Permissions mirror the
- * scorecard's setEntry (docs/specs/rocks.md + access rules): admin any rock,
+ * scorecard's setEntry (docs/specs/goals.md + access rules): admin any rock,
  * the rock's owner their own, other members forbidden. Week normalizes to its
  * Monday via weekStart; the past-quarter freeze reuses quarterWritable.
  *

@@ -330,7 +330,7 @@ export type Todo = typeof todos.$inferSelect
  * `team_id` from data-model.md is omitted (single company; documented delta,
  * same as todos). Targets are REAL numbers — any finite value is allowed,
  * including 0 and negatives (e.g. "defects" targeting 0, or deviation-from-
- * baseline metrics targeting below zero; specs/scorecard.md imposes no sign
+ * baseline metrics targeting below zero; specs/data.md imposes no sign
  * restriction and the seam validates finiteness). Retire = flip `active` to 0,
  * never delete — weekly entries (ticket 14) keep referencing the row.
  */
@@ -367,7 +367,7 @@ export type Metric = typeof metrics.$inferSelect
  * created_at/updated_at (a re-entry IS the update). `week` is always the
  * Monday ISO date of the entry's week (derived via weekStart, never stored
  * raw). Entry permissions: admins any metric; the metric's owner their own
- * (specs/scorecard.md "owner (or any admin) enters"; member access rule
+ * (specs/data.md "owner (or any admin) enters"; member access rule
  * "own assigned metrics").
  */
 export const metricEntries = sqliteTable(
