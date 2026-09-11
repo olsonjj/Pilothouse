@@ -19,13 +19,13 @@ describe('people CRUD', () => {
     const { token } = await signedInUser(db)
     const result = await createPerson(db, token, {
       fullName: 'Ada Lovelace',
-      email: 'ada@openeos.local',
+      email: 'ada@pilothouse.local',
       startDate: '2026-01-05',
     })
     assert.equal(result.ok, true)
     if (!result.ok) return
     assert.equal(result.value.fullName, 'Ada Lovelace')
-    assert.equal(result.value.email, 'ada@openeos.local')
+    assert.equal(result.value.email, 'ada@pilothouse.local')
     assert.equal(result.value.startDate, '2026-01-05')
     const rows = await db.select().from(people).all()
     assert.equal(rows.length, 1)
@@ -64,12 +64,12 @@ describe('people CRUD', () => {
     const { token } = await signedInUser(db)
     const first = await createPerson(db, token, {
       fullName: 'A',
-      email: 'same@openeos.local',
+      email: 'same@pilothouse.local',
     })
     assert.equal(first.ok, true)
     const dup = await createPerson(db, token, {
       fullName: 'B',
-      email: ' same@openeos.local ',
+      email: ' same@pilothouse.local ',
     })
     assert.deepEqual(dup, { ok: false, error: 'email_taken' })
     const second = await createPerson(db, token, { fullName: 'B' })
@@ -81,8 +81,8 @@ describe('people CRUD', () => {
   it('admin edits a person and their email stays unique', async () => {
     const { db } = await createTestDb()
     const { token } = await signedInUser(db)
-    const a = await createPerson(db, token, { fullName: 'A', email: 'a@openeos.local' })
-    const b = await createPerson(db, token, { fullName: 'B', email: 'b@openeos.local' })
+    const a = await createPerson(db, token, { fullName: 'A', email: 'a@pilothouse.local' })
+    const b = await createPerson(db, token, { fullName: 'B', email: 'b@pilothouse.local' })
     if (!a.ok || !b.ok) throw new Error('fixture failed')
     const edit = await updatePerson(db, token, a.value.id, {
       fullName: 'A Prime',
@@ -94,7 +94,7 @@ describe('people CRUD', () => {
     assert.equal(edit.value.startDate, '2026-02-02')
     const steal = await updatePerson(db, token, a.value.id, {
       fullName: 'A Prime',
-      email: 'b@openeos.local',
+      email: 'b@pilothouse.local',
     })
     assert.deepEqual(steal, { ok: false, error: 'email_taken' })
   })

@@ -1,6 +1,6 @@
 # 01: Scaffold, auth & test seam
 
-**What to build:** A working OpenEOS app anyone can sign into: TanStack Start + Tailwind + SQLite via Drizzle, email/password auth with sessions, admin/member roles, a seeded owner account, a scheduled SQLite snapshot job, and the server-function test seam established so every later ticket follows it.
+**What to build:** A working Pilothouse app anyone can sign into: TanStack Start + Tailwind + SQLite via Drizzle, email/password auth with sessions, admin/member roles, a seeded owner account, a scheduled SQLite snapshot job, and the server-function test seam established so every later ticket follows it.
 
 **Blocked by:** None (can start immediately).
 

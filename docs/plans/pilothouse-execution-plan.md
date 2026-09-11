@@ -1,4 +1,4 @@
-# OpenEOS — Execution Plan
+# Pilothouse — Execution Plan
 
 *Spec produced from the docs in this repository (`overview.md`, `data-model.md`,
 and `specs/*`). All decisions referenced here are already decided in those
@@ -6,7 +6,7 @@ documents; this spec turns them into an implementable plan.*
 
 ## Problem Statement
 
-OpenEOS's owner runs a ~10-person company on the Entrepreneurial Operating System
+Pilothouse's owner runs a ~10-person company on the Entrepreneurial Operating System
 (per *Traction*). Today the EOS toolset — vision, accountability chart, rocks,
 weekly Level 10 meetings, scorecard, issues, and to-dos — is tracked across
 whiteboards, spreadsheets, and loose notes. Nothing enforces the meeting pulse,
@@ -17,7 +17,7 @@ company, that the whole team runs on.
 
 ## Solution
 
-A single-company web application, OpenEOS, that digitizes the Tier 1 and Tier 2
+A single-company web application, Pilothouse, that digitizes the Tier 1 and Tier 2
 EOS tools for all 10 users: an Accountability Chart (seats, GWC, People
 Analyzer), a versioned V/TO, quarter-scoped Rocks with weekly traffic-light
 status, the Level 10 Meeting as a live shared companion (timed agenda, polling,
@@ -301,7 +301,7 @@ foundation → Accountability Chart → V/TO → To-Dos → Scorecard → Issues
 - All 13 previously-open questions are decided in the docs; the only
   implementation-time choice left is the issue carry-forward mechanism (lean:
   keep row, update `quarter_id`), noted in the data model.
-- App name is OpenEOS; the repository working title was my-eos.
+- App name is Pilothouse; the repository working title was my-eos.
 - The DB roadmap note (overview stack section) is binding: keep all DB access in
   server functions and behind the Drizzle layer so a later cloud-DB swap stays
   contained.

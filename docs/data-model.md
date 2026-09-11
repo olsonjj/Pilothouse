@@ -474,7 +474,7 @@ end state; each phase adds its tables plus any back-references (e.g., core
 values exist before People Analyzer scores).
 ## Pilothouse rename (ticket 27 — first shipped as "Boardroom", renamed before release)
 
-The app was renamed **Boardroom** (from OpenEOS) and EOS-branded user-facing
+The app carried the working names **OpenEOS** and **Boardroom** during development and was renamed **Pilothouse** before release; EOS-branded user-facing
 names were replaced with neutral ones for the public release: Scorecard →
 **Data**, V/TO → **Company**, Level 10 Meeting → **Weekly Meeting**,
 People Analyzer → **Employee Assessment**, Accountability Chart → **Org

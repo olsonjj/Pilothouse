@@ -3,7 +3,7 @@
 Pilothouse is an open-source tool for small companies running a leadership
 operating system (inspired by the one described in *Traction* by Gino Wickman;
 not affiliated with EOS Worldwide). Built for a single company (~10 people).
-Names in these docs predate the public rename: "OpenEOS" = Pilothouse, and the
+Historical note: the project used the working names "OpenEOS" and "Boardroom" before the public release; the
 spec sections use the original terminology (V/TO, L10, Rocks, …) — the mapping
 to current user-facing names is in [`data-model.md`](./data-model.md).
 
@@ -12,7 +12,7 @@ to current user-facing names is in [`data-model.md`](./data-model.md).
 1. [`overview.md`](./overview.md) — what this is, what it is not, global assumptions
    and decided decisions.
 2. [`data-model.md`](./data-model.md) — tables, conventions, and cross-module links.
-3. [`plans/openeos-execution-plan.md`](./plans/openeos-execution-plan.md) — the
+3. [`plans/pilothouse-execution-plan.md`](./plans/pilothouse-execution-plan.md) — the
    execution spec for implementing the whole build.
 4. [`plans/01`…`25`](./plans/) — tickets as individual markdown files, numbered
    in dependency order (blockers first). Each declares its blockers; work the

@@ -1,6 +1,6 @@
 # Overview
 
-App name: **OpenEOS**.
+App name: **Pilothouse**.
 
 ## What this is
 
@@ -70,7 +70,7 @@ None — all open questions are resolved.
 
 ## Decided
 
-1. **App name:** OpenEOS.
+1. **App name:** Pilothouse.
 2. **Week convention:** weeks run Monday–Sunday; the shared week utility derives
    week starts as Mondays and displays them as "Week of Mar 3".
 3. **To-Dos: rate-first (Option A)** — v1 shows completion rates plus the

@@ -10,7 +10,7 @@ top to bottom; each case has steps and the expected result.*
       taken by the dev default script — use `node_modules/.bin/vite dev --port 3250`).
 - [x] Sign in as the owner: `owner@pilothouse.local` /
       `pilothouse-owner-dev` on fresh installs. On the original dev instance
-      (pre-rename DB) the email is `owner@openeos.local` but the password has
+      (pre-rename DB) the email is `owner@pilothouse.local` but the password has
       been reset to the same documented `pilothouse-owner-dev`.
 - [x] **Create a second (member) account** — there is deliberately no signup UI
       (accounts come from the seed; adding a creation UI was never a ticket).

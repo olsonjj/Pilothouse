@@ -33,7 +33,7 @@ describe('sign-in', () => {
 
   it('rejects an unknown email', async () => {
     const { db } = await createTestDb()
-    assert.deepEqual(await signIn(db, 'nobody@openeos.local', 'irrelevant'), {
+    assert.deepEqual(await signIn(db, 'nobody@pilothouse.local', 'irrelevant'), {
       ok: false,
       error: 'invalid_credentials',
     })

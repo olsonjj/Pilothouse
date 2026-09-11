@@ -1,6 +1,6 @@
 # 27: Rename to Pilothouse — de-brand for public release
 
-**What to build:** Rebrand the app from OpenEOS to **Pilothouse** and replace
+**What to build:** Rebrand the app (working name OpenEOS/Boardroom) to **Pilothouse** and replace
 EOS-branded user-facing terminology with neutral names, so the repo can be
 published publicly. Product name, nav labels, page headings, route paths, and
 README are in scope. **DB table/column names and internal identifiers are NOT**
@@ -13,10 +13,10 @@ with or endorsed by EOS Worldwide").
 
 **Status:** done (reviewer SIGN-OFF; meeting.tsx stub regression recovered in b27b706)
 
-- [x] Product renamed Pilothouse everywhere user-facing: package.json name,
+- [x] Product renamed Pilothouse (from the working name OpenEOS/Boardroom) everywhere user-facing: package.json name,
       page titles, sign-in/home headings, cookie name
-      (`openeos_session` → `pilothouse_session`), DB filename
-      (`data/openeos.db` → `data/pilothouse.db`, file MOVED so existing data
+      (`pilothouse_session` → `pilothouse_session`), DB filename
+      (`data/pilothouse.db` → `data/pilothouse.db`, file MOVED so existing data
       survives; code constant + docs updated)
 - [x] Nav + headings: Scorecard → **Data** (`/scorecard` → `/data`); V/TO →
       **Company** (`/vto` → `/company`); Level 10 Meeting / L10 → **Weekly
@@ -37,7 +37,7 @@ with or endorsed by EOS Worldwide").
       MIT LICENSE file added, disclaimer added; QA plan updated to new names
 - [x] All tests updated for renamed strings/routes and passing; no DB
       migrations added (existing data preserved; renamed ROUTES only)
-- [x] Gates: pnpm test / typecheck / build green; grep for "OpenEOS",
+- [x] Gates: pnpm test / typecheck / build green; grep for "Pilothouse",
       "Level 10", "V/TO", "People Analyzer", "Accountability Chart", "IDS",
       "Segue", "Scorecard", "Rock" in src/ returns only internal identifiers
       and comments (document each remaining hit)

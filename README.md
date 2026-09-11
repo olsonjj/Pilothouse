@@ -34,7 +34,7 @@ pnpm dev            # dev server (see port note below)
   `pilothouse-owner-dev`. Override before first run with
   `PILOTHOUSE_OWNER_PASSWORD=<your password>` — never ship an instance with the
   default. (Databases created before the v1 rename keep their original
-  `owner@openeos.local` seed email — existing rows are never migrated.)
+  `owner@pilothouse.local` seed email — existing rows are never migrated.)
 - Then sign in, create your people on the People page, link logins, and add
   your second account via the Users page (admin).
 
