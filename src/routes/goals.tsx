@@ -17,7 +17,7 @@ import type { RockWithOwner, RockList, QuarterCompletion } from '../server/rocks
 import type { RockStatusValue } from '../server/rocks'
 import { weekStart } from '../server/week'
 
-export const Route = createFileRoute('/rocks')({
+export const Route = createFileRoute('/goals')({
   loader: async () => {
     const [me, quarterList, period, peopleList] = await Promise.all([
       getCurrentUserFn(),
@@ -72,7 +72,7 @@ const EMPTY_ROCK_FORM: RockFormState = {
 function errorText(error: string): string {
   switch (error) {
     case 'forbidden':
-      return 'Members can only create and edit their own personal rocks.'
+      return 'Members can only create and edit their own personal goals.'
     case 'statement_required':
       return 'A rock statement is required.'
     case 'target_direction_mismatch':
@@ -84,7 +84,7 @@ function errorText(error: string): string {
     case 'quarter_not_found':
       return 'That quarter does not exist.'
     case 'quarter_read_only':
-      return 'That quarter has ended — rocks are read-only history.'
+      return 'That quarter has ended — goals are read-only history.'
     case 'owner_not_found':
       return 'That person no longer exists — refresh.'
     case 'rock_not_found':
@@ -190,7 +190,7 @@ function RocksPage() {
       return
     }
     if ('warning' in result && result.warning === 'over_rock_cap') {
-      setWarning('That makes more than 7 rocks — the EOS norm is 3–7. Consider deferring one.')
+      setWarning('That makes more than 7 goals — the norm is 3–7. Consider deferring one.')
     } else {
       setWarning(null)
     }
@@ -268,9 +268,9 @@ function RocksPage() {
       return
     }
     if ('warning' in result && result.warning === 'over_rock_cap') {
-      setWarning(`Carried over into ${next.label} — that quarter now has more than 7 rocks for that owner.`)
+      setWarning(`Carried over into ${next.label} — that quarter now has more than 7 goals for that owner.`)
     } else {
-      setWarning(`Rock carried over into ${next.label} — the original is untouched history.`)
+      setWarning(`Goal carried over into ${next.label} — the original is untouched history.`)
     }
   }
 
@@ -459,7 +459,7 @@ function RocksPage() {
       </header>
 
       <div className="mt-6 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Rocks</h1>
+        <h1 className="text-xl font-semibold">Goals</h1>
         <select
           value={quarterId ?? ''}
           onChange={(e) => selectQuarter(Number(e.target.value))}
@@ -598,18 +598,18 @@ function RocksPage() {
         <>
           <section className="mt-6">
             <div className="flex items-center justify-between">
-              <h2 className="font-medium text-slate-700">Company rocks</h2>
+              <h2 className="font-medium text-slate-700">Company goals</h2>
               {isAdmin && !editing && writable && (
                 <button
                   onClick={() => openCreate('')}
                   className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
                 >
-                  Add company rock
+                  Add company goal
                 </button>
               )}
             </div>
             {rocks.company.length === 0 ? (
-              <p className="mt-2 text-sm text-slate-400">No company rocks yet.</p>
+              <p className="mt-2 text-sm text-slate-400">No company goals yet.</p>
             ) : (
               <ul className="mt-2 space-y-2">
                 {rocks.company.map((r) => (
@@ -621,19 +621,19 @@ function RocksPage() {
 
           <section className="mt-8">
             <div className="flex items-center justify-between">
-              <h2 className="font-medium text-slate-700">Personal rocks</h2>
+              <h2 className="font-medium text-slate-700">Personal goals</h2>
               {!editing && writable && (
                 <button
                   onClick={() => openCreate(String(myPersonId ?? ''))}
                   disabled={!isAdmin && myPersonId == null}
                   className="rounded border border-blue-600 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 disabled:opacity-40"
                 >
-                  {isAdmin ? 'Add personal rock' : 'Add my rock'}
+                  {isAdmin ? 'Add personal goal' : 'Add my goal'}
                 </button>
               )}
             </div>
             {rocks.personal.length === 0 ? (
-              <p className="mt-2 text-sm text-slate-400">No personal rocks yet.</p>
+              <p className="mt-2 text-sm text-slate-400">No personal goals yet.</p>
             ) : (
               <ul className="mt-2 space-y-2">
                 {rocks.personal.map((r) => (

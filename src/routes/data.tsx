@@ -14,7 +14,7 @@ import {
 } from '../functions/metrics'
 import type { MetricWithOwner, MetricGrid, MetricTrend, OnTrackRollup } from '../server/metrics'
 
-export const Route = createFileRoute('/scorecard')({
+export const Route = createFileRoute('/data')({
   loader: async () => {
     // listAllMetricsFn (with retired rows) is admin-only; members get the
     // active-only public list via the fallback.
@@ -234,7 +234,7 @@ function ScorecardPage() {
       </header>
 
       <div className="mt-6 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Scorecard — metrics</h1>
+        <h1 className="text-xl font-semibold">Data — metrics</h1>
         {isAdmin && (
           <button
             onClick={openCreate}

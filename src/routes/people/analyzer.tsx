@@ -29,7 +29,7 @@ const SCORE_OPTIONS: Array<{ value: Score; label: string; title: string }> = [
 ]
 
 function errorText(error: string): string {
-  if (error === 'forbidden') return 'People Analyzer scores are admins only.'
+  if (error === 'forbidden') return 'Employee Assessment scores are admins only.'
   if (error === 'unauthenticated') return 'Sign in first.'
   return 'Something went wrong.'
 }
@@ -85,7 +85,7 @@ function AnalyzerPage() {
           ← People
         </Link>
         <p className="mt-8 rounded border border-slate-200 bg-white p-6 text-center text-sm text-slate-600">
-          The People Analyzer is admins only — scores are sensitive assessments.
+          The Employee Assessment is admins only — scores are sensitive assessments.
         </p>
       </main>
     )
@@ -108,7 +108,7 @@ function AnalyzerPage() {
       </header>
 
       <div className="mt-6 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">People Analyzer</h1>
+        <h1 className="text-xl font-semibold">Employee Assessment</h1>
         <select
           value={quarterId ?? ''}
           onChange={(e) => setQuarterId(e.target.value ? Number(e.target.value) : null)}
@@ -132,7 +132,7 @@ function AnalyzerPage() {
 
       {analyzer && analyzer.values.length === 0 && (
         <p className="mt-6 rounded border border-slate-200 bg-white p-6 text-center text-sm text-slate-500">
-          No core values yet — add them on the V/TO page first.
+          No core values yet — add them on the Company page first.
         </p>
       )}
 

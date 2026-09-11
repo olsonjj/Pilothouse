@@ -30,7 +30,7 @@ import { listTodosByWeek, type TodoInput } from './todos'
 import { createTodo } from './todos'
 
 /**
- * Level 10 meeting lifecycle (ticket 21). One OPEN meeting per company at a
+ * Weekly meeting lifecycle (ticket 21). One OPEN meeting per company at a
  * time; anyone signed in starts/joins; any participant advances segments
  * (advisory facilitator — a label, no permissions attach). Concluding is
  * ticket 25; open meetings are deletable.
@@ -50,12 +50,12 @@ import { createTodo } from './todos'
  */
 
 export const SEGMENT_AGENDA = [
-  { key: 'segue', label: 'Segue', plannedMinutes: 5 },
-  { key: 'scorecard', label: 'Scorecard', plannedMinutes: 5 },
-  { key: 'rocks', label: 'Rocks', plannedMinutes: 5 },
+  { key: 'segue', label: 'Check-in', plannedMinutes: 5 },
+  { key: 'scorecard', label: 'Data', plannedMinutes: 5 },
+  { key: 'rocks', label: 'Goals', plannedMinutes: 5 },
   { key: 'headlines', label: 'Headlines', plannedMinutes: 5 },
   { key: 'todos', label: 'To-Dos', plannedMinutes: 5 },
-  { key: 'ids', label: 'IDS', plannedMinutes: 60 },
+  { key: 'ids', label: 'Issues', plannedMinutes: 60 },
   { key: 'conclude', label: 'Conclude', plannedMinutes: 5 },
 ] as const
 
@@ -604,7 +604,7 @@ async function openMeetingById(db: Db, meetingId: number) {
 }
 
 /**
- * Queue an EXISTING issue for this meeting's IDS. Any participant; the
+ * Queue an EXISTING issue for this meeting's issue queue. Any participant; the
  * meeting must be open; the issue must be long-term and unresolved.
  */
 export async function pushToMeeting(
@@ -737,7 +737,7 @@ export type MeetingIssueView = {
 }
 
 /**
- * The meeting's IDS queue, oldest push first. Signed-in readable (any
+ * The meeting's issue queue, oldest push first. Signed-in readable (any
  * participant — and the team outside the meeting too). Join columns are
  * SQL-aliased uniquely (node:sqlite proxy constraint, see db.ts).
  */
@@ -806,7 +806,7 @@ export async function removeMeetingIssue(
 }
 
 /* ------------------------------------------------------------------ */
-/* IDS (ticket 24): pull long-term issues + solve in-session           */
+/* IDS (ticket 24; segment now labeled Issues): pull long-term issues + solve in-session           */
 /* ------------------------------------------------------------------ */
 
 export type PullOutcome = {
@@ -818,7 +818,7 @@ export type PullOutcome = {
 }
 
 /**
- * Pull LONG-TERM issues from the team's list into this meeting's IDS queue
+ * Pull LONG-TERM issues from the team's list into this meeting's issue queue
  * (any participant; the meeting must be open). Each id rides pushToMeeting
  * semantics: long-term only, unresolved only, duplicate pull = idempotent
  * alreadyQueued (the ticket-23 dedup decision). Short-term issues age in
@@ -860,7 +860,7 @@ export type SolveInput = {
 }
 
 /**
- * Solve an in-IDS issue: capture the resolution note and create the assigned
+ * Solve an in-queue issue: capture the resolution note and create the assigned
  * to-dos (7-day due via the shared rule), then flip the queue row to
  * 'solved_today'. Any participant; the meeting must be open; the row must
  * still be 'in_ids' (solved_today/carried rows are conclude-state).

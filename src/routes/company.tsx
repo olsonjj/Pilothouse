@@ -17,7 +17,7 @@ import type { VtoVersionSummary } from '../server/vto'
 import type { VtoView } from '../server/vto'
 import type { CoreValue } from '../server/schema'
 
-export const Route = createFileRoute('/vto')({
+export const Route = createFileRoute('/company')({
   loader: async () => {
     const [vto, me] = await Promise.all([getVtoFn(), getCurrentUserFn()])
     // Core values: everyone reads the active list (read view); admins also
@@ -66,7 +66,7 @@ function toForm(view: VtoView): VtoForm {
 }
 
 const ERROR_TEXT: Record<string, string> = {
-  forbidden: 'Only admins can edit the V/TO.',
+  forbidden: 'Only admins can edit the Company page.',
   missing_required: 'Core Focus ("why" and "what") is required.',
   invalid_list: 'List items must be short text (and at most three uniques).',
   invalid_number: 'Financial figures must be non-negative whole numbers.',
@@ -294,7 +294,7 @@ function VtoPage() {
   }
 
   async function handleRestore(versionId: number) {
-    if (!confirm('Restore this version? It becomes the published V/TO (and a new version is recorded).'))
+    if (!confirm('Restore this version? It becomes the published Company page (and a new version is recorded).'))
       return
     setBusy(true)
     setError(null)
@@ -357,7 +357,7 @@ function VtoPage() {
             }}
             className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700"
           >
-            Edit V/TO
+            Edit Company
           </button>
         </div>
         <VersionHistory versions={versions} busy={busy} onRestore={handleRestore} />
@@ -379,7 +379,7 @@ function VtoPage() {
           Sign out
         </button>
       </header>
-      <h1 className="mt-4 text-xl font-semibold">Vision/Traction Organizer</h1>
+      <h1 className="mt-4 text-xl font-semibold">Company</h1>
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
       <form onSubmit={handleSave} className="space-y-4 pb-16">
         <QuestionBlock title="2 · Core Focus">
@@ -505,7 +505,7 @@ function VtoPage() {
             disabled={busy}
             className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
           >
-            Save V/TO
+            Save Company
           </button>
           <button
             type="button"
@@ -528,7 +528,7 @@ function ReadView(props: { view: VtoView; values: CoreValue[] }) {
   return (
     <div>
       <div className="mt-4 flex items-baseline justify-between">
-        <h1 className="text-xl font-semibold">Vision/Traction Organizer</h1>
+        <h1 className="text-xl font-semibold">Company</h1>
         <span className="text-xs text-slate-400">
           {v.exists
             ? `published as of ${(v.publishedAt ?? v.updatedAt)?.slice(0, 10) ?? '—'}`
@@ -863,7 +863,7 @@ function VersionHistory(props: {
     <section className="mt-8">
       <h2 className="text-sm font-medium text-slate-500">Version history</h2>
       {props.versions.length === 0 ? (
-        <p className="mt-2 text-sm text-slate-400">No versions yet — save the V/TO once.</p>
+        <p className="mt-2 text-sm text-slate-400">No versions yet — save the Company page once.</p>
       ) : (
         <ul className="mt-2 space-y-1">
           {props.versions.map((v, i) => (

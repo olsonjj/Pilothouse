@@ -354,7 +354,7 @@ describe('Ticket 20: issue provenance (seam)', () => {
     if (result.ok) {
       assert.equal(result.value.origin, 'from_rock')
       assert.equal(result.value.originSourceId, rock.value.id)
-      assert.equal(result.value.title, 'Rock off track: Ship the L10 app')
+      assert.equal(result.value.title, 'Goal off track: Ship the L10 app')
       assert.equal(result.value.classification, 'long_term')
     }
 

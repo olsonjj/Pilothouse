@@ -25,7 +25,7 @@ function Home() {
   return (
     <main className="mx-auto max-w-xl p-8">
       <div className="rounded border border-slate-200 bg-white p-6 shadow-sm">
-        <h1 className="text-xl font-semibold">OpenEOS</h1>
+        <h1 className="text-xl font-semibold">Boardroom</h1>
         <p className="mt-4">
           Signed in as <strong>{user.name}</strong>{' '}
           <span className="rounded bg-slate-100 px-2 py-0.5 text-sm text-slate-700">
@@ -50,23 +50,23 @@ function Home() {
           <Link to="/todos" className="text-blue-600 hover:underline">
             To-Dos
           </Link>
-          <Link to="/scorecard" className="text-blue-600 hover:underline">
-            Scorecard
+          <Link to="/data" className="text-blue-600 hover:underline">
+            Data
           </Link>
-          <Link to="/rocks" className="text-blue-600 hover:underline">
-            Rocks
+          <Link to="/goals" className="text-blue-600 hover:underline">
+            Goals
           </Link>
           <Link to="/issues" className="text-blue-600 hover:underline">
             Issues
           </Link>
-          <Link to="/chart" search={{ seat: null }} className="text-blue-600 hover:underline">
-            Chart
+          <Link to="/org-chart" search={{ seat: null }} className="text-blue-600 hover:underline">
+            Org Chart
           </Link>
-          <Link to="/vto" className="text-blue-600 hover:underline">
-            V/TO
+          <Link to="/company" className="text-blue-600 hover:underline">
+            Company
           </Link>
-          <Link to="/l10" className="text-blue-600 hover:underline">
-            L10
+          <Link to="/meeting" className="text-blue-600 hover:underline">
+            Weekly Meeting
           </Link>
         </nav>
         <button

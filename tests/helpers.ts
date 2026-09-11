@@ -15,7 +15,7 @@ import type { Role } from '../src/server/schema'
  * against this real database.
  */
 export async function createTestDb(): Promise<{ db: Db; sqlite: DatabaseSync; dir: string }> {
-  const dir = mkdtempSync(path.join(tmpdir(), 'openeos-test-'))
+  const dir = mkdtempSync(path.join(tmpdir(), 'boardroom-test-'))
   const dbFile = path.join(dir, 'test.db')
   const { db, sqlite } = createDb(dbFile)
   await migrateDb(db)

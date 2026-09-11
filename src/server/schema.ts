@@ -82,7 +82,7 @@ export const quarters = sqliteTable(
   (t) => [check('quarters_label_check', sql`${t.label} GLOB '[0-9][0-9][0-9][0-9] Q[1-4]'`)],
 )
 
-/** Seats are the nodes of the Accountability Chart (ticket 04). */
+/** Seats are the nodes of the Org Chart (ticket 04). */
 export const seats = sqliteTable(
   'seats',
   {
@@ -126,7 +126,7 @@ export const seatAssignments = sqliteTable('seat_assignments', {
 })
 
 /**
- * V/TO (ticket 05): the single LIVE version of the Vision/Traction Organizer —
+ * Company page (ticket 05): the single LIVE version of the vision document —
  * exactly one row (id 1), upserted on save. Every save also snapshots into
  * `vto_versions` (ticket 06); restoring copies a version back here AND appends
  * a new version (history is append-only). The column shape here mirrors that
@@ -212,7 +212,7 @@ export type CoreValue = typeof coreValues.$inferSelect
 export type Role = 'admin' | 'member'
 
 /**
- * People Analyzer scores (ticket 10): one row per (person, quarter, core
+ * Employee Assessment scores (ticket 10): one row per (person, quarter, core
  * value). Scores are ADMIN-ONLY view + edit (sensitive — data-model.md access
  * rules). Re-entering a triple overwrites (unique index + upsert). Value IDs
  * are stable (ticket 07: rows never deleted) so scores survive renames and
@@ -241,7 +241,7 @@ export const peopleAnalyzerScores = sqliteTable(
 )
 
 /**
- * V/TO version history (ticket 06): one immutable snapshot row per save.
+ * Company-page version history (ticket 06): one immutable snapshot row per save.
  * Content columns mirror the live `vto` row (no id/created_at/updated_at of
  * their own meaning); plus published_at (snapshot time) and created_by (author
  * user). Immutable per data-model.md — baseFields only, no updated_at.
@@ -547,7 +547,7 @@ export const rockStatuses = sqliteTable(
 export type RockStatus = typeof rockStatuses.$inferSelect
 
 /**
- * Level 10 meetings (ticket 21). One open meeting per company at a time
+ * Weekly meetings (ticket 21). One open meeting per company at a time
  * (app-enforced; `team_id` omitted — same single-company delta as todos).
  * Concluded meetings are frozen (ticket 25 concludes); open meetings are
  * deletable. `date` is the meeting day (YYYY-MM-DD); `started_at` the ISO
@@ -602,7 +602,7 @@ export const meetingSegments = sqliteTable(
 export type MeetingSegment = typeof meetingSegments.$inferSelect
 
 /**
- * Meeting issues (ticket 23): the meeting's IDS queue — a many-to-many
+ * Meeting issues (ticket 23): the meeting's issue queue — a many-to-many
  * between meetings and issues. `state` starts 'in_ids'; ticket 25's conclude
  * flips non-solved rows to 'carried' (and solve-in-IDS sets 'solved_today').
  * UNIQUE(meeting_id, issue_id) is the in-meeting dedup: pushing the same red

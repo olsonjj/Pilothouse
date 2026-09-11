@@ -209,7 +209,7 @@ describe('Admin user management (seam, ticket 26)', () => {
     const linked = list.value.find((u) => u.email === 'linked@co.com')
     assert.ok(linked)
     assert.equal(linked.personName, 'Linked Person')
-    const unlinked = list.value.find((u) => u.email === 'owner@openeos.local')
+    const unlinked = list.value.find((u) => u.email === 'owner@boardroom.local')
     assert.ok(unlinked)
     assert.equal(unlinked.personName, null)
 

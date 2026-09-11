@@ -13,5 +13,5 @@ __unconfig*
 todos.json
 .data
 
-# OpenEOS runtime data (SQLite db + backups). Pattern is documented in README.
+# Boardroom runtime data (SQLite db + backups). Pattern is documented in README.
 data/

@@ -472,3 +472,19 @@ Tables land in the build order from the README (foundation → accountability
 chart → vto → todos → scorecard → issues → rocks → L10). The schema above is the
 end state; each phase adds its tables plus any back-references (e.g., core
 values exist before People Analyzer scores).
+## Boardroom rename (ticket 27)
+
+The app was renamed **Boardroom** (from OpenEOS) and EOS-branded user-facing
+names were replaced with neutral ones for the public release: Scorecard →
+**Data**, V/TO → **Company**, Level 10 Meeting → **Weekly Meeting**,
+People Analyzer → **Employee Assessment**, Accountability Chart → **Org
+Chart**, GWC → **Right Fit**, Rocks → **Goals**, IDS → **Issues** (queue),
+Segue → **Check-in**.
+
+**Rule:** only user-facing strings changed. DB table/column names, enum CHECK
+values, and internal identifiers (`rocks`, `rock_statuses`, `vto`,
+`vto_versions`, `segment_key` values `segue/…/ids/conclude`,
+`carried_over_from_rock_id`, `RockError`, `over_rock_cap`, `RockError` codes)
+are intentionally unchanged — they are invisible to users and renaming them
+would be migration churn with no benefit. Any code hit for an old term below
+the UI layer is an internal identifier, not a brand reference.

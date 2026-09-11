@@ -36,7 +36,7 @@ import type {
   MeetingTrendPoint,
 } from '../server/meetings'
 
-export const Route = createFileRoute('/l10')({
+export const Route = createFileRoute('/meeting')({
   loader: async () => {
     const [me, people, open, history, trend] = await Promise.all([
       getCurrentUserFn(),
@@ -177,7 +177,7 @@ function L10Page() {
   const [savedTicks, setSavedTicks] = useState<Record<number, number>>({})
   const saveTimers = useRef<Record<number, ReturnType<typeof setTimeout>>>({})
   const saveInFlight = useRef(false)
-  // IDS queue (ticket 23): polled with the meeting; headline input state.
+  // Issue queue (ticket 23): polled with the meeting; headline input state.
   const [meetingIssues, setMeetingIssues] = useState<MeetingIssueView[]>([])
   const [headline, setHeadline] = useState('')
 
@@ -466,7 +466,7 @@ function L10Page() {
       </header>
 
       <div className="mt-6 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Level 10 Meeting</h1>
+        <h1 className="text-xl font-semibold">Weekly Meeting</h1>
         {!open && (
           <button
             onClick={handleStart}
@@ -572,7 +572,7 @@ function L10Page() {
             <div className="mt-4 grid grid-cols-1 gap-3 text-xs md:grid-cols-3">
               <div className="rounded border border-slate-200 p-3">
                 <h3 className="font-medium text-slate-700">
-                  Scorecard {pre.scorecard.previousWeekLabel ? `· ${pre.scorecard.previousWeekLabel}` : ''}
+                  Data {pre.scorecard.previousWeekLabel ? `· ${pre.scorecard.previousWeekLabel}` : ''}
                 </h3>
                 {pre.scorecard.metrics.length === 0 ? (
                   <p className="mt-1 text-slate-400">No metrics defined.</p>
@@ -757,11 +757,11 @@ function L10Page() {
             </div>
           )}
 
-          {/* IDS queue (ticket 23): pushed issues + the headline composer. */}
+          {/* Issue queue (ticket 23): pushed issues + the headline composer. */}
           {open && (
             <div className="mt-4 rounded border border-slate-200 bg-white p-3 text-xs">
               <div className="flex items-center justify-between">
-                <h3 className="font-medium text-slate-700">IDS queue ({meetingIssues.length})</h3>
+                <h3 className="font-medium text-slate-700">Issue queue ({meetingIssues.length})</h3>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => (showPull ? setShowPull(false) : void openPullPanel())}
@@ -935,7 +935,7 @@ function L10Page() {
         </section>
       ) : (
         <p className="mt-4 text-sm text-slate-500">
-          No meeting is open. Start one to run this week's Level 10.
+          No meeting is open. Start one to run this week's weekly meeting.
         </p>
       )}
       {frozen && (

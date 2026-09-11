@@ -5,7 +5,7 @@ import { asc, eq, sql } from 'drizzle-orm'
 
 /**
  * Core values module (ticket 07). First-class rows with STABLE IDs — the
- * People Analyzer (ticket 10) scores against core_values.id, so rows are
+ * Employee Assessment (ticket 10) scores against core_values.id, so rows are
  * never deleted: deactivation flips `active` to 0. Everyone signed in can
  * list; only admins create/edit/reorder.
  *

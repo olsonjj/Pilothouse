@@ -167,7 +167,7 @@ function PeoplePage() {
               to="/people/analyzer"
               className="text-sm text-blue-600 hover:underline"
             >
-              People Analyzer
+              Employee Assessment
             </Link>
           )}
           {isAdmin && (
@@ -382,7 +382,7 @@ function PersonAssignments({ personId }: { personId: number }) {
 
   return (
     <div className="mt-3 rounded border border-slate-200 bg-white p-4 shadow-sm">
-      <h3 className="text-sm font-medium text-slate-700">Seats &amp; GWC</h3>
+      <h3 className="text-sm font-medium text-slate-700">Seats &amp; Right Fit</h3>
       {rows === null && <p className="mt-1 text-sm text-slate-400">Loading…</p>}
       {rows != null && rows.length === 0 && (
         <p className="mt-1 text-sm text-slate-400">No seat assignments yet.</p>

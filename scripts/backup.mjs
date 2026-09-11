@@ -6,8 +6,8 @@ import { DatabaseSync } from 'node:sqlite'
 import fs from 'node:fs'
 import path from 'node:path'
 
-const dbFile = process.env.OPENEOS_DB_PATH ?? path.resolve('data/openeos.db')
-const backupDir = process.env.OPENEOS_BACKUP_DIR ?? path.join(path.dirname(dbFile), 'backups')
+const dbFile = process.env.BOARDROOM_DB_PATH ?? path.resolve('data/boardroom.db')
+const backupDir = process.env.BOARDROOM_BACKUP_DIR ?? path.join(path.dirname(dbFile), 'backups')
 
 if (!fs.existsSync(dbFile)) {
   console.error(`Database not found: ${dbFile}`)

@@ -10,16 +10,16 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ChartRouteImport } from './routes/chart'
+import { Route as CompanyRouteImport } from './routes/company'
+import { Route as DataRouteImport } from './routes/data'
+import { Route as GoalsRouteImport } from './routes/goals'
 import { Route as IssuesRouteImport } from './routes/issues'
-import { Route as L10RouteImport } from './routes/l10'
+import { Route as MeetingRouteImport } from './routes/meeting'
+import { Route as OrgChartRouteImport } from './routes/org-chart'
 import { Route as PeopleRouteImport } from './routes/people'
-import { Route as RocksRouteImport } from './routes/rocks'
-import { Route as ScorecardRouteImport } from './routes/scorecard'
 import { Route as SigninRouteImport } from './routes/signin'
 import { Route as TodosRouteImport } from './routes/todos'
 import { Route as UsersRouteImport } from './routes/users'
-import { Route as VtoRouteImport } from './routes/vto'
 import { Route as PeopleAnalyzerRouteImport } from './routes/people/analyzer'
 
 const IndexRoute = IndexRouteImport.update({
@@ -27,9 +27,19 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ChartRoute = ChartRouteImport.update({
-  id: '/chart',
-  path: '/chart',
+const CompanyRoute = CompanyRouteImport.update({
+  id: '/company',
+  path: '/company',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DataRoute = DataRouteImport.update({
+  id: '/data',
+  path: '/data',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GoalsRoute = GoalsRouteImport.update({
+  id: '/goals',
+  path: '/goals',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IssuesRoute = IssuesRouteImport.update({
@@ -37,24 +47,19 @@ const IssuesRoute = IssuesRouteImport.update({
   path: '/issues',
   getParentRoute: () => rootRouteImport,
 } as any)
-const L10Route = L10RouteImport.update({
-  id: '/l10',
-  path: '/l10',
+const MeetingRoute = MeetingRouteImport.update({
+  id: '/meeting',
+  path: '/meeting',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OrgChartRoute = OrgChartRouteImport.update({
+  id: '/org-chart',
+  path: '/org-chart',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PeopleRoute = PeopleRouteImport.update({
   id: '/people',
   path: '/people',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const RocksRoute = RocksRouteImport.update({
-  id: '/rocks',
-  path: '/rocks',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ScorecardRoute = ScorecardRouteImport.update({
-  id: '/scorecard',
-  path: '/scorecard',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SigninRoute = SigninRouteImport.update({
@@ -72,11 +77,6 @@ const UsersRoute = UsersRouteImport.update({
   path: '/users',
   getParentRoute: () => rootRouteImport,
 } as any)
-const VtoRoute = VtoRouteImport.update({
-  id: '/vto',
-  path: '/vto',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const PeopleAnalyzerRoute = PeopleAnalyzerRouteImport.update({
   id: '/analyzer',
   path: '/analyzer',
@@ -85,104 +85,104 @@ const PeopleAnalyzerRoute = PeopleAnalyzerRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/chart': typeof ChartRoute
+  '/company': typeof CompanyRoute
+  '/data': typeof DataRoute
+  '/goals': typeof GoalsRoute
   '/issues': typeof IssuesRoute
-  '/l10': typeof L10Route
+  '/meeting': typeof MeetingRoute
+  '/org-chart': typeof OrgChartRoute
   '/people': typeof PeopleRouteWithChildren
-  '/rocks': typeof RocksRoute
-  '/scorecard': typeof ScorecardRoute
   '/signin': typeof SigninRoute
   '/todos': typeof TodosRoute
   '/users': typeof UsersRoute
-  '/vto': typeof VtoRoute
   '/people/analyzer': typeof PeopleAnalyzerRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/chart': typeof ChartRoute
+  '/company': typeof CompanyRoute
+  '/data': typeof DataRoute
+  '/goals': typeof GoalsRoute
   '/issues': typeof IssuesRoute
-  '/l10': typeof L10Route
+  '/meeting': typeof MeetingRoute
+  '/org-chart': typeof OrgChartRoute
   '/people': typeof PeopleRouteWithChildren
-  '/rocks': typeof RocksRoute
-  '/scorecard': typeof ScorecardRoute
   '/signin': typeof SigninRoute
   '/todos': typeof TodosRoute
   '/users': typeof UsersRoute
-  '/vto': typeof VtoRoute
   '/people/analyzer': typeof PeopleAnalyzerRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/chart': typeof ChartRoute
+  '/company': typeof CompanyRoute
+  '/data': typeof DataRoute
+  '/goals': typeof GoalsRoute
   '/issues': typeof IssuesRoute
-  '/l10': typeof L10Route
+  '/meeting': typeof MeetingRoute
+  '/org-chart': typeof OrgChartRoute
   '/people': typeof PeopleRouteWithChildren
-  '/rocks': typeof RocksRoute
-  '/scorecard': typeof ScorecardRoute
   '/signin': typeof SigninRoute
   '/todos': typeof TodosRoute
   '/users': typeof UsersRoute
-  '/vto': typeof VtoRoute
   '/people/analyzer': typeof PeopleAnalyzerRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/chart'
+    | '/company'
+    | '/data'
+    | '/goals'
     | '/issues'
-    | '/l10'
+    | '/meeting'
+    | '/org-chart'
     | '/people'
-    | '/rocks'
-    | '/scorecard'
     | '/signin'
     | '/todos'
     | '/users'
-    | '/vto'
     | '/people/analyzer'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/chart'
+    | '/company'
+    | '/data'
+    | '/goals'
     | '/issues'
-    | '/l10'
+    | '/meeting'
+    | '/org-chart'
     | '/people'
-    | '/rocks'
-    | '/scorecard'
     | '/signin'
     | '/todos'
     | '/users'
-    | '/vto'
     | '/people/analyzer'
   id:
     | '__root__'
     | '/'
-    | '/chart'
+    | '/company'
+    | '/data'
+    | '/goals'
     | '/issues'
-    | '/l10'
+    | '/meeting'
+    | '/org-chart'
     | '/people'
-    | '/rocks'
-    | '/scorecard'
     | '/signin'
     | '/todos'
     | '/users'
-    | '/vto'
     | '/people/analyzer'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  ChartRoute: typeof ChartRoute
+  CompanyRoute: typeof CompanyRoute
+  DataRoute: typeof DataRoute
+  GoalsRoute: typeof GoalsRoute
   IssuesRoute: typeof IssuesRoute
-  L10Route: typeof L10Route
+  MeetingRoute: typeof MeetingRoute
+  OrgChartRoute: typeof OrgChartRoute
   PeopleRoute: typeof PeopleRouteWithChildren
-  RocksRoute: typeof RocksRoute
-  ScorecardRoute: typeof ScorecardRoute
   SigninRoute: typeof SigninRoute
   TodosRoute: typeof TodosRoute
   UsersRoute: typeof UsersRoute
-  VtoRoute: typeof VtoRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -194,11 +194,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/chart': {
-      id: '/chart'
-      path: '/chart'
-      fullPath: '/chart'
-      preLoaderRoute: typeof ChartRouteImport
+    '/company': {
+      id: '/company'
+      path: '/company'
+      fullPath: '/company'
+      preLoaderRoute: typeof CompanyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/data': {
+      id: '/data'
+      path: '/data'
+      fullPath: '/data'
+      preLoaderRoute: typeof DataRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/goals': {
+      id: '/goals'
+      path: '/goals'
+      fullPath: '/goals'
+      preLoaderRoute: typeof GoalsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/issues': {
@@ -208,11 +222,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IssuesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/l10': {
-      id: '/l10'
-      path: '/l10'
-      fullPath: '/l10'
-      preLoaderRoute: typeof L10RouteImport
+    '/meeting': {
+      id: '/meeting'
+      path: '/meeting'
+      fullPath: '/meeting'
+      preLoaderRoute: typeof MeetingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/org-chart': {
+      id: '/org-chart'
+      path: '/org-chart'
+      fullPath: '/org-chart'
+      preLoaderRoute: typeof OrgChartRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/people': {
@@ -220,20 +241,6 @@ declare module '@tanstack/react-router' {
       path: '/people'
       fullPath: '/people'
       preLoaderRoute: typeof PeopleRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/rocks': {
-      id: '/rocks'
-      path: '/rocks'
-      fullPath: '/rocks'
-      preLoaderRoute: typeof RocksRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/scorecard': {
-      id: '/scorecard'
-      path: '/scorecard'
-      fullPath: '/scorecard'
-      preLoaderRoute: typeof ScorecardRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/signin': {
@@ -255,13 +262,6 @@ declare module '@tanstack/react-router' {
       path: '/users'
       fullPath: '/users'
       preLoaderRoute: typeof UsersRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/vto': {
-      id: '/vto'
-      path: '/vto'
-      fullPath: '/vto'
-      preLoaderRoute: typeof VtoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/people/analyzer': {
@@ -287,16 +287,16 @@ const PeopleRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  ChartRoute: ChartRoute,
+  CompanyRoute: CompanyRoute,
+  DataRoute: DataRoute,
+  GoalsRoute: GoalsRoute,
   IssuesRoute: IssuesRoute,
-  L10Route: L10Route,
+  MeetingRoute: MeetingRoute,
+  OrgChartRoute: OrgChartRoute,
   PeopleRoute: PeopleRouteWithChildren,
-  RocksRoute: RocksRoute,
-  ScorecardRoute: ScorecardRoute,
   SigninRoute: SigninRoute,
   TodosRoute: TodosRoute,
   UsersRoute: UsersRoute,
-  VtoRoute: VtoRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

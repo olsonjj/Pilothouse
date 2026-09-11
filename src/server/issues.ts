@@ -227,7 +227,7 @@ export type IssueResolutionView = {
  * require a non-empty note — a solved issue without a captured decision and
  * a dropped issue without a reason both defeat the "kept forever" archive.
  * `input.meetingId` (ticket 24): set when the issue was solved in an L10's
- * IDS — the resolution row then references that meeting (data-model:
+ * solve — the resolution row then references that meeting (data-model:
  * "resolution rows reference the solving meeting").
  */
 export async function resolveIssue(
@@ -395,7 +395,7 @@ export async function listIssues(
 /**
  * Internal origin-setting creator (public addIssue keeps origin='manual').
  * Origin issues are always long_term and land in the CURRENT quarter — the
- * list where IDS works — regardless of the source row's own quarter (a rock
+ * list where the meeting works — regardless of the source row's own quarter (a rock
  * or entry from any quarter can be pushed; decided ticket 20, documented).
  * Duplicates are ALLOWED: the EOS room may push the same red cell twice and
  * the team decides in the room (the L10's meeting_issues UNIQUE handles
@@ -448,7 +448,7 @@ export async function issueFromRock(
   return createIssueWithOrigin(db, token, {
     origin: 'from_rock',
     originSourceId: rock.id,
-    title: `Rock off track: ${rock.statement}`,
+    title: `Goal off track: ${rock.statement}`,
   })
 }
 

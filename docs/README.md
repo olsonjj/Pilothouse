@@ -1,7 +1,11 @@
-# OpenEOS — Documentation
+# Boardroom — Documentation
 
-Internal EOS (Entrepreneurial Operating System, per *Traction* by Gino Wickman) software
-for a single company (~10 people: owner + 9 employees).
+Boardroom is an open-source tool for small companies running a leadership
+operating system (inspired by the one described in *Traction* by Gino Wickman;
+not affiliated with EOS Worldwide). Built for a single company (~10 people).
+Names in these docs predate the public rename: "OpenEOS" = Boardroom, and the
+spec sections use the original terminology (V/TO, L10, Rocks, …) — the mapping
+to current user-facing names is in [`data-model.md`](./data-model.md).
 
 ## Reading order
 

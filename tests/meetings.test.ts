@@ -558,7 +558,7 @@ describe('Meeting issue queue: push, dedup, remove (seam, ticket 23)', () => {
     const queue = await listMeetingIssues(db, token, started.value.id)
     if (!queue.ok) throw new Error('list failed')
     assert.equal(queue.value[0].origin, 'from_rock')
-    assert.match(queue.value[0].title, /Rock off track: Ship the thing/)
+    assert.match(queue.value[0].title, /Goal off track: Ship the thing/)
     // Provenance pinned to the exact source rock (via the issues table read).
     const src = sqlite
       .prepare('SELECT origin_source_id FROM issues WHERE id = ?')

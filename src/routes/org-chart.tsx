@@ -14,7 +14,7 @@ import {
 } from '../functions/seats'
 import type { SeatWithOccupants, AssignmentRow, GwcInput } from "../server/seats"
 
-export const Route = createFileRoute('/chart')({
+export const Route = createFileRoute('/org-chart')({
   validateSearch: (search: Record<string, unknown>) => {
     const n = search.seat ? Number(search.seat) : NaN
     return { seat: Number.isFinite(n) ? (n as number | null) : (null as number | null) }
@@ -120,7 +120,7 @@ function ChartPage() {
       const seatResult = await getSeatFn({ data: { seatId: selectedSeatId } })
       setDetail(seatResult.ok ? seatResult.value : null)
     }
-    await navigate({ to: '/chart', search: { seat: selectedSeatId }, replace: true })
+    await navigate({ to: '/org-chart', search: { seat: selectedSeatId }, replace: true })
   }
 
   async function handleSignOut() {
@@ -243,7 +243,7 @@ function ChartPage() {
       </header>
 
       <div className="mt-6 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Accountability Chart</h1>
+        <h1 className="text-xl font-semibold">Org Chart</h1>
         {isAdmin && (
           <button
             onClick={() => openCreate(null)}
@@ -321,7 +321,7 @@ function ChartPage() {
                     allSeats={seats}
                     selectedSeatId={selectedSeatId}
                     isAdmin={isAdmin}
-                    onSelect={(id) => navigate({ to: '/chart', search: { seat: id } })}
+                    onSelect={(id) => navigate({ to: '/org-chart', search: { seat: id } })}
                     onEdit={openEdit}
                     onAssign={(id) => {
                       setFormError(null)
@@ -675,7 +675,7 @@ function OccupantGwc(props: {
             disabled={props.busy}
             className="rounded bg-blue-600 px-2 py-0.5 text-xs text-white hover:bg-blue-700 disabled:opacity-50"
           >
-            Save GWC
+            Save Right Fit
           </button>
           <button
             onClick={() => setEditing(false)}
