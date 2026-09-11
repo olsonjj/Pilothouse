@@ -188,7 +188,7 @@ Definitions are not quarter-scoped (active flag + entry-time targets handle
 retirement and re-targeting; targets change at quarter boundaries by convention).
 Implemented (ticket 13): `team_id` omitted like other tables (single company);
 targets are REAL with **any finite value allowed, including 0 and negatives**
-(seam validates finiteness only — "defects" can target 0); `listMetrics`
+(seam validates finiteness only — numeric strings are coerced and accepted, "defects" can target 0); `listMetrics`
 `includeInactive` is admin-gated (ticket-07 rule).
 
 ### metric_entries

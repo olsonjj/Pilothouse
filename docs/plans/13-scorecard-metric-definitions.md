@@ -4,7 +4,7 @@
 
 **Blocked by:** 02: People & account linking.
 
-**Status:** done (review pending)
+**Status:** done (reviewer sign-off)
 
 - [x] Admin creates/edits metrics: name, owner, target, direction (gte/lte), unit suffix, active flag
 - [x] Members view the metric list
