@@ -58,10 +58,10 @@ the expected result (include what you saw).
 *(member)*
 - [x] 2.5 People page is view-only — no Add/Edit/Link controls.
 
-## 3. Quarters & week header (ticket 03)
+## 3. Quarters & week header (ticket 03) — DONE
 
-- [ ] 3.1 Home header shows the current quarter and "Week of <Mon date>".
-- [ ] 3.2 Quarter dropdowns (Goals, Issues) list current + next year's quarters.
+- [x] 3.1 Home header shows the current quarter and "Week of <Mon date>".
+- [x] 3.2 Quarter dropdowns (Goals, Issues) list current + next year's quarters.
 
 ## 4. Org Chart (tickets 04, 08)
 
