@@ -212,6 +212,14 @@ body {
   .badge-neutral::before {
     background: var(--color-standby-dot);
   }
+  /* Elevated-role pill (e.g. Admin) — filled navy, white text, no status dot semantics */
+  .badge-ink {
+    background: var(--color-navy);
+    color: #ffffff;
+  }
+  .badge-ink::before {
+    background: var(--color-slate-deep);
+  }
 
   /* ---- Elevation containers ("Elevation & Depth") ---- */
   /* Level 1: instrument container */
