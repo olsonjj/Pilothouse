@@ -47,16 +47,16 @@ the expected result (include what you saw).
 - [x] 1.4 Close the browser, reopen → still signed in (session persists).
 - [x] 1.5 As **member**: home shows member role; no admin-only controls anywhere.
 
-## 2. People & linking (ticket 02)
+## 2. People & linking (ticket 02) — DONE
 
 *(admin)*
-- [ ] 2.1 People page: create a person (name + email). Duplicate email → clear error.
-- [ ] 2.2 Edit the person's name → saves.
-- [ ] 2.3 Link the person to the member user account (Link account → select).
-- [ ] 2.4 Unlink → the login shows "no login"; display name falls back to the
+- [x] 2.1 People page: create a person (name + email). Duplicate email → clear error.
+- [x] 2.2 Edit the person's name → saves.
+- [x] 2.3 Link the person to the member user account (Link account → select).
+- [x] 2.4 Unlink → the login shows "no login"; display name falls back to the
       account name.
 *(member)*
-- [ ] 2.5 People page is view-only — no Add/Edit/Link controls.
+- [x] 2.5 People page is view-only — no Add/Edit/Link controls.
 
 ## 3. Quarters & week header (ticket 03)
 
