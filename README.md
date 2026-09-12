@@ -20,10 +20,6 @@ DB, which keeps a future database swap contained.
 
 ## Screenshots
 
-Home — the command deck:
-
-![Home](docs/screenshots/home.png)
-
 <img src="docs/screenshots/tour.gif" alt="Walkthrough tour" width="800">
 
 <p align="center"><em>A ~26-second tour of every screen (Data, To-Dos, Goals,
