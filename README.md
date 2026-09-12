@@ -20,6 +20,25 @@ DB, which keeps a future database swap contained.
 
 ## Screenshots
 
+Home — the command deck:
+
+![Home](docs/screenshots/home.png)
+
+▶ **[Watch the walkthrough](docs/screenshots/walkthrough.mp4)** — a ~26-second
+tour of every screen (Data, To-Dos, Goals, Issues, Company, Weekly Meeting,
+Org Chart, People, Employee Assessment).
+
+## Stack
+
+- TanStack Start (SSR + server functions), React, Tailwind CSS
+- SQLite via Drizzle ORM (Node's built-in `node:sqlite` — no native deps)
+- Session auth (scrypt password hashing, httpOnly cookies)
+
+All database access lives behind server modules; the client never touches the
+DB, which keeps a future database swap contained.
+
+## Screenshots
+
 | Home — the command deck | Data — the weekly scorecard |
 | --- | --- |
 | ![Home](docs/screenshots/home.png) | ![Data scorecard](docs/screenshots/data.png) |
