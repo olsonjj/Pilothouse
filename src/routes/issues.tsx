@@ -70,7 +70,7 @@ function IssuesPage() {
   const data = Route.useLoaderData()
 
   const isAdmin = data.me?.role === 'admin'
-  const [tab, setTab] = useState<'long_term' | 'short_term'>('long_term')
+  const [tab, setTab] = useState<'long_term' | 'short_term'>('short_term')
   const [open, setOpen] = useState<IssueView[]>([])
   const [resolved, setResolved] = useState<IssueView[]>([])
   const [showResolved, setShowResolved] = useState(false)
@@ -247,15 +247,6 @@ function IssuesPage() {
 
       <div className="mt-4 flex gap-2 text-sm">
         <button
-          onClick={() => setTab('long_term')}
-          className={
-            'rounded px-3 py-1.5 ' +
-            (tab === 'long_term' ? 'bg-blue-600 text-white' : 'border border-slate-300 hover:bg-slate-100')
-          }
-        >
-          Long-term
-        </button>
-        <button
           onClick={() => setTab('short_term')}
           className={
             'rounded px-3 py-1.5 ' +
@@ -263,6 +254,15 @@ function IssuesPage() {
           }
         >
           Short-term
+        </button>
+        <button
+          onClick={() => setTab('long_term')}
+          className={
+            'rounded px-3 py-1.5 ' +
+            (tab === 'long_term' ? 'bg-blue-600 text-white' : 'border border-slate-300 hover:bg-slate-100')
+          }
+        >
+          Long-term
         </button>
       </div>
 
