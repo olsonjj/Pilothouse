@@ -89,6 +89,8 @@ function ChartPage() {
     null,
   )
   const selectedSeatId = detail?.id ?? null
+  const filledCount = seats.filter((s) => s.occupants.length > 0).length
+  const openCount = seats.length - filledCount
 
   useEffect(() => {
     let cancelled = false
@@ -223,38 +225,45 @@ function ChartPage() {
     return true
   }
 
+  const detailParentName =
+    detail?.parentSeatId != null
+      ? (seats.find((s) => s.id === detail.parentSeatId)?.name ?? null)
+      : null
+
   return (
-    <main className="mx-auto max-w-4xl p-8">
+    <main className="mx-auto max-w-6xl p-8">
       <header className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Link to="/" className="text-sm text-blue-600 hover:underline">
-            ← Home
-          </Link>
-          <Link to="/people" className="text-sm text-blue-600 hover:underline">
-            People
-          </Link>
-        </div>
-        <button
-          onClick={handleSignOut}
-          className="rounded border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100"
-        >
+        <Link to="/" className="btn-ghost">
+          ← Home
+        </Link>
+        <button onClick={handleSignOut} className="btn-ghost">
           Sign out
         </button>
       </header>
 
-      <div className="mt-6 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Org Chart</h1>
-        {isAdmin && (
-          <button
-            onClick={() => openCreate(null)}
-            className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
-          >
-            Add top seat
-          </button>
-        )}
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="label-sm">Accountability architecture</p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Org Chart</h1>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="badge badge-neutral">
+            {seats.length} {seats.length === 1 ? 'seat' : 'seats'} configured
+          </span>
+          {openCount > 0 && <span className="badge badge-crit">{openCount} open</span>}
+          {isAdmin && (
+            <button onClick={() => openCreate(null)} className="btn-primary">
+              Add top seat
+            </button>
+          )}
+        </div>
       </div>
 
-      {formError && <p className="mt-2 text-sm text-red-600">{formError}</p>}
+      {formError && (
+        <p className="mt-4 rounded border border-crit-border bg-crit-surface px-3 py-2 text-sm text-crit-ink">
+          {formError}
+        </p>
+      )}
 
       {seatForm && isAdmin && (
         <SeatEditor
@@ -268,16 +277,13 @@ function ChartPage() {
       )}
 
       {assignSeatId != null && isAdmin && (
-        <form
-          onSubmit={handleAssign}
-          className="mt-4 flex items-end gap-3 rounded border border-slate-200 bg-white p-4 shadow-sm"
-        >
+        <form onSubmit={handleAssign} className="card mt-4 flex flex-wrap items-end gap-3 p-4">
           <label className="block text-sm">
-            <span className="text-slate-700">Person</span>
+            <span className="label-sm">Person</span>
             <select
               value={assignPersonId ?? ''}
               onChange={(e) => setAssignPersonId(e.target.value ? Number(e.target.value) : null)}
-              className="mt-1 block rounded border border-slate-300 px-3 py-2"
+              className="input mt-1 block"
             >
               <option value="">Choose a person…</option>
               {(data.people.ok ? data.people.value : []).map((p) => (
@@ -287,58 +293,59 @@ function ChartPage() {
               ))}
             </select>
           </label>
-          <button
-            type="submit"
-            disabled={busy}
-            className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
-          >
+          <button type="submit" disabled={busy} className="btn-primary">
             Assign
           </button>
-          <button
-            type="button"
-            onClick={() => setAssignSeatId(null)}
-            className="rounded border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100"
-          >
+          <button type="button" onClick={() => setAssignSeatId(null)} className="btn-secondary">
             Cancel
           </button>
         </form>
       )}
 
-      <div className="mt-6 grid gap-6 md:grid-cols-2">
-        <section>
-          {seats.length === 0 ? (
-            <p className="rounded border border-dashed border-slate-300 p-6 text-center text-slate-400">
-              No seats yet.
-            </p>
-          ) : (
-            <ul className="space-y-1">
-              {seats
-                .filter((s) => s.parentSeatId == null)
-                .map((top) => (
-                  <SeatNode
-                    key={top.id}
-                    seat={top}
-                    allSeats={seats}
-                    selectedSeatId={selectedSeatId}
-                    isAdmin={isAdmin}
-                    onSelect={(id) => navigate({ to: '/org-chart', search: { seat: id } })}
-                    onEdit={openEdit}
-                    onAssign={(id) => {
-                      setFormError(null)
-                      setAssignSeatId(id)
-                      setAssignPersonId(null)
-                    }}
-                    onAddChild={(parentId) => openCreate(parentId)}
-                  />
-                ))}
-            </ul>
-          )}
+      <div className="mt-6 grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_380px]">
+        <section className="card overflow-hidden">
+          <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
+            <span className="label-sm">Seat hierarchy</span>
+            <span className="label-sm tnum">
+              {filledCount} filled · {openCount} empty
+            </span>
+          </div>
+          <div className="overflow-x-auto p-6">
+            {seats.length === 0 ? (
+              <p className="rounded border border-dashed border-ruler p-6 text-center text-sm text-ink-faint">
+                No seats yet.
+              </p>
+            ) : (
+              <div className="flex w-max min-w-full items-start justify-center gap-12">
+                {seats
+                  .filter((s) => s.parentSeatId == null)
+                  .map((top) => (
+                    <SeatNode
+                      key={top.id}
+                      seat={top}
+                      allSeats={seats}
+                      selectedSeatId={selectedSeatId}
+                      isAdmin={isAdmin}
+                      onSelect={(id) => navigate({ to: '/org-chart', search: { seat: id } })}
+                      onEdit={openEdit}
+                      onAssign={(id) => {
+                        setFormError(null)
+                        setAssignSeatId(id)
+                        setAssignPersonId(null)
+                      }}
+                      onAddChild={(parentId) => openCreate(parentId)}
+                    />
+                  ))}
+              </div>
+            )}
+          </div>
         </section>
 
         <section>
           {detail ? (
             <SeatDetail
               detail={detail}
+              parentName={detailParentName}
               isAdmin={isAdmin}
               busy={busy}
               onEnd={handleEnd}
@@ -351,9 +358,9 @@ function ChartPage() {
               }}
             />
           ) : (
-            <p className="rounded border border-slate-200 bg-white p-6 text-sm text-slate-500 shadow-sm">
+            <div className="card p-6 text-sm text-ink-muted">
               Select a seat to see its detail, occupants, and history.
-            </p>
+            </div>
           )}
         </section>
       </div>
@@ -371,29 +378,26 @@ function SeatEditor(props: {
 }) {
   const { form } = props
   return (
-    <form
-      onSubmit={props.onSubmit}
-      className="mt-4 space-y-3 rounded border border-slate-200 bg-white p-4 shadow-sm"
-    >
-      <h2 className="font-medium">{form.id ? 'Edit seat' : 'New seat'}</h2>
-      <div className="grid grid-cols-2 gap-3">
+    <form onSubmit={props.onSubmit} className="card mt-4 space-y-3 p-4">
+      <h2 className="text-base font-semibold">{form.id ? 'Edit seat' : 'New seat'}</h2>
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <label className="block text-sm">
-          <span className="text-slate-700">Name</span>
+          <span className="label-sm">Name</span>
           <input
             required
             value={form.name}
             onChange={(e) => props.onChange({ ...form, name: e.target.value })}
-            className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
+            className="input mt-1 w-full"
           />
         </label>
         <label className="block text-sm">
-          <span className="text-slate-700">Parent seat</span>
+          <span className="label-sm">Parent seat</span>
           <select
             value={form.parentSeatId ?? ''}
             onChange={(e) =>
               props.onChange({ ...form, parentSeatId: e.target.value ? Number(e.target.value) : null })
             }
-            className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
+            className="input mt-1 w-full"
           >
             <option value="">(top seat)</option>
             {props.seats
@@ -407,27 +411,19 @@ function SeatEditor(props: {
         </label>
       </div>
       <label className="block text-sm">
-        <span className="text-slate-700">Responsibilities (one per line, in order)</span>
+        <span className="label-sm">Responsibilities (one per line, in order)</span>
         <textarea
           rows={4}
           value={form.responsibilities}
           onChange={(e) => props.onChange({ ...form, responsibilities: e.target.value })}
-          className="mt-1 w-full rounded border border-slate-300 px-3 py-2 font-mono text-xs"
+          className="input mt-1 w-full font-mono text-xs"
         />
       </label>
       <div className="flex gap-2">
-        <button
-          type="submit"
-          disabled={props.busy}
-          className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
-        >
+        <button type="submit" disabled={props.busy} className="btn-primary">
           Save
         </button>
-        <button
-          type="button"
-          onClick={props.onCancel}
-          className="rounded border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100"
-        >
+        <button type="button" onClick={props.onCancel} className="btn-secondary">
           Cancel
         </button>
       </div>
@@ -435,6 +431,12 @@ function SeatEditor(props: {
   )
 }
 
+/**
+ * Boxes-and-lines tree: parent box, then a centered stem dropping into a
+ * sibling row where each child draws half-trunk connectors via before/after
+ * pseudo-elements (first child drops its left half, last child its right
+ * half, so the trunk spans exactly between the outer children's centers).
+ */
 function SeatNode(props: {
   seat: SeatWithOccupants
   allSeats: SeatWithOccupants[]
@@ -453,38 +455,51 @@ function SeatNode(props: {
     (s) => s.parentSeatId === seat.id && !seen.has(s.id),
   )
   const empty = seat.occupants.length === 0
+  const selected = props.selectedSeatId === seat.id
+  const fullyCalibrated =
+    !empty && seat.occupants.every((o) => o.gwc.get === true && o.gwc.want === true && o.gwc.capacity === true)
   return (
-    <li className="mt-2">
+    <div className="flex flex-col items-center">
       <div
         className={
-          'flex items-center justify-between rounded border px-3 py-2 text-sm ' +
-          (empty ? 'border-dashed border-slate-300 bg-slate-50' : 'border-slate-300 bg-white') +
-          (props.selectedSeatId === seat.id ? ' ring-2 ring-blue-400' : '')
+          'w-full max-w-[240px] rounded-lg border px-3 py-2.5 ' +
+          (empty
+            ? 'border-dashed border-ruler bg-canvas'
+            : 'border-line bg-sheet shadow-[0_1px_2px_0_rgba(15,23,42,0.04)]') +
+          (selected ? ' border-beacon shadow-[0_0_0_3px_var(--color-beacon-ring)]' : '')
         }
       >
-        <button className="text-left hover:underline" onClick={() => props.onSelect(seat.id)}>
-          <span className="font-medium">{seat.name}</span>{' '}
-          <span className={empty ? 'text-slate-400' : 'text-slate-600'}>
-            {empty ? 'empty seat' : seat.occupants.map((o) => o.personName).join(' · ')}
+        <button className="block w-full text-left" onClick={() => props.onSelect(seat.id)}>
+          <span className="label-sm block truncate">{seat.name}</span>
+          <span
+            className={
+              'mt-1 block truncate text-sm font-medium ' +
+              (empty ? 'text-ink-faint' : 'text-ink')
+            }
+          >
+            {empty ? 'Empty seat' : seat.occupants.map((o) => o.personName).join(' · ')}
           </span>
+          {fullyCalibrated && (
+            <span className="badge badge-ok mt-1.5 !h-5 !text-[10px]">Right Fit ✓</span>
+          )}
         </button>
         {props.isAdmin && (
-          <span className="flex gap-1 text-xs">
+          <span className="mt-2 flex gap-1.5 border-t border-line-soft pt-2">
             <button
               onClick={() => props.onEdit(seat)}
-              className="rounded border border-slate-300 px-2 py-0.5 hover:bg-slate-100"
+              className="btn-secondary !h-6 !px-2 !text-[11px]"
             >
               Edit
             </button>
             <button
               onClick={() => props.onAssign(seat.id)}
-              className="rounded border border-slate-300 px-2 py-0.5 hover:bg-slate-100"
+              className="btn-secondary !h-6 !px-2 !text-[11px]"
             >
               Assign
             </button>
             <button
               onClick={() => props.onAddChild(seat.id)}
-              className="rounded border border-slate-300 px-2 py-0.5 hover:bg-slate-100"
+              className="btn-secondary !h-6 !px-2 !text-[11px]"
             >
               + Seat
             </button>
@@ -492,23 +507,41 @@ function SeatNode(props: {
         )}
       </div>
       {children.length > 0 && (
-        <div className="ml-6 border-l border-slate-300 pl-4">
-          {children.map((child) => (
-            <SeatNode
-              key={child.id}
-              {...props}
-              seat={child}
-              seen={new Set([...seen, child.id])}
-            />
-          ))}
-        </div>
+        <>
+          {/* Stem: parent box down to the sibling trunk. */}
+          <span aria-hidden className="h-6 w-px bg-ruler" />
+          <div className="flex items-start justify-center">
+            {children.map((child, i) => (
+              <div
+                key={child.id}
+                className={
+                  'relative flex flex-col items-center px-3 pt-6 ' +
+                  (children.length === 1
+                    ? '!pt-0 before:hidden after:hidden '
+                    : (i === 0
+                        ? ''
+                        : 'before:absolute before:top-0 before:right-1/2 before:h-6 before:w-1/2 before:border-t before:border-ruler ') +
+                      'after:absolute after:top-0 after:left-1/2 after:h-6 after:w-1/2 after:border-l after:border-ruler ' +
+                      (i === children.length - 1 ? '' : 'after:border-t '))
+                }
+              >
+                <SeatNode
+                  {...props}
+                  seat={child}
+                  seen={new Set([...seen, child.id])}
+                />
+              </div>
+            ))}
+          </div>
+        </>
       )}
-    </li>
+    </div>
   )
 }
 
 function SeatDetail(props: {
   detail: SeatWithOccupants & { history: AssignmentRow[] }
+  parentName: string | null
   isAdmin: boolean
   busy: boolean
   onEnd: (assignmentId: number) => void
@@ -518,40 +551,51 @@ function SeatDetail(props: {
 }) {
   const seat = props.detail
   return (
-    <div className="rounded border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex items-start justify-between">
+    <div className="card-raised p-5">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">{seat.name}</h2>
-          {seat.description && <p className="mt-1 text-sm text-slate-600">{seat.description}</p>}
+          <p className="label-sm">Selected seat</p>
+          <h2 className="mt-1 text-lg font-semibold">{seat.name}</h2>
+          {props.parentName ? (
+            <p className="tnum mt-0.5 font-mono text-xs text-ink-muted">
+              Reports directly to: {props.parentName}
+            </p>
+          ) : (
+            seat.parentSeatId == null && (
+              <p className="tnum mt-0.5 font-mono text-xs text-ink-muted">Top-level seat</p>
+            )
+          )}
+          {seat.description && <p className="mt-2 text-sm text-ink-secondary">{seat.description}</p>}
         </div>
         {props.isAdmin && (
-          <span className="flex gap-2 text-xs">
-            <button
-              onClick={props.onEdit}
-              className="rounded border border-slate-300 px-2 py-1 hover:bg-slate-100"
-            >
+          <span className="flex flex-shrink-0 gap-2">
+            <button onClick={props.onEdit} className="btn-secondary !h-7 !px-2.5 !text-xs">
               Edit seat
             </button>
-            <button
-              onClick={props.onAssign}
-              className="rounded bg-blue-600 px-2 py-1 text-white hover:bg-blue-700"
-            >
+            <button onClick={props.onAssign} className="btn-primary !h-7 !px-2.5 !text-xs">
               Assign person
             </button>
           </span>
         )}
       </div>
 
-      <h3 className="mt-4 text-sm font-medium text-slate-700">Responsibilities</h3>
-      <ol className="mt-1 list-decimal pl-5 text-sm text-slate-600">
+      <h3 className="label-sm mt-5">Responsibilities</h3>
+      <ol className="mt-2 space-y-1.5">
         {seat.responsibilities.map((r: string, i: number) => (
-          <li key={i}>{r}</li>
+          <li key={i} className="flex gap-2.5 text-sm text-ink-secondary">
+            <span className="tnum flex-shrink-0 font-mono text-xs text-ink-muted">
+              {String(i + 1).padStart(2, '0')}
+            </span>
+            <span>{r}</span>
+          </li>
         ))}
-        {seat.responsibilities.length === 0 && <li className="list-none text-slate-400">None set.</li>}
+        {seat.responsibilities.length === 0 && (
+          <li className="text-sm text-ink-faint">None set.</li>
+        )}
       </ol>
 
-      <h3 className="mt-4 text-sm font-medium text-slate-700">Current occupants</h3>
-      {seat.occupants.length === 0 && <p className="mt-1 text-sm text-slate-600">Empty seat.</p>}
+      <h3 className="label-sm mt-5">Current occupants</h3>
+      {seat.occupants.length === 0 && <p className="mt-2 text-sm text-ink-faint">Empty seat.</p>}
       {seat.occupants.map((o) => (
         <OccupantGwc
           key={o.assignmentId}
@@ -563,17 +607,22 @@ function SeatDetail(props: {
         />
       ))}
 
-      <h3 className="mt-4 text-sm font-medium text-slate-700">Assignment history</h3>
-      <ul className="mt-1 space-y-1 text-sm text-slate-600">
-        {seat.history.length === 0 && <li className="text-slate-400">No assignments yet.</li>}
+      <h3 className="label-sm mt-5">Assignment history</h3>
+      <ul className="mt-1 divide-y divide-line-soft">
+        {seat.history.length === 0 && (
+          <li className="py-2 text-sm text-ink-faint">No assignments yet.</li>
+        )}
         {seat.history.map((h) => (
-          <li key={h.id} className="flex items-center justify-between">
-            <span>
-              {h.personName} — {h.startedAt} → {h.endedAt ?? 'current'}
+          <li key={h.id} className="flex items-start justify-between gap-3 py-2">
+            <div>
+              <span className="text-sm font-medium">{h.personName}</span>
+              <span className="tnum ml-2 font-mono text-xs text-ink-muted">
+                {h.startedAt} → {h.endedAt ?? 'current'}
+              </span>
               <GwcSummary gwc={h.gwc} />
-            </span>
+            </div>
             {props.isAdmin && h.endedAt == null && (
-              <span className="text-xs text-slate-400">active</span>
+              <span className="badge badge-ok">current</span>
             )}
           </li>
         ))}
@@ -581,15 +630,16 @@ function SeatDetail(props: {
     </div>
   )
 }
+
 /** Compact read-only Right Fit line: "Get ✓ · Want — · Capacity ✗" style; hidden when unrated. */
 function GwcSummary({ gwc }: { gwc: GwcView }) {
   if (gwc.get == null && gwc.want == null && gwc.capacity == null && !gwc.note) return null
   const mark = (v: boolean | null) => (v == null ? '—' : v ? '✓' : '✗')
   return (
-    <span className="ml-2 text-xs text-slate-500">
+    <div className="tnum mt-1 font-mono text-xs text-ink-muted">
       Right Fit — Get {mark(gwc.get)} · Want {mark(gwc.want)} · Capacity {mark(gwc.capacity)}
-      {gwc.note ? <span className="italic"> “{gwc.note}”</span> : null}
-    </span>
+      {gwc.note ? <span className="font-sans italic"> “{gwc.note}”</span> : null}
+    </div>
   )
 }
 
@@ -621,73 +671,81 @@ function OccupantGwc(props: {
   }
 
   return (
-    <div className="mt-1 rounded border border-slate-200 p-2 text-sm">
-      <div className="flex items-center justify-between">
+    <div className="mt-2 rounded-lg border border-line p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <span>
-          {o.personName} <span className="text-slate-400">(since {o.startedAt})</span>
-          {!editing && <GwcSummary gwc={o.gwc} />}
+          <span className="text-sm font-medium">{o.personName}</span>
+          <span className="tnum ml-2 font-mono text-xs text-ink-muted">since {o.startedAt}</span>
         </span>
         {props.isAdmin && !editing && (
           <span className="flex gap-2">
             <button
               onClick={openEditor}
-              className="rounded border border-slate-300 px-2 py-0.5 text-xs hover:bg-slate-100"
+              className="btn-secondary !h-7 !px-2.5 !text-xs"
             >
               Right Fit
             </button>
             <button
               disabled={props.busy}
               onClick={() => props.onEnd(o.assignmentId)}
-              className="rounded border border-slate-300 px-2 py-0.5 text-xs hover:bg-slate-100 disabled:opacity-50"
+              className="btn-ghost !h-7 !px-2.5 !text-xs !text-crit-ink hover:!bg-crit-surface hover:!text-crit-ink"
             >
               Unassign
             </button>
           </span>
         )}
       </div>
+      {!editing && <GwcSummary gwc={o.gwc} />}
       {editing && (
-        <div className="mt-2 flex flex-wrap items-center gap-3">
-          {(['get', 'want', 'capacity'] as const).map((k) => (
-            <label key={k} className="flex items-center gap-1 text-xs">
-              <span className="uppercase text-slate-500">{k}</span>
-              <select
-                value={draft[k] == null ? '' : draft[k] ? 'yes' : 'no'}
-                disabled={props.busy}
-                onChange={(e) =>
-                  setDraft({
-                    ...draft,
-                    [k]: e.target.value === '' ? null : e.target.value === 'yes',
-                  })
-                }
-                className="rounded border border-slate-300 px-1.5 py-0.5"
-              >
-                <option value="">—</option>
-                <option value="yes">✓</option>
-                <option value="no">✗</option>
-              </select>
-            </label>
-          ))}
-          <input
-            value={draft.note ?? ''}
-            disabled={props.busy}
-            maxLength={1000}
-            placeholder="note (optional)"
-            onChange={(e) => setDraft({ ...draft, note: e.target.value })}
-            className="flex-1 rounded border border-slate-300 px-2 py-0.5 text-xs"
-          />
-          <button
-            onClick={save}
-            disabled={props.busy}
-            className="rounded bg-blue-600 px-2 py-0.5 text-xs text-white hover:bg-blue-700 disabled:opacity-50"
-          >
-            Save Right Fit
-          </button>
-          <button
-            onClick={() => setEditing(false)}
-            className="rounded border border-slate-300 px-2 py-0.5 text-xs hover:bg-slate-100"
-          >
-            Cancel
-          </button>
+        <div className="mt-3">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {(['get', 'want', 'capacity'] as const).map((k) => (
+              <label key={k} className="block text-sm">
+                <span className="label-sm">{k}</span>
+                <select
+                  value={draft[k] == null ? '' : draft[k] ? 'yes' : 'no'}
+                  disabled={props.busy}
+                  onChange={(e) =>
+                    setDraft({
+                      ...draft,
+                      [k]: e.target.value === '' ? null : e.target.value === 'yes',
+                    })
+                  }
+                  className="input mt-1 w-full"
+                >
+                  <option value="">—</option>
+                  <option value="yes">✓</option>
+                  <option value="no">✗</option>
+                </select>
+              </label>
+            ))}
+          </div>
+          <label className="mt-2 block text-sm">
+            <span className="label-sm">Note (optional)</span>
+            <input
+              value={draft.note ?? ''}
+              disabled={props.busy}
+              maxLength={1000}
+              placeholder="Add a note…"
+              onChange={(e) => setDraft({ ...draft, note: e.target.value })}
+              className="input mt-1 w-full"
+            />
+          </label>
+          <div className="mt-3 flex gap-2">
+            <button
+              onClick={save}
+              disabled={props.busy}
+              className="btn-primary !h-8 !px-3 !text-xs"
+            >
+              Save Right Fit
+            </button>
+            <button
+              onClick={() => setEditing(false)}
+              className="btn-secondary !h-8 !px-3 !text-xs"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       )}
     </div>
