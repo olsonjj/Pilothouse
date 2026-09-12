@@ -123,7 +123,7 @@ function AnalyzerPage() {
       </div>
       <p className="mt-1 text-sm text-slate-500">
         Score each person against each core value: ✓ exemplifies, − needs work, −− does not
-        exemplify. GWC comes from their active seats.
+        exemplify. Right Fit comes from their active seats.
       </p>
 
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
@@ -147,7 +147,7 @@ function AnalyzerPage() {
                   {!v.active && <span className="ml-1 text-xs text-slate-400">(inactive)</span>}
                 </th>
               ))}
-              <th className="px-3 py-2 font-medium">GWC</th>
+              <th className="px-3 py-2 font-medium">Right Fit</th>
               <th className="px-3 py-2 font-medium">Verdict</th>
             </tr>
           </thead>
