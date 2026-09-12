@@ -124,21 +124,21 @@ the expected result (include what you saw).
       excluded; empty window shows "—".
 - [x] 8.6 Any member can complete/drop anyone's to-do (team property).
 
-## 9. Data (the scorecard; tickets 13–15)
+## 9. Data (the scorecard; tickets 13–15) — DONE
 
-- [ ] 9.1 Add a metric (name, owner, target, direction ≥/≤, unit).
-- [ ] 9.2 Enter a number for the current week in the grid → cell colors by
+- [x] 9.1 Add a metric (name, owner, target, direction ≥/≤, unit).
+- [x] 9.2 Enter a number for the current week in the grid → cell colors by
       direction (≥: actual ≥ target green; ≤: actual ≤ target green). Exact
       equality passes.
-- [ ] 9.3 Re-enter the same week → overwrites (same cell, new value).
-- [ ] 9.4 Re-target the metric, re-enter → past weeks still render against the
+- [x] 9.3 Re-enter the same week → overwrites (same cell, new value).
+- [x] 9.4 Re-target the metric, re-enter → past weeks still render against the
       target that was in force when each number was written.
-- [ ] 9.5 Retire a metric → drops off the current grid; history still viewable
+- [x] 9.5 Retire a metric → drops off the current grid; history still viewable
       (Trend). Reactivate restores it.
-- [ ] 9.6 Trend panel: 12 weeks, bars colored pass/fail, missing weeks gray.
-- [ ] 9.7 Rollup table: per-metric and per-owner on-track % (one decimal, "—"
+- [x] 9.6 Trend panel: 12 weeks, bars colored pass/fail, missing weeks gray.
+- [x] 9.7 Rollup table: per-metric and per-owner on-track % (one decimal, "—"
       when no entries).
-- [ ] 9.8 *(member)* can view the grid; can enter only for **their own**
+- [x] 9.8 *(member)* can view the grid; can enter only for **their own**
       metrics; admin enters for any.
 
 ## 10. Issues (tickets 16, 20)
