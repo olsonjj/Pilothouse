@@ -141,73 +141,73 @@ the expected result (include what you saw).
 - [x] 9.8 *(member)* can view the grid; can enter only for **their own**
       metrics; admin enters for any.
 
-## 10. Issues (tickets 16, 20)
+## 10. Issues (tickets 16, 20) — DONE
 
-- [ ] 10.1 Add a long-term issue (defaults to current quarter) and a short-term
+- [x] 10.1 Add a long-term issue (defaults to current quarter) and a short-term
       one (no quarter field).
-- [ ] 10.2 Age display ("this week", "2 wks") on each issue.
-- [ ] 10.3 Resolve (Solved) → prompt requires a note → moves to "Resolved (N) —
+- [x] 10.2 Age display ("this week", "2 wks") on each issue.
+- [x] 10.3 Resolve (Solved) → prompt requires a note → moves to "Resolved (N) —
       kept forever".
-- [ ] 10.4 Drop → requires a reason → same archive.
-- [ ] 10.5 Resolved issues are read-only (no edit) and stay in the archive.
-- [ ] 10.6 Origin badges: create an issue from a goal/scorecard/todo (via the weekly-meeting
+- [x] 10.4 Drop → requires a reason → same archive.
+- [x] 10.5 Resolved issues are read-only (no edit) and stay in the archive.
+- [x] 10.6 Origin badges: create an issue from a goal/scorecard/todo (via the weekly-meeting
       push, section 12) → badge "from rock"/"from scorecard"/"from to-do"
       (internal origin values keep the old names — cosmetic only).
-- [ ] 10.7 Quarter-end carry (admin, on an **ended** quarter's long-term list):
+- [x] 10.7 Quarter-end carry (admin, on an **ended** quarter's long-term list):
       carry-or-drop panel appears; Carry keeps the row and moves it to the
       chosen quarter; "Carry all" bulk-works; short-term issues are not
       offered.
 
-## 11. Goals (tickets 17–19)
+## 11. Goals (tickets 17–19) — DONE
 
-- [ ] 11.1 Add a company goal (admin) and a personal goal (member, "Me" only).
-- [ ] 11.2 8th goal in a quarter → yellow warning banner (never blocks).
-- [ ] 11.3 Target without direction (or vice versa) → rejected.
-- [ ] 11.4 Weekly status: ✓ / ✗ / 📊 per goal per week; re-entering the same
+- [x] 11.1 Add a company goal (admin) and a personal goal (member, "Me" only).
+- [x] 11.2 8th goal in a quarter → yellow warning banner (never blocks).
+- [x] 11.3 Target without direction (or vice versa) → rejected.
+- [x] 11.4 Weekly status: ✓ / ✗ / 📊 per goal per week; re-entering the same
       week overwrites; comment saved.
-- [ ] 11.5 📊 measuring requires the goal to have a target; captures the
+- [x] 11.5 📊 measuring requires the goal to have a target; captures the
       actual number.
-- [ ] 11.6 Two consecutive ✗ weeks → red ring / "off-track 2 weeks in a row".
-- [ ] 11.7 Past quarter: everything read-only; admin sees ✓/✗ scoring buttons
+- [x] 11.6 Two consecutive ✗ weeks → red ring / "off-track 2 weeks in a row".
+- [x] 11.7 Past quarter: everything read-only; admin sees ✓/✗ scoring buttons
       and the completion-percentage bars (EOS ~80% reference); unscored goals
       count as incomplete.
-- [ ] 11.8 Carry over an unfinished goal to the next quarter → new goal with a
+- [x] 11.8 Carry over an unfinished goal to the next quarter → new goal with a
       "carried" badge; original untouched.
 
-## 12. Weekly Meeting (tickets 21–25)
+## 12. Weekly Meeting (tickets 21–25) — DONE
 
-- [ ] 12.1 Start meeting → 7 segments in agenda order (Check-in 5 / Data 5 /
+- [x] 12.1 Start meeting → 7 segments in agenda order (Check-in 5 / Data 5 /
       Goals 5 / Headlines 5 / To-Dos 5 / Issues 60 / Conclude 5), first active
       with countdown.
-- [ ] 12.2 Pre-loads: Data segment shows last week's column with pass/fail;
+- [x] 12.2 Pre-loads: Data segment shows last week's column with pass/fail;
       Goals shows current statuses; To-Dos shows last week's bucket.
-- [ ] 12.3 Advance → segment's actual time recorded, next starts; sub-second
+- [x] 12.3 Advance → segment's actual time recorded, next starts; sub-second
       advance still marks it done.
-- [ ] 12.4 Advancing Conclude is rejected (explicit conclude act).
-- [ ] 12.5 **Two browsers** (owner + member): member's advances/notes appear in
+- [x] 12.4 Advancing Conclude is rejected (explicit conclude act).
+- [x] 12.5 **Two browsers** (owner + member): member's advances/notes appear in
       owner's view within ~2.5s and vice versa.
-- [ ] 12.6 Notes: type in a segment textarea → autosaves (~1s after typing
+- [x] 12.6 Notes: type in a segment textarea → autosaves (~1s after typing
       stops) → "saved" indicator → visible in the other browser.
-- [ ] 12.7 Poll doesn't clobber a note you're actively typing (draft
+- [x] 12.7 Poll doesn't clobber a note you're actively typing (draft
       protection); a focused-but-untouched textarea may update.
-- [ ] 12.8 Push: "Make issue" on a red scorecard cell, an off-track goal, and a
+- [x] 12.8 Push: "Make issue" on a red scorecard cell, an off-track goal, and a
       missed to-do → each lands in the Issue queue with the right origin badge.
-- [ ] 12.9 Duplicate push → no second queue row (idempotent).
-- [ ] 12.10 IDS: pull an unresolved long-term issue; solve with note + to-do →
+- [x] 12.9 Duplicate push → no second queue row (idempotent).
+- [x] 12.10 IDS: pull an unresolved long-term issue; solve with note + to-do →
       queue row "solved today", resolution recorded, to-do created with
       meeting link + 7-day due.
-- [ ] 12.11 Headline composer → manual issue in the queue.
-- [ ] 12.12 Conclude: recap shows meeting to-dos; cascading messages saved in
+- [x] 12.11 Headline composer → manual issue in the queue.
+- [x] 12.12 Conclude: recap shows meeting to-dos; cascading messages saved in
       the conclude segment notes; remaining unsolved queue issues flip to
       "carried" (visible on the long-term list); solved ones stay solved.
-- [ ] 12.13 Post-conclude freeze: advance / notes / push / pull / solve /
+- [x] 12.13 Post-conclude freeze: advance / notes / push / pull / solve /
       facilitator / delete ALL rejected; ratings remain open.
-- [ ] 12.14 Ratings: each participant rates 1–10 (0/11 rejected); one per
+- [x] 12.14 Ratings: each participant rates 1–10 (0/11 rejected); one per
       person (re-rate overwrites); unlinked account → "link a person" error.
-- [ ] 12.15 History: past meetings listed with date, avg rating; archive view
+- [x] 12.15 History: past meetings listed with date, avg rating; archive view
       is read-only with segment durations; rating trend across meetings.
 
-## 13. Permission matrix (spot-check across modules)
+## 13. Permission matrix (spot-check across modules) — DONE
 
 | Action | admin | member |
 |---|---|---|
@@ -217,7 +217,7 @@ the expected result (include what you saw).
 | Conclude meeting, carry issues, score goals at quarter end | ✅ | ❌ |
 | Rate meetings (linked account required) | ✅ | ✅ |
 
-## 14. Known deferred items — do NOT file as bugs
+## 14. Known deferred items — do NOT file as bugs — DONE
 
 - Creating **user accounts** has no UI (seed-only; SQL insert documented in §0).
 - FK constraints on `issues.meeting_id`, `todos.source_meeting_id`,
@@ -230,7 +230,7 @@ the expected result (include what you saw).
 - Recaps/dashboards, multi-team UI, notifications, integrations = Tier 3
   (out of scope per `docs/overview.md`).
 
-## 15. When you find something
+## 15. When you find something — DONE
 
 Note the module, the step number, what you did, what you expected vs saw. Most
 behavior is pinned by the 195 seam tests (`pnpm test`), so a deviation likely
