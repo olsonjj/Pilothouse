@@ -18,6 +18,16 @@ licensed by EOS Worldwide.
 All database access lives behind server modules; the client never touches the
 DB, which keeps a future database swap contained.
 
+## Screenshots
+
+| Data — the weekly scorecard | Org Chart — seats & Right Fit |
+| --- | --- |
+| ![Data scorecard](docs/screenshots/data.png) | ![Org Chart](docs/screenshots/org-chart.png) |
+
+| Goals — quarterly priorities | |
+| --- | --- |
+| ![Goals](docs/screenshots/goals.png) | |
+
 ## Setup
 
 ```bash
