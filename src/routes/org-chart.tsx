@@ -581,13 +581,13 @@ function SeatDetail(props: {
     </div>
   )
 }
-/** Compact read-only GWC line: "G ✓ W — C ✗" style; hidden when unrated. */
+/** Compact read-only Right Fit line: "Get ✓ · Want — · Capacity ✗" style; hidden when unrated. */
 function GwcSummary({ gwc }: { gwc: GwcView }) {
   if (gwc.get == null && gwc.want == null && gwc.capacity == null && !gwc.note) return null
   const mark = (v: boolean | null) => (v == null ? '—' : v ? '✓' : '✗')
   return (
     <span className="ml-2 text-xs text-slate-500">
-      [G {mark(gwc.get)} · W {mark(gwc.want)} · C {mark(gwc.capacity)}]
+      Right Fit — Get {mark(gwc.get)} · Want {mark(gwc.want)} · Capacity {mark(gwc.capacity)}
       {gwc.note ? <span className="italic"> “{gwc.note}”</span> : null}
     </span>
   )
