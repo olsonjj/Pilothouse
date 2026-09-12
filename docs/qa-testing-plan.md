@@ -63,26 +63,26 @@ the expected result (include what you saw).
 - [x] 3.1 Home header shows the current quarter and "Week of <Mon date>".
 - [x] 3.2 Quarter dropdowns (Goals, Issues) list current + next year's quarters.
 
-## 4. Org Chart (tickets 04, 08)
+## 4. Org Chart (tickets 04, 08) — DONE
 
-- [ ] 4.1 Chart renders the tree; empty seats visually distinct from filled ones.
-- [ ] 4.2 Create a seat with responsibilities (one per line) + parent → appears
+- [x] 4.1 Chart renders the tree; empty seats visually distinct from filled ones.
+- [x] 4.2 Create a seat with responsibilities (one per line) + parent → appears
       nested under its parent.
-- [ ] 4.3 Assign a person to a seat → occupant shows on the seat and the seat
+- [x] 4.3 Assign a person to a seat → occupant shows on the seat and the seat
       detail; assignment appears in Assignment history with dates.
-- [ ] 4.4 Assign the same person to a **third** seat → rejected (max two active).
-- [ ] 4.5 Assign a second person to an occupied seat → rejected (one occupant).
-- [ ] 4.6 End an assignment → seat becomes empty; the assignment moves to
+- [x] 4.4 Assign the same person to a **third** seat → rejected (max two active).
+- [x] 4.5 Assign a second person to an occupied seat → rejected (one occupant).
+- [x] 4.6 End an assignment → seat becomes empty; the assignment moves to
       history with an end date (never deleted). **Unassign button lives on the
       current occupant row in the seat detail** (not the history list).
-- [ ] 4.7 Right Fit: open a seat with an active assignment → set Get/Want/Capacity +
+- [x] 4.7 Right Fit: open a seat with an active assignment → set Get/Want/Capacity +
       note → Save → shown on the seat detail and the person's row.
-- [ ] 4.8 *(member)* sees the chart and Right Fit read-only; no Edit/Assign/Right Fit buttons.
+- [x] 4.8 *(member)* sees the chart and Right Fit read-only; no Edit/Assign/Right Fit buttons.
 
-## 5. Right Fit (ticket 09)
+## 5. Right Fit (ticket 09) — DONE
 
-- [ ] 5.1 Right Fit editor only appears for admins, on the **active** assignment.
-- [ ] 5.2 Re-save overwrites (values update, history row keeps its own ratings).
+- [x] 5.1 Right Fit editor only appears for admins, on the **active** assignment.
+- [x] 5.2 Re-save overwrites (values update, history row keeps its own ratings).
 
 ## 6. Employee Assessment (ticket 10)
 
