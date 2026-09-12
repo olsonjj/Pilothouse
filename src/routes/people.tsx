@@ -145,166 +145,224 @@ function PeoplePage() {
     await refresh()
   }
 
+  const detailOpen = editing !== null && isAdmin && showCreate
+  const railPerson = editing !== null && isAdmin && !showCreate ? editingPerson : null
+
   return (
-    <main className="mx-auto max-w-3xl p-8">
+    <main className="mx-auto max-w-6xl p-8">
       <header className="flex items-center justify-between">
-        <Link to="/" className="text-sm text-blue-600 hover:underline">
+        <Link to="/" className="btn-ghost">
           ← Home
         </Link>
-        <button
-          onClick={handleSignOut}
-          className="rounded border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100"
-        >
+        <button onClick={handleSignOut} className="btn-ghost">
           Sign out
         </button>
       </header>
 
-      <div className="mt-6 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">People</h1>
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="label-sm">Team roster</p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">People</h1>
+        </div>
         <div className="flex items-center gap-3">
+          <span className="badge badge-neutral">
+            {people.length} {people.length === 1 ? 'member' : 'members'}
+          </span>
           {isAdmin && (
-            <Link
-              to="/employee-assessment"
-              className="text-sm text-blue-600 hover:underline"
-            >
+            <Link to="/employee-assessment" className="btn-secondary">
               Employee Assessment
             </Link>
           )}
           {isAdmin && (
-            <button
-              onClick={openCreate}
-              className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
-            >
-              Add person
+            <button onClick={openCreate} className="btn-primary">
+              + Add person
             </button>
           )}
         </div>
       </div>
 
-      {formError && <p className="mt-2 text-sm text-red-600">{formError}</p>}
+      {formError && (
+        <p className="mt-4 rounded border border-crit-border bg-crit-surface px-3 py-2 text-sm text-crit-ink">
+          {formError}
+        </p>
+      )}
 
-      {editing && isAdmin && (
+      {detailOpen && editing && (
         <form
           onSubmit={handleSave}
-          className="mt-4 space-y-3 rounded border border-slate-200 bg-white p-4 shadow-sm"
+          className="card mt-4 space-y-3 p-4"
         >
-          <h2 className="font-medium">{showCreate ? 'New person' : 'Edit person'}</h2>
-          <div className="grid grid-cols-3 gap-3">
+          <h2 className="text-base font-semibold">
+            {showCreate ? 'New person' : 'Edit person'}
+          </h2>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <label className="block text-sm">
-              <span className="text-slate-700">Full name</span>
+              <span className="label-sm">Full name</span>
               <input
                 required
                 value={editing.fullName}
                 onChange={(e) => setEditing({ ...editing, fullName: e.target.value })}
-                className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
+                className="input mt-1 w-full"
               />
             </label>
             <label className="block text-sm">
-              <span className="text-slate-700">Email (optional)</span>
+              <span className="label-sm">Email (optional)</span>
               <input
                 type="email"
                 value={editing.email}
                 onChange={(e) => setEditing({ ...editing, email: e.target.value })}
-                className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
+                className="input mt-1 w-full"
               />
             </label>
             <label className="block text-sm">
-              <span className="text-slate-700">Start date (optional)</span>
+              <span className="label-sm">Start date (optional)</span>
               <input
                 type="date"
                 value={editing.startDate}
                 onChange={(e) => setEditing({ ...editing, startDate: e.target.value })}
-                className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
+                className="input mt-1 w-full"
               />
             </label>
           </div>
           <div className="flex gap-2">
-            <button
-              type="submit"
-              disabled={busy}
-              className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
-            >
+            <button type="submit" disabled={busy} className="btn-primary">
               Save
             </button>
-            <button
-              type="button"
-              onClick={closeEditor}
-              className="rounded border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100"
-            >
+            <button type="button" onClick={closeEditor} className="btn-secondary">
               Cancel
             </button>
           </div>
         </form>
       )}
 
-      {editing && isAdmin && !showCreate && editingPerson && (
-        <>
-          <AccountLinker
-            person={editingPerson}
-            disabled={busy}
-            onLink={(userId) => handleLink(editingPerson.id, userId)}
-            onUnlink={() => handleUnlink(editingPerson)}
-          />
-          <PersonAssignments personId={editingPerson.id} />
-        </>
-      )}
-
-      <table className="mt-6 w-full rounded border border-slate-200 bg-white text-sm shadow-sm">
-        <thead>
-          <tr className="border-b border-slate-200 text-left text-slate-500">
-            <th className="px-4 py-2 font-medium">Name</th>
-            <th className="px-4 py-2 font-medium">Email</th>
-            <th className="px-4 py-2 font-medium">Start date</th>
-            <th className="px-4 py-2 font-medium">Account</th>
-            {isAdmin && <th className="px-4 py-2" />}
-          </tr>
-        </thead>
-        <tbody>
-          {people.length === 0 && (
+      <div className={railPerson ? 'mt-6 grid grid-cols-1 items-start gap-6 lg:grid-cols-[1fr_360px]' : 'mt-6'}>
+        <table className="table-precision">
+          <thead>
             <tr>
-              <td colSpan={isAdmin ? 5 : 4} className="px-4 py-6 text-center text-slate-400">
-                No people yet.
-              </td>
+              <th>Name</th>
+              <th>Email</th>
+              <th className="num">Start date</th>
+              <th>Account</th>
+              {isAdmin && <th className="!text-right">Actions</th>}
             </tr>
-          )}
-          {people.map((p) => (
-            <tr
-              key={p.id}
-              className={
-                'border-b border-slate-100 last:border-0' +
-                (isAdmin ? ' cursor-pointer hover:bg-slate-50' : '') +
-                (editingPerson?.id === p.id ? ' bg-blue-50' : '')
-              }
-              onClick={() => isAdmin && openEdit(p)}
-            >
-              <td className="px-4 py-2 font-medium">{p.fullName}</td>
-              <td className="px-4 py-2 text-slate-600">{p.email ?? '—'}</td>
-              <td className="px-4 py-2 text-slate-600">{p.startDate ?? '—'}</td>
-              <td className="px-4 py-2 text-slate-600">
-                {p.linkedUser ? p.linkedUser.email : 'no login'}
-              </td>
-              {isAdmin && (
-                <td className="px-4 py-2 text-right">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      openEdit(p)
-                    }}
-                    className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100"
-                  >
-                    Edit
-                  </button>
+          </thead>
+          <tbody>
+            {people.length === 0 && (
+              <tr>
+                <td colSpan={isAdmin ? 5 : 4} className="!h-14 text-center text-ink-faint">
+                  No people yet.
                 </td>
-              )}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+              </tr>
+            )}
+            {people.map((p) => (
+              <tr
+                key={p.id}
+                className={
+                  (isAdmin ? 'cursor-pointer' : '') +
+                  (railPerson?.id === p.id ? ' bg-canvas' : '')
+                }
+                onClick={() => isAdmin && openEdit(p)}
+              >
+                <td className="font-medium">{p.fullName}</td>
+                <td className="text-ink-secondary">{p.email ?? '—'}</td>
+                <td className="num text-ink-secondary">{p.startDate ?? '—'}</td>
+                <td>
+                  {p.linkedUser ? (
+                    <span className="badge badge-ok">{p.linkedUser.email}</span>
+                  ) : (
+                    <span className="badge badge-neutral">no login</span>
+                  )}
+                </td>
+                {isAdmin && (
+                  <td className="text-right">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openEdit(p)
+                      }}
+                      className="btn-secondary !h-7 !px-2.5 !text-xs"
+                    >
+                      Edit
+                    </button>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {railPerson && (
+          <aside className="space-y-4">
+            <div className="card-raised p-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-semibold">{railPerson.fullName}</h2>
+                <button onClick={closeEditor} className="btn-ghost !h-7 !px-2 !text-xs">
+                  Close
+                </button>
+              </div>
+
+              <div className="mt-4">
+                <h3 className="label-sm">Edit details</h3>
+                <form onSubmit={handleSave} className="mt-2 space-y-3">
+                  <label className="block text-sm">
+                    <span className="label-sm">Full name</span>
+                    <input
+                      required
+                      value={editing!.fullName}
+                      onChange={(e) =>
+                        setEditing({ ...editing!, fullName: e.target.value })
+                      }
+                      className="input mt-1 w-full"
+                    />
+                  </label>
+                  <label className="block text-sm">
+                    <span className="label-sm">Email (optional)</span>
+                    <input
+                      type="email"
+                      value={editing!.email}
+                      onChange={(e) => setEditing({ ...editing!, email: e.target.value })}
+                      className="input mt-1 w-full"
+                    />
+                  </label>
+                  <label className="block text-sm">
+                    <span className="label-sm">Start date (optional)</span>
+                    <input
+                      type="date"
+                      value={editing!.startDate}
+                      onChange={(e) =>
+                        setEditing({ ...editing!, startDate: e.target.value })
+                      }
+                      className="input mt-1 w-full"
+                    />
+                  </label>
+                  <div className="flex gap-2">
+                    <button type="submit" disabled={busy} className="btn-primary">
+                      Save
+                    </button>
+                    <button type="button" onClick={closeEditor} className="btn-secondary">
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              <AccountLinker
+                person={railPerson}
+                disabled={busy}
+                onLink={(userId) => handleLink(railPerson.id, userId)}
+                onUnlink={() => handleUnlink(railPerson)}
+              />
+            </div>
+
+            <PersonAssignments personId={railPerson.id} />
+          </aside>
+        )}
+      </div>
     </main>
   )
 }
 
-/** Link/unlink panel shown under the edit form for an existing person. */
+/** Link/unlink panel shown in the detail rail for an existing person. */
 function AccountLinker(props: {
   person: PersonWithAccount
   disabled: boolean
@@ -327,25 +385,21 @@ function AccountLinker(props: {
   }, [props.person.linkedUser?.id])
 
   return (
-    <div className="mt-3 rounded border border-slate-200 bg-white p-4 shadow-sm">
-      <h3 className="text-sm font-medium text-slate-700">Login account</h3>
+    <div className="mt-4 border-t border-line pt-4">
+      <h3 className="label-sm">Account</h3>
       {props.person.linkedUser ? (
         <div className="mt-2 flex items-center gap-3">
-          <span className="text-sm text-slate-600">{props.person.linkedUser.email}</span>
-          <button
-            onClick={props.onUnlink}
-            disabled={props.disabled}
-            className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100 disabled:opacity-50"
-          >
+          <span className="badge badge-ok">{props.person.linkedUser.email}</span>
+          <button onClick={props.onUnlink} disabled={props.disabled} className="btn-secondary !h-7 !px-2.5 !text-xs">
             Unlink account
           </button>
         </div>
       ) : (
-        <div className="mt-1 flex items-center gap-2">
+        <div className="mt-2 flex items-center gap-2">
           <select
             value={selectedUserId ?? ''}
             onChange={(e) => setSelectedUserId(e.target.value ? Number(e.target.value) : null)}
-            className="rounded border border-slate-300 px-3 py-1.5 text-sm"
+            className="input flex-1"
           >
             <option value="">Choose an account…</option>
             {unlinked.map((u) => (
@@ -357,7 +411,7 @@ function AccountLinker(props: {
           <button
             onClick={() => selectedUserId && props.onLink(selectedUserId)}
             disabled={props.disabled || selectedUserId == null}
-            className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 disabled:opacity-50"
+            className="btn-secondary"
           >
             Link account
           </button>
@@ -366,7 +420,8 @@ function AccountLinker(props: {
     </div>
   )
 }
-/** Person detail: their seat history with stored GWC (ticket 09). */
+
+/** Person detail: their seat history with stored Right Fit ratings (ticket 09). */
 function PersonAssignments({ personId }: { personId: number }) {
   const [rows, setRows] = useState<AssignmentRow[] | null>(null)
 
@@ -381,17 +436,27 @@ function PersonAssignments({ personId }: { personId: number }) {
   }, [personId])
 
   return (
-    <div className="mt-3 rounded border border-slate-200 bg-white p-4 shadow-sm">
-      <h3 className="text-sm font-medium text-slate-700">Seats &amp; Right Fit</h3>
-      {rows === null && <p className="mt-1 text-sm text-slate-400">Loading…</p>}
+    <div className="card p-4">
+      <h3 className="label-sm">Seat history</h3>
+      {rows === null && <p className="mt-2 text-sm text-ink-faint">Loading…</p>}
       {rows != null && rows.length === 0 && (
-        <p className="mt-1 text-sm text-slate-400">No seat assignments yet.</p>
+        <p className="mt-2 text-sm text-ink-faint">No seat assignments yet.</p>
       )}
       {rows != null && rows.length > 0 && (
-        <ul className="mt-1 space-y-1 text-sm text-slate-600">
+        <ul className="mt-2 space-y-2">
           {rows.map((r) => (
-            <li key={r.id}>
-              {r.seatName} — {r.startedAt} → {r.endedAt ?? 'current'}
+            <li key={r.id} className="rounded border border-line px-3 py-2 text-sm">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium">{r.seatName}</span>
+                {r.endedAt == null ? (
+                  <span className="badge badge-ok">current</span>
+                ) : (
+                  <span className="badge badge-neutral">ended</span>
+                )}
+              </div>
+              <div className="tnum mt-0.5 font-mono text-xs text-ink-secondary">
+                {r.startedAt} → {r.endedAt ?? 'current'}
+              </div>
               <GwcLine gwc={r.gwc} />
             </li>
           ))}
@@ -405,9 +470,9 @@ function GwcLine({ gwc }: { gwc: GwcView }) {
   if (gwc.get == null && gwc.want == null && gwc.capacity == null && !gwc.note) return null
   const mark = (v: boolean | null) => (v == null ? '—' : v ? '✓' : '✗')
   return (
-    <span className="ml-2 text-xs text-slate-500">
+    <div className="tnum mt-1 font-mono text-xs text-ink-muted">
       Right Fit — Get {mark(gwc.get)} · Want {mark(gwc.want)} · Capacity {mark(gwc.capacity)}
-      {gwc.note ? <span className="italic"> “{gwc.note}”</span> : null}
-    </span>
+      {gwc.note ? <span className="font-sans italic"> “{gwc.note}”</span> : null}
+    </div>
   )
 }
