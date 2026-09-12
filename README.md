@@ -20,13 +20,13 @@ DB, which keeps a future database swap contained.
 
 ## Screenshots
 
-| Data — the weekly scorecard | Org Chart — seats & Right Fit |
+| Home — the command deck | Data — the weekly scorecard |
 | --- | --- |
-| ![Data scorecard](docs/screenshots/data.png) | ![Org Chart](docs/screenshots/org-chart.png) |
+| ![Home](docs/screenshots/home.png) | ![Data scorecard](docs/screenshots/data.png) |
 
-| Goals — quarterly priorities | |
+| Org Chart — seats & Right Fit | Goals — quarterly priorities |
 | --- | --- |
-| ![Goals](docs/screenshots/goals.png) | |
+| ![Org Chart](docs/screenshots/org-chart.png) | ![Goals](docs/screenshots/goals.png) |
 
 ## Setup
 
