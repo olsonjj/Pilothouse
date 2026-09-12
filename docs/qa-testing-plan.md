@@ -73,7 +73,8 @@ the expected result (include what you saw).
 - [ ] 4.4 Assign the same person to a **third** seat → rejected (max two active).
 - [ ] 4.5 Assign a second person to an occupied seat → rejected (one occupant).
 - [ ] 4.6 End an assignment → seat becomes empty; the assignment moves to
-      history with an end date (never deleted).
+      history with an end date (never deleted). **Unassign button lives on the
+      current occupant row in the seat detail** (not the history list).
 - [ ] 4.7 Right Fit: open a seat with an active assignment → set Get/Want/Capacity +
       note → Save → shown on the seat detail and the person's row.
 - [ ] 4.8 *(member)* sees the chart and Right Fit read-only; no Edit/Assign/Right Fit buttons.

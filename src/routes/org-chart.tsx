@@ -559,6 +559,7 @@ function SeatDetail(props: {
           isAdmin={props.isAdmin}
           busy={props.busy}
           onSetGwc={props.onSetGwc}
+          onEnd={props.onEnd}
         />
       ))}
 
@@ -572,13 +573,7 @@ function SeatDetail(props: {
               <GwcSummary gwc={h.gwc} />
             </span>
             {props.isAdmin && h.endedAt == null && (
-              <button
-                disabled={props.busy}
-                onClick={() => props.onEnd(h.id)}
-                className="rounded border border-slate-300 px-2 py-0.5 text-xs hover:bg-slate-100 disabled:opacity-50"
-              >
-                End
-              </button>
+              <span className="text-xs text-slate-400">active</span>
             )}
           </li>
         ))}
@@ -604,6 +599,7 @@ function OccupantGwc(props: {
   isAdmin: boolean
   busy: boolean
   onSetGwc: (assignmentId: number, input: GwcInput) => Promise<boolean>
+  onEnd: (assignmentId: number) => void
 }) {
   const { occupant: o } = props
   const [editing, setEditing] = useState(false)
@@ -632,12 +628,21 @@ function OccupantGwc(props: {
           {!editing && <GwcSummary gwc={o.gwc} />}
         </span>
         {props.isAdmin && !editing && (
-          <button
-            onClick={openEditor}
-            className="rounded border border-slate-300 px-2 py-0.5 text-xs hover:bg-slate-100"
-          >
-            Right Fit
-          </button>
+          <span className="flex gap-2">
+            <button
+              onClick={openEditor}
+              className="rounded border border-slate-300 px-2 py-0.5 text-xs hover:bg-slate-100"
+            >
+              Right Fit
+            </button>
+            <button
+              disabled={props.busy}
+              onClick={() => props.onEnd(o.assignmentId)}
+              className="rounded border border-slate-300 px-2 py-0.5 text-xs hover:bg-slate-100 disabled:opacity-50"
+            >
+              Unassign
+            </button>
+          </span>
         )}
       </div>
       {editing && (
