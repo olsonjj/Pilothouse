@@ -84,18 +84,18 @@ the expected result (include what you saw).
 - [x] 5.1 Right Fit editor only appears for admins, on the **active** assignment.
 - [x] 5.2 Re-save overwrites (values update, history row keeps its own ratings).
 
-## 6. Employee Assessment (ticket 10)
+## 6. Employee Assessment (ticket 10) — DONE
 
-- [ ] 6.1 As admin: `/employee-assessment` — quarter selector, people × core-values
+- [x] 6.1 As admin: `/employee-assessment` — quarter selector, people × core-values
       grid, Right Fit summary column, verdict column ("Complete Right Fit first" when Right Fit
       incomplete).
-- [ ] 6.2 Set +/−/−− scores; re-entering overwrites (no duplicate rows).
-- [ ] 6.3 Rename a core value → scores still render under the new name.
-- [ ] 6.4 Deactivate a core value → its past scores still visible in quarters
+- [x] 6.2 Set +/−/−− scores; re-entering overwrites (no duplicate rows).
+- [x] 6.3 Rename a core value → scores still render under the new name.
+- [x] 6.4 Deactivate a core value → its past scores still visible in quarters
       that have them.
-- [ ] 6.5 *(member)* visiting the analyzer → "admins only" message; direct API
+- [x] 6.5 *(member)* visiting the analyzer → "admins only" message; direct API
       access denied.
-- [ ] 6.6 Quarter selector defaults to the **current** quarter.
+- [x] 6.6 Quarter selector defaults to the **current** quarter.
 
 ## 7. Company page (tickets 05–07)
 
