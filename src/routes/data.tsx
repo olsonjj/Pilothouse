@@ -220,33 +220,36 @@ function ScorecardPage() {
   }
 
   return (
-    <main className="mx-auto max-w-3xl p-8">
+    <main className="mx-auto max-w-6xl p-8">
       <header className="flex items-center justify-between">
-        <Link to="/" className="text-sm text-blue-600 hover:underline">
+        <Link to="/" className="btn-ghost">
           ← Home
         </Link>
-        <button
-          onClick={handleSignOut}
-          className="rounded border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100"
-        >
+        <button onClick={handleSignOut} className="btn-ghost">
           Sign out
         </button>
       </header>
 
-      <div className="mt-6 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Data — metrics</h1>
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="label-sm">Company scorecard</p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Data — metrics</h1>
+          <p className="mt-1 text-sm text-ink-secondary">
+            Weekly pulse metrics. The grid below covers the last 8 weeks.
+          </p>
+        </div>
         {isAdmin && (
-          <button
-            onClick={openCreate}
-            className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
-          >
-            Add metric
+          <button onClick={openCreate} className="btn-primary">
+            + Add metric
           </button>
         )}
       </div>
-      <p className="mt-1 text-sm text-slate-500">
-        Weekly pulse metrics. The grid below covers the last 8 weeks.
-      </p>
+
+      {formError && (
+        <p className="mt-4 rounded border border-crit-border bg-crit-surface px-3 py-2 text-sm text-crit-ink">
+          {formError}
+        </p>
+      )}
 
       {grid && grid.metrics.length > 0 && (
         <WeeklyGrid
@@ -264,32 +267,27 @@ function ScorecardPage() {
 
       {rollup && <RollupTable rollup={rollup} />}
 
-      {formError && <p className="mt-2 text-sm text-red-600">{formError}</p>}
-
       {form && isAdmin && (
-        <form
-          onSubmit={handleSave}
-          className="mt-4 space-y-3 rounded border border-slate-200 bg-white p-4 shadow-sm"
-        >
-          <h2 className="font-medium">{form.id ? 'Edit metric' : 'New metric'}</h2>
-          <div className="grid grid-cols-2 gap-3">
+        <form onSubmit={handleSave} className="card mt-6 space-y-3 p-4">
+          <h2 className="text-base font-semibold">{form.id ? 'Edit metric' : 'New metric'}</h2>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <label className="block text-sm">
-              <span className="text-slate-700">Name</span>
+              <span className="label-sm">Name</span>
               <input
                 required
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
+                className="input mt-1 w-full"
               />
             </label>
             <label className="block text-sm">
-              <span className="text-slate-700">Owner</span>
+              <span className="label-sm">Owner</span>
               <select
                 value={form.ownerPersonId ?? ''}
                 onChange={(e) =>
                   setForm({ ...form, ownerPersonId: e.target.value ? Number(e.target.value) : null })
                 }
-                className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
+                className="input mt-1 w-full"
               >
                 <option value="">Choose a person…</option>
                 {data.people.map((p) => (
@@ -300,35 +298,35 @@ function ScorecardPage() {
               </select>
             </label>
             <label className="block text-sm">
-              <span className="text-slate-700">Weekly target</span>
+              <span className="label-sm">Weekly target</span>
               <input
                 required
                 type="number"
                 step="any"
                 value={form.target}
                 onChange={(e) => setForm({ ...form, target: e.target.value })}
-                className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
+                className="input mt-1 w-full tnum"
               />
             </label>
             <label className="block text-sm">
-              <span className="text-slate-700">Direction</span>
+              <span className="label-sm">Direction</span>
               <select
                 value={form.direction}
                 onChange={(e) =>
                   setForm({ ...form, direction: e.target.value as 'gte' | 'lte' })
                 }
-                className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
+                className="input mt-1 w-full"
               >
                 <option value="gte">≥ target is good</option>
                 <option value="lte">≤ target is good</option>
               </select>
             </label>
             <label className="block text-sm">
-              <span className="text-slate-700">Unit (optional, e.g. %, $)</span>
+              <span className="label-sm">Unit (optional, e.g. %, $)</span>
               <input
                 value={form.unit}
                 onChange={(e) => setForm({ ...form, unit: e.target.value })}
-                className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
+                className="input mt-1 w-full"
               />
             </label>
             <label className="mt-1 flex items-center gap-2 text-sm">
@@ -336,102 +334,89 @@ function ScorecardPage() {
                 type="checkbox"
                 checked={form.active}
                 onChange={(e) => setForm({ ...form, active: e.target.checked })}
+                className="check-box"
               />
-              <span className="text-slate-700">Active</span>
+              <span className="text-ink-secondary">Active</span>
             </label>
           </div>
           <div className="flex gap-2">
-            <button
-              type="submit"
-              disabled={busy}
-              className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
-            >
+            <button type="submit" disabled={busy} className="btn-primary disabled:opacity-50">
               Save
             </button>
-            <button
-              type="button"
-              onClick={closeEditor}
-              className="rounded border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100"
-            >
+            <button type="button" onClick={closeEditor} className="btn-secondary">
               Cancel
             </button>
           </div>
         </form>
       )}
 
-      <table className="mt-6 w-full rounded border border-slate-200 bg-white text-sm shadow-sm">
-        <thead>
-          <tr className="border-b border-slate-200 text-left text-slate-500">
-            <th className="px-4 py-2 font-medium">Metric</th>
-            <th className="px-4 py-2 font-medium">Owner</th>
-            <th className="px-4 py-2 font-medium">Weekly target</th>
-            <th className="px-4 py-2 font-medium">Trend</th>
-            {isAdmin && <th className="px-4 py-2 font-medium">Status</th>}
-            {isAdmin && <th className="px-4 py-2" />}
-          </tr>
-        </thead>
-        <tbody>
-          {metrics.length === 0 && (
+      <div className="mt-6">
+        <p className="label-sm">Metric definitions</p>
+        <table className="table-precision mt-2 text-sm">
+          <thead>
             <tr>
-              <td colSpan={isAdmin ? 6 : 4} className="px-4 py-6 text-center text-slate-400">
-                No metrics yet.
-              </td>
+              <th>Metric</th>
+              <th>Owner</th>
+              <th className="num">Weekly target</th>
+              <th>Trend</th>
+              {isAdmin && <th>Status</th>}
+              {isAdmin && <th aria-label="actions" />}
             </tr>
-          )}
-          {metrics.map((m) => (
-            <tr
-              key={m.id}
-              className={
-                'border-b border-slate-100 last:border-0' +
-                (m.active === 0 ? ' text-slate-400' : '')
-              }
-            >
-              <td className="px-4 py-2 font-medium">
-                {m.name}
-                {m.active === 0 && <span className="ml-2 text-xs">(retired)</span>}
-              </td>
-              <td className="px-4 py-2 text-slate-600">{m.ownerName}</td>
-              <td className="px-4 py-2 text-slate-600">{targetDisplay(m)}</td>
-              <td className="px-4 py-2">
-                <button
-                  onClick={() => toggleTrend(m.id)}
-                  className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100"
-                >
-                  {trendOpenFor === m.id ? 'Hide trend' : 'Trend'}
-                </button>
-              </td>
-              {isAdmin && (
-                <td className="px-4 py-2">
+          </thead>
+          <tbody>
+            {metrics.length === 0 && (
+              <tr>
+                <td colSpan={isAdmin ? 6 : 4} className="text-center text-ink-faint">
+                  No metrics yet.
+                </td>
+              </tr>
+            )}
+            {metrics.map((m) => (
+              <tr key={m.id} className={m.active === 0 ? 'text-ink-faint' : ''}>
+                <td className="font-medium">
+                  {m.name}
+                  {m.active === 0 && <span className="badge badge-neutral ml-2">retired</span>}
+                </td>
+                <td className="text-ink-secondary">{m.ownerName}</td>
+                <td className="num text-ink-secondary">{targetDisplay(m)}</td>
+                <td>
                   <button
-                    onClick={() => toggleActive(m)}
-                    disabled={busy}
-                    className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100 disabled:opacity-50"
+                    onClick={() => toggleTrend(m.id)}
+                    className="btn-secondary h-7 px-2 text-xs"
                   >
-                    {m.active === 1 ? 'Retire' : 'Reactivate'}
+                    {trendOpenFor === m.id ? 'Hide trend' : 'Trend'}
                   </button>
                 </td>
-              )}
-              {isAdmin && (
-                <td className="px-4 py-2 text-right">
-                  <button
-                    onClick={() => openEdit(m)}
-                    className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100"
-                  >
-                    Edit
-                  </button>
-                </td>
-              )}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+                {isAdmin && (
+                  <td>
+                    <button
+                      onClick={() => toggleActive(m)}
+                      disabled={busy}
+                      className="btn-secondary h-7 px-2 text-xs disabled:opacity-50"
+                    >
+                      {m.active === 1 ? 'Retire' : 'Reactivate'}
+                    </button>
+                  </td>
+                )}
+                {isAdmin && (
+                  <td className="text-right">
+                    <button onClick={() => openEdit(m)} className="btn-ghost h-7 px-2 text-xs">
+                      Edit
+                    </button>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </main>
   )
 }
 function cellClass(pass: boolean | null): string {
-  if (pass === true) return 'bg-green-100 text-green-800'
-  if (pass === false) return 'bg-red-100 text-red-700'
-  return 'text-slate-300'
+  if (pass === true) return 'bg-ok-surface text-ok-ink'
+  if (pass === false) return 'bg-crit-surface text-crit-ink'
+  return 'text-ink-faint'
 }
 
 /**
@@ -449,87 +434,104 @@ function WeeklyGrid(props: {
   const [editing, setEditing] = useState<{ metricId: number; monday: string; value: string } | null>(
     null,
   )
+  const lastWeek = props.grid.weeks[props.grid.weeks.length - 1]?.monday
   return (
-    <div className="mt-6 overflow-x-auto rounded border border-slate-200 bg-white shadow-sm">
-      <h2 className="border-b border-slate-200 px-4 py-3 font-medium">Weekly grid</h2>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-slate-200 text-left text-slate-500">
-            <th className="sticky left-0 bg-white px-4 py-2 font-medium">Metric</th>
-            {props.grid.weeks.map((w) => (
-              <th key={w.monday} className="px-2 py-2 text-center text-xs font-medium">
-                {w.label.replace('Week of ', '')}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {props.grid.metrics.map((m) => {
-            const canEdit = props.isAdmin || props.mePersonId === m.ownerPersonId
-            return (
-              <tr key={m.id} className="border-b border-slate-100 last:border-0">
-                <td className="sticky left-0 bg-white px-4 py-2">
-                  <div className="font-medium">{m.name}</div>
-                  <div className="text-xs text-slate-500">
-                    {(m.direction === 'gte' ? '≥ ' : '≤ ') + m.target}
-                    {m.unit ? ` ${m.unit}` : ''} · {m.ownerName}
-                  </div>
-                </td>
-                {m.cells.map((cell, i) => {
-                  const monday = props.grid.weeks[i]!.monday
-                  const isEditing =
-                    editing?.metricId === m.id && editing.monday === monday
-                  return (
-                    <td
-                      key={monday}
-                      className={'px-2 py-2 text-center ' + cellClass(cell.pass)}
-                    >
-                      {isEditing ? (
-                        <input
-                          autoFocus
-                          disabled={props.busy}
-                          defaultValue={editing!.value}
-                          onBlur={(e) => {
-                            setEditing(null)
-                            props.onSave(m.id, monday, e.target.value)
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
+    <div className="card mt-6 overflow-hidden">
+      <div className="flex items-center justify-between border-b border-line px-4 py-3">
+        <h2 className="text-base font-semibold">Weekly grid</h2>
+        <span className="label-sm">Last 8 operating weeks</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="table-precision border-0">
+          <thead>
+            <tr>
+              <th className="sticky left-0 z-10 bg-canvas">Metric</th>
+              {props.grid.weeks.map((w) => (
+                <th
+                  key={w.monday}
+                  className={
+                    'tnum text-center font-mono text-xs' +
+                    (w.monday === lastWeek ? ' border-x border-line bg-panel' : '')
+                  }
+                >
+                  {w.label.replace('Week of ', '')}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {props.grid.metrics.map((m) => {
+              const canEdit = props.isAdmin || props.mePersonId === m.ownerPersonId
+              return (
+                <tr key={m.id}>
+                  <td className="sticky left-0 z-10 bg-white">
+                    <div className="font-medium">{m.name}</div>
+                    <div className="tnum mt-0.5 font-mono text-xs text-ink-muted">
+                      {(m.direction === 'gte' ? '≥ ' : '≤ ') + m.target}
+                      {m.unit ? ` ${m.unit}` : ''} · {m.ownerName}
+                    </div>
+                  </td>
+                  {m.cells.map((cell, i) => {
+                    const monday = props.grid.weeks[i]!.monday
+                    const isEditing =
+                      editing?.metricId === m.id && editing.monday === monday
+                    const isCurrent = monday === lastWeek
+                    return (
+                      <td
+                        key={monday}
+                        className={
+                          'px-2 py-2 text-center ' +
+                          cellClass(cell.pass) +
+                          (isCurrent ? ' border-x border-line bg-panel' : '')
+                        }
+                      >
+                        {isEditing ? (
+                          <input
+                            autoFocus
+                            disabled={props.busy}
+                            defaultValue={editing!.value}
+                            onBlur={(e) => {
                               setEditing(null)
-                              props.onSave(m.id, monday, e.currentTarget.value)
+                              props.onSave(m.id, monday, e.target.value)
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                setEditing(null)
+                                props.onSave(m.id, monday, e.currentTarget.value)
+                              }
+                              if (e.key === 'Escape') setEditing(null)
+                            }}
+                            className="tnum w-16 rounded border border-beacon bg-white px-1 py-0.5 text-center font-mono text-xs"
+                          />
+                        ) : (
+                          <button
+                            disabled={!canEdit || props.busy}
+                            onClick={() =>
+                              canEdit &&
+                              setEditing({
+                                metricId: m.id,
+                                monday,
+                                value: cell.actual == null ? '' : String(cell.actual),
+                              })
                             }
-                            if (e.key === 'Escape') setEditing(null)
-                          }}
-                          className="w-16 rounded border border-blue-400 px-1 py-0.5 text-center text-xs"
-                        />
-                      ) : (
-                        <button
-                          disabled={!canEdit || props.busy}
-                          onClick={() =>
-                            canEdit &&
-                            setEditing({
-                              metricId: m.id,
-                              monday,
-                              value: cell.actual == null ? '' : String(cell.actual),
-                            })
-                          }
-                          className={
-                            'w-full px-1 py-0.5 text-center text-xs ' +
-                            (canEdit ? 'cursor-pointer hover:underline' : 'cursor-default')
-                          }
-                          title={canEdit ? 'Click to enter / edit' : 'Read-only'}
-                        >
-                          {cell.actual == null ? '–' : cell.actual}
-                        </button>
-                      )}
-                    </td>
-                  )
-                })}
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
+                            className={
+                              'tnum w-full px-1 py-0.5 text-center font-mono text-xs ' +
+                              (canEdit ? 'cursor-pointer hover:underline' : 'cursor-default')
+                            }
+                            title={canEdit ? 'Click to enter / edit' : 'Read-only'}
+                          >
+                            {cell.actual == null ? '–' : cell.actual}
+                          </button>
+                        )}
+                      </td>
+                    )
+                  })}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
@@ -547,17 +549,14 @@ function TrendPanel(props: { trend: MetricTrend; onClose: () => void }) {
   const max = actuals.length > 0 ? Math.max(...actuals) : 1
   const span = max - min || 1 // flat series → mid-height bars
   return (
-    <div className="mt-4 rounded border border-slate-200 bg-white p-4 shadow-sm">
+    <div className="card mt-4 p-4">
       <div className="flex items-center justify-between">
-        <h2 className="font-medium">
+        <h2 className="text-base font-semibold">
           Trend — {trend.metric.name}
           {trend.metric.unit ? ` (${trend.metric.unit})` : ''}
-          {trend.metric.active === 0 && <span className="ml-2 text-xs text-slate-400">(retired)</span>}
+          {trend.metric.active === 0 && <span className="badge badge-neutral ml-2">retired</span>}
         </h2>
-        <button
-          onClick={props.onClose}
-          className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100"
-        >
+        <button onClick={props.onClose} className="btn-secondary h-7 px-2 text-xs">
           Close
         </button>
       </div>
@@ -570,22 +569,22 @@ function TrendPanel(props: { trend: MetricTrend; onClose: () => void }) {
                 className={
                   'w-full rounded-t ' +
                   (p.pass == null
-                    ? 'bg-slate-200'
+                    ? 'bg-line'
                     : p.pass
-                      ? 'bg-green-500'
-                      : 'bg-red-500')
+                      ? 'bg-ok-dot'
+                      : 'bg-crit-dot')
                 }
                 style={{ height: `${pct}%` }}
                 title={p.actual == null ? `${p.label}: no entry` : `${p.label}: ${p.actual}`}
               />
-              <span className="mt-1 text-[10px] text-slate-500">
+              <span className="tnum mt-1 font-mono text-[10px] text-ink-muted">
                 {p.label.replace('Week of ', '').replace(' ', '\u00a0')}
               </span>
             </div>
           )
         })}
       </div>
-      <p className="mt-2 text-xs text-slate-500">
+      <p className="mt-2 text-xs text-ink-secondary">
         Bars colored by target pass/fail (server-derived); gray = no entry that week.
       </p>
     </div>
@@ -604,67 +603,70 @@ function rateDisplay(rate: number | null): string {
 function RollupTable(props: { rollup: OnTrackRollup }) {
   const { rollup } = props
   return (
-    <div className="mt-4 rounded border border-slate-200 bg-white shadow-sm">
-      <h2 className="border-b border-slate-200 px-4 py-3 font-medium">
-        On-track % — trailing 12 weeks ({rollup.windowStart} … before {rollup.windowEnd})
-      </h2>
+    <div className="card mt-4 overflow-hidden">
+      <div className="border-b border-line px-4 py-3">
+        <p className="label-sm">On-track %</p>
+        <h2 className="mt-0.5 text-base font-semibold">
+          Trailing 12 weeks <span className="font-mono text-sm font-medium text-ink-secondary">({rollup.windowStart} … before {rollup.windowEnd})</span>
+        </h2>
+      </div>
       <div className="flex flex-wrap">
-        <table className="w-full min-w-72 flex-1 text-sm">
+        <table className="table-precision min-w-72 flex-1 border-0">
           <thead>
-            <tr className="border-b border-slate-200 text-left text-slate-500">
-              <th className="px-4 py-2 font-medium">Metric</th>
-              <th className="px-4 py-2 font-medium">Owner</th>
-              <th className="px-4 py-2 font-medium">On track</th>
-              <th className="px-4 py-2 font-medium">%</th>
+            <tr>
+              <th>Metric</th>
+              <th>Owner</th>
+              <th className="num">On track</th>
+              <th className="num">%</th>
             </tr>
           </thead>
           <tbody>
             {rollup.metrics.map((m) => (
-              <tr key={m.metricId} className="border-b border-slate-100 last:border-0">
-                <td className="px-4 py-2 font-medium">{m.metricName}</td>
-                <td className="px-4 py-2 text-slate-600">{m.ownerName}</td>
-                <td className="px-4 py-2 text-slate-600">
+              <tr key={m.metricId}>
+                <td className="font-medium">{m.metricName}</td>
+                <td className="text-ink-secondary">{m.ownerName}</td>
+                <td className="num text-ink-secondary">
                   {m.counted === 0 ? '—' : `${m.done}/${m.counted}`}
                 </td>
-                <td className="px-4 py-2 font-medium">{rateDisplay(m.rate)}</td>
+                <td className="num font-medium">{rateDisplay(m.rate)}</td>
               </tr>
             ))}
           </tbody>
         </table>
-        <table className="w-full min-w-64 border-l border-slate-100 text-sm">
+        <table className="table-precision min-w-64 flex-1 border-0 border-l border-line">
           <thead>
-            <tr className="border-b border-slate-200 text-left text-slate-500">
-              <th className="px-4 py-2 font-medium">Owner rollup</th>
-              <th className="px-4 py-2 font-medium">%</th>
+            <tr>
+              <th>Owner rollup</th>
+              <th className="num">%</th>
             </tr>
           </thead>
           <tbody>
             {rollup.owners.length === 0 && (
               <tr>
-                <td colSpan={2} className="px-4 py-6 text-center text-slate-400">
+                <td colSpan={2} className="text-center text-ink-faint">
                   No window entries yet.
                 </td>
               </tr>
             )}
             {rollup.owners.map((o) => (
-              <tr key={o.ownerPersonId} className="border-b border-slate-100 last:border-0">
-                <td className="px-4 py-2">
+              <tr key={o.ownerPersonId}>
+                <td>
                   {o.ownerName}{' '}
-                  <span className="text-xs text-slate-500">
+                  <span className="tnum font-mono text-xs text-ink-muted">
                     ({o.done}/{o.counted})
                   </span>
                 </td>
-                <td className="px-4 py-2 font-medium">{rateDisplay(o.rate)}</td>
+                <td className="num font-medium">{rateDisplay(o.rate)}</td>
               </tr>
             ))}
-            <tr className="bg-slate-50 font-medium">
-              <td className="px-4 py-2">
+            <tr className="bg-panel font-medium">
+              <td>
                 Team{' '}
-                <span className="text-xs text-slate-500">
+                <span className="tnum font-mono text-xs text-ink-muted">
                   ({rollup.team.done}/{rollup.team.counted})
                 </span>
               </td>
-              <td className="px-4 py-2">{rateDisplay(rollup.team.rate)}</td>
+              <td className="num">{rateDisplay(rollup.team.rate)}</td>
             </tr>
           </tbody>
         </table>
