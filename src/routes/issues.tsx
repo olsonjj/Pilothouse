@@ -148,142 +148,143 @@ function IssuesPage() {
     return (
       <li
         className={
-          'rounded border px-3 py-2 text-sm ' +
-          (resolvedRow ? 'border-slate-200 bg-slate-50 text-slate-500' : 'border-slate-200 bg-white')
+          'card flex items-start justify-between gap-3 px-4 py-3 text-sm transition-shadow ' +
+          (resolvedRow ? 'text-ink-muted' : '')
         }
       >
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <span className={'font-medium' + (resolvedRow ? ' line-through' : '')}>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={'font-medium text-ink' + (resolvedRow ? ' line-through' : '')}>
               {issue.title}
-            </span>{' '}
-            {originLabel(issue.origin) && (
-              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">
-                {originLabel(issue.origin)}
-              </span>
-            )}{' '}
-            <span className="text-xs text-slate-400">
-              · {ageLabel(issue.ageWeeks)}
-              {issue.addedByName ? ` · added by ${issue.addedByName}` : ''}
             </span>
-            {issue.resolution && (
-              <p className="mt-1 text-xs text-slate-500">
-                {issue.resolution.outcome === 'solved' ? 'Solved' : 'Dropped'}:{' '}
-                {issue.resolution.note}
-                {issue.resolution.resolvedByName ? ` — ${issue.resolution.resolvedByName}` : ''}
-              </p>
+            {originLabel(issue.origin) && (
+              <span className="badge badge-neutral">{originLabel(issue.origin)}</span>
             )}
           </div>
-          {!resolvedRow && (
-            <span className="flex shrink-0 gap-1 text-xs">
-              <button
-                disabled={busy}
-                onClick={() => {
-                  const note = window.prompt('Resolution note — what was decided? (required)')
-                  if (note && note.trim()) {
-                    run(() => resolveIssueFn({ data: { issueId: issue.id, outcome: 'solved', note } }))
-                  } else if (note !== null) {
-                    setError('A solved issue needs a resolution note.')
-                  }
-                }}
-                className="rounded border border-emerald-300 px-2 py-1 text-emerald-700 hover:bg-emerald-50"
-              >
-                Solved
-              </button>
-              <button
-                disabled={busy}
-                onClick={() => {
-                  const note = window.prompt('Why is this no longer an issue? (required)')
-                  if (note && note.trim()) {
-                    run(() => resolveIssueFn({ data: { issueId: issue.id, outcome: 'dropped', note } }))
-                  } else if (note !== null) {
-                    setError('A dropped issue needs a reason.')
-                  }
-                }}
-                className="rounded border border-slate-300 px-2 py-1 hover:bg-slate-100"
-              >
-                Drop
-              </button>
-              <button
-                disabled={busy}
-                onClick={() => {
-                  const nextTab = tab === 'long_term' ? 'short_term' : 'long_term'
-                  run(async () => {
-                    const result = await updateIssueFn({
-                      data: { issueId: issue.id, classification: nextTab },
-                    })
-                    if (result.ok) setTab(nextTab)
-                    return result
-                  })
-                }}
-                className="rounded border border-slate-300 px-2 py-1 hover:bg-slate-100"
-              >
-                {tab === 'long_term' ? '→ Short' : '→ Long'}
-              </button>
-            </span>
+          <p className="tnum mt-0.5 text-xs text-ink-faint">
+            {ageLabel(issue.ageWeeks)}
+            {issue.addedByName ? ` · added by ${issue.addedByName}` : ''}
+          </p>
+          {issue.resolution && (
+            <p className="mt-1 text-xs text-ink-muted">
+              {issue.resolution.outcome === 'solved' ? 'Solved' : 'Dropped'}:{' '}
+              {issue.resolution.note}
+              {issue.resolution.resolvedByName ? ` — ${issue.resolution.resolvedByName}` : ''}
+            </p>
           )}
         </div>
+        {!resolvedRow && (
+          <span className="flex shrink-0 gap-1">
+            <button
+              disabled={busy}
+              onClick={() => {
+                const note = window.prompt('Resolution note — what was decided? (required)')
+                if (note && note.trim()) {
+                  run(() => resolveIssueFn({ data: { issueId: issue.id, outcome: 'solved', note } }))
+                } else if (note !== null) {
+                  setError('A solved issue needs a resolution note.')
+                }
+              }}
+              className="btn-secondary text-ok-ink hover:text-ok-ink"
+            >
+              Solved
+            </button>
+            <button
+              disabled={busy}
+              onClick={() => {
+                const note = window.prompt('Why is this no longer an issue? (required)')
+                if (note && note.trim()) {
+                  run(() => resolveIssueFn({ data: { issueId: issue.id, outcome: 'dropped', note } }))
+                } else if (note !== null) {
+                  setError('A dropped issue needs a reason.')
+                }
+              }}
+              className="btn-ghost"
+            >
+              Drop
+            </button>
+            <button
+              disabled={busy}
+              onClick={() => {
+                const nextTab = tab === 'long_term' ? 'short_term' : 'long_term'
+                run(async () => {
+                  const result = await updateIssueFn({
+                    data: { issueId: issue.id, classification: nextTab },
+                  })
+                  if (result.ok) setTab(nextTab)
+                  return result
+                })
+              }}
+              className="btn-ghost"
+            >
+              {tab === 'long_term' ? '→ Short' : '→ Long'}
+            </button>
+          </span>
+        )}
       </li>
     )
   }
 
   return (
-    <main className="mx-auto max-w-3xl p-8">
+    <main className="mx-auto max-w-5xl p-8">
       <header className="flex items-center justify-between">
-        <Link to="/" className="text-sm text-blue-600 hover:underline">
+        <Link to="/" className="btn-ghost">
           ← Home
         </Link>
-        <button
-          onClick={handleSignOut}
-          className="rounded border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100"
-        >
+        <button onClick={handleSignOut} className="btn-ghost">
           Sign out
         </button>
       </header>
 
-      <h1 className="mt-6 text-xl font-semibold">Issues</h1>
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="label-sm">Triage log</p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Issues</h1>
+        </div>
+        <span className="badge badge-neutral">
+          {open.length} open · {resolved.length} resolved
+        </span>
+      </div>
 
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {error && (
+        <p className="mt-4 rounded border border-crit-border bg-crit-surface px-3 py-2 text-sm text-crit-ink">
+          {error}
+        </p>
+      )}
 
-      <div className="mt-4 flex gap-2 text-sm">
+      <div className="segmented mt-4">
         <button
           onClick={() => setTab('short_term')}
-          className={
-            'rounded px-3 py-1.5 ' +
-            (tab === 'short_term' ? 'bg-blue-600 text-white' : 'border border-slate-300 hover:bg-slate-100')
-          }
+          className={tab === 'short_term' ? 'active' : ''}
         >
           Short-term
         </button>
         <button
           onClick={() => setTab('long_term')}
-          className={
-            'rounded px-3 py-1.5 ' +
-            (tab === 'long_term' ? 'bg-blue-600 text-white' : 'border border-slate-300 hover:bg-slate-100')
-          }
+          className={tab === 'long_term' ? 'active' : ''}
         >
           Long-term
         </button>
       </div>
 
-      <form onSubmit={handleAdd} className="mt-4 flex items-end gap-2">
-        <label className="flex-1 text-sm">
-          <span className="text-slate-700">New issue</span>
+      <form onSubmit={handleAdd} className="card mt-4 flex flex-wrap items-end gap-2 p-4">
+        <label className="min-w-0 flex-1 text-sm">
+          <span className="label-sm">New issue</span>
           <input
             required
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Phrase it as a solution — 'Fix X'"
-            className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
+            className="input mt-1 w-full"
           />
         </label>
         {tab === 'long_term' && (
           <label className="text-sm">
-            <span className="text-slate-700">Quarter</span>
+            <span className="label-sm">Quarter</span>
             <select
               value={quarterId}
               onChange={(e) => setQuarterId(e.target.value)}
-              className="mt-1 block rounded border border-slate-300 px-3 py-2"
+              className="input mt-1 block"
             >
               <option value="current">Current quarter</option>
               {data.quarters.map((q) => (
@@ -294,21 +295,19 @@ function IssuesPage() {
             </select>
           </label>
         )}
-        <button
-          type="submit"
-          disabled={busy}
-          className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
-        >
-          Add
+        <button type="submit" disabled={busy} className="btn-primary">
+          Add issue
         </button>
       </form>
 
       <section className="mt-6">
-        <h2 className="text-sm font-medium text-slate-700">
+        <h2 className="label-sm">
           {tab === 'long_term' ? 'Long-term (quarter)' : 'Short-term (week)'} — open
         </h2>
         {open.length === 0 ? (
-          <p className="mt-2 text-sm text-slate-400">No open issues.</p>
+          <p className="card mt-2 px-4 py-6 text-center text-sm text-ink-faint">
+            No open issues.
+          </p>
         ) : (
           <ul className="mt-2 space-y-2">
             {open.map((issue) => (
@@ -320,17 +319,21 @@ function IssuesPage() {
 
       {isAdmin && <CarryPanel quarters={data.quarters} />}
 
-      <section className="mt-8">
+      <section className="card mt-8">
         <button
           onClick={() => setShowResolved(!showResolved)}
-          className="text-sm text-slate-500 hover:text-slate-700"
+          className="flex w-full items-center justify-between px-4 py-3 text-left"
         >
-          {showResolved ? '▾' : '▸'} Resolved ({resolved.length}) — kept forever
+          <span className="flex items-center gap-2">
+            <span className="label-sm">Resolved &amp; archived</span>
+            <span className="badge badge-neutral">{resolved.length} kept forever</span>
+          </span>
+          <span className="text-xs text-ink-muted">{showResolved ? 'Hide log ▴' : 'Show log ▾'}</span>
         </button>
         {showResolved && (
-          <ul className="mt-2 space-y-2">
+          <ul className="space-y-2 border-t border-line p-3">
             {resolved.length === 0 ? (
-              <li className="text-sm text-slate-400">Nothing resolved yet.</li>
+              <li className="px-1 py-2 text-sm text-ink-faint">Nothing resolved yet.</li>
             ) : (
               resolved.map((issue) => <IssueRow key={issue.id} issue={issue} />)
             )}
@@ -382,9 +385,16 @@ function CarryPanel(props: { quarters: QuarterOption[] }) {
   }
 
   return (
-    <section className="mt-8 rounded border border-slate-200 bg-white p-4 shadow-sm">
-      <h2 className="text-sm font-medium text-slate-700">Quarter-end carry-or-drop (admin)</h2>
-      <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+    <section className="card-raised mt-8 border-warn-border bg-warn-surface/40 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-warn-ink">Quarter-end carry-or-drop</h2>
+        <span className="badge badge-ink">Admin</span>
+      </div>
+      <p className="mt-1 text-xs text-ink-muted">
+        Pick an ended quarter to review its unresolved long-term issues — carry them forward or
+        drop them. Short-term issues are never offered.
+      </p>
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
         <select
           value={fromQuarterId}
           onChange={(e) => {
@@ -392,7 +402,7 @@ function CarryPanel(props: { quarters: QuarterOption[] }) {
             setIssues(null)
             setMessage(null)
           }}
-          className="rounded border border-slate-300 px-2 py-1"
+          className="input"
         >
           <option value="">Ended quarter…</option>
           {props.quarters.map((q) => (
@@ -401,18 +411,16 @@ function CarryPanel(props: { quarters: QuarterOption[] }) {
             </option>
           ))}
         </select>
-        <button
-          onClick={review}
-          disabled={busy || !fromQuarterId}
-          className="rounded border border-slate-300 px-3 py-1 hover:bg-slate-100 disabled:opacity-50"
-        >
+        <button onClick={review} disabled={busy || !fromQuarterId} className="btn-secondary">
           Review
         </button>
-        <span aria-hidden>→</span>
+        <span aria-hidden className="text-ink-faint">
+          →
+        </span>
         <select
           value={toQuarterId}
           onChange={(e) => setToQuarterId(e.target.value)}
-          className="rounded border border-slate-300 px-2 py-1"
+          className="input"
         >
           <option value="">Carry into…</option>
           {toOptions.map((q) => (
@@ -432,25 +440,35 @@ function CarryPanel(props: { quarters: QuarterOption[] }) {
               return result.ok ? { ok: true } : result
             })
           }
-          className="rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700 disabled:opacity-50"
+          className="btn-primary"
         >
           Carry all
         </button>
       </div>
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-      {message && <p className="mt-2 text-sm text-emerald-700">{message}</p>}
+      {error && (
+        <p className="mt-3 rounded border border-crit-border bg-crit-surface px-3 py-2 text-sm text-crit-ink">
+          {error}
+        </p>
+      )}
+      {message && (
+        <p className="mt-3 rounded border border-ok-border bg-ok-surface px-3 py-2 text-sm text-ok-ink">
+          {message}
+        </p>
+      )}
       {issues && (
         <ul className="mt-3 space-y-2">
           {issues.length === 0 && (
-            <li className="text-sm text-slate-400">Nothing unresolved in that quarter. 🎉</li>
+            <li className="rounded border border-line bg-white px-3 py-2 text-sm text-ink-muted">
+              Nothing unresolved in that quarter. 🎉
+            </li>
           )}
           {issues.map((issue) => (
             <li
               key={issue.id}
-              className="flex items-center justify-between gap-2 rounded border border-slate-200 px-3 py-2 text-sm"
+              className="flex items-center justify-between gap-2 rounded border border-line bg-white px-3 py-2 text-sm"
             >
-              <span>{issue.title}</span>
-              <span className="flex shrink-0 gap-1 text-xs">
+              <span className="text-ink">{issue.title}</span>
+              <span className="flex shrink-0 gap-1">
                 <button
                   disabled={busy || !toQuarterId}
                   onClick={() =>
@@ -460,7 +478,7 @@ function CarryPanel(props: { quarters: QuarterOption[] }) {
                       }),
                     )
                   }
-                  className="rounded border border-blue-300 px-2 py-1 text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                  className="btn-secondary"
                 >
                   Carry
                 </button>
@@ -478,7 +496,7 @@ function CarryPanel(props: { quarters: QuarterOption[] }) {
                       setError('A dropped issue needs a reason.')
                     }
                   }}
-                  className="rounded border border-slate-300 px-2 py-1 hover:bg-slate-100 disabled:opacity-50"
+                  className="btn-ghost"
                 >
                   Drop
                 </button>
