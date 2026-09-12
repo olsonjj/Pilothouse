@@ -293,61 +293,81 @@ function RocksPage() {
     </option>
   ))
 
+  const goalCount = rocks ? rocks.company.length + rocks.personal.length : 0
+
   function RockRow({ rock }: { rock: RockWithOwner }) {
     const measuring = rock.target != null
     const history = historyByRock.get(rock.id)
     const latest = history?.statuses[history.statuses.length - 1] ?? null
     const flagged = latest?.twoConsecutiveOffTrack ?? false
+    const accent = flagged
+      ? 'border-l-[3px] border-l-[var(--color-crit-dot)]'
+      : rock.ownerPersonId == null
+        ? 'border-l-[3px] border-l-[var(--color-navy)]'
+        : 'border-l-[3px] border-l-[var(--color-beacon)]'
     return (
-      <li
-        className={
-          'flex items-start justify-between rounded border bg-white px-3 py-2 text-sm ' +
-          (flagged ? 'border-2 border-red-500 ring-2 ring-red-200' : 'border-slate-200')
-        }
-      >
-        <div>
-          <span className="font-medium">{rock.statement}</span>
+      <li className={`card border-l-[3px] p-4 ${accent}`}>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="label-sm">{rock.ownerPersonId == null ? 'Company goal' : 'Personal goal'}</span>
+          {latest && (
+            <span
+              className={
+                'badge ' +
+                (latest.status === 'on_track'
+                  ? 'badge-ok'
+                  : latest.status === 'off_track'
+                    ? 'badge-crit'
+                    : 'badge-neutral')
+              }
+            >
+              {latest.status === 'on_track'
+                ? 'On track'
+                : latest.status === 'off_track'
+                  ? 'Off track'
+                  : 'Measuring'}
+            </span>
+          )}
           {rock.carriedOverFromRockId != null && (
             <span
-              className="ml-2 rounded bg-purple-100 px-1.5 py-0.5 text-xs font-medium text-purple-700"
+              className="badge badge-neutral"
               title={`carried over from goal #${rock.carriedOverFromRockId}`}
             >
               ↩ carried over
             </span>
           )}
           {rock.completed != null && (
-            <span
-              className={
-                'ml-2 rounded px-1.5 py-0.5 text-xs font-medium ' +
-                (rock.completed === 1
-                  ? 'bg-green-100 text-green-700'
-                  : 'bg-slate-200 text-slate-600')
-              }
-            >
+            <span className={'badge ' + (rock.completed === 1 ? 'badge-ok' : 'badge-neutral')}>
               {rock.completed === 1 ? '✓ complete' : '✗ incomplete'}
             </span>
           )}
-          {flagged && (
-            <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-xs font-medium text-red-700">
-              off-track 2 weeks in a row
+          {flagged && <span className="badge badge-crit">off-track 2 weeks in a row</span>}
+        </div>
+        <p className="mt-2 text-[15px] font-semibold leading-snug text-[var(--color-ink)]">
+          {rock.statement}
+        </p>
+        {rock.detail && <p className="mt-1 text-sm text-[var(--color-ink-secondary)]">{rock.detail}</p>}
+        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--color-ink-secondary)]">
+          {rock.ownerName && (
+            <span>
+              Owner: <span className="font-medium text-[var(--color-ink)]">{rock.ownerName}</span>
             </span>
           )}
-          {rock.detail && <span className="block text-xs text-slate-500">{rock.detail}</span>}
           {measuring && (
-            <span className="mt-1 block text-xs text-slate-500">
-              target: {rock.target} ({rock.direction === 'gte' ? 'higher is better' : 'lower is better'})
+            <span className="tnum font-mono text-xs">
+              Target {rock.direction === 'gte' ? '≥' : '≤'} {rock.target}
             </span>
           )}
           {latest && (
-            <span className="mt-1 block text-xs">
-              this week:{' '}
+            <span className="flex items-center gap-1">
+              This week:{' '}
               <span
                 className={
-                  latest.status === 'on_track'
-                    ? 'text-green-700'
+                  'tnum font-mono text-xs font-medium ' +
+                  (latest.status === 'on_track'
+                    ? 'text-[var(--color-ok-ink)]'
                     : latest.status === 'off_track'
-                      ? 'text-red-700'
-                      : 'text-blue-700'
+                      ? 'text-[var(--color-crit-ink)]'
+                      : 'text-[var(--color-beacon)]')
                 }
               >
                 {latest.status === 'on_track'
@@ -356,13 +376,12 @@ function RocksPage() {
                     ? '✗ off track'
                     : `📊 measuring: ${latest.actual ?? '—'}`}
               </span>
-              {latest.comment && <span className="text-slate-500"> — {latest.comment}</span>}
+              {latest.comment && <span className="text-[var(--color-ink-muted)]">— {latest.comment}</span>}
             </span>
           )}
-          {history && history.statuses.length > 0 && <StatusDots history={history} />}
         </div>
-        <div className="ml-4 flex shrink-0 items-center gap-2 text-xs text-slate-500">
-          {rock.ownerName && <span>{rock.ownerName}</span>}
+        {history && history.statuses.length > 0 && <StatusDots history={history} />}
+        <div className="mt-3 flex flex-wrap items-center justify-end gap-2 border-t border-[var(--color-line-soft)] pt-3 text-xs">
           {canEdit(rock) && writable && (
             <StatusControls
               rock={rock}
@@ -372,10 +391,7 @@ function RocksPage() {
             />
           )}
           {canEdit(rock) && writable && (
-            <button
-              onClick={() => openEdit(rock)}
-              className="rounded border border-slate-300 px-2 py-0.5 hover:bg-slate-100"
-            >
+            <button onClick={() => openEdit(rock)} className="btn-secondary">
               Edit
             </button>
           )}
@@ -384,11 +400,12 @@ function RocksPage() {
               <button
                 disabled={busy}
                 onClick={() => handleScore(rock.id, true)}
+                title="Mark complete"
                 className={
-                  'rounded border px-2 py-0.5 hover:bg-green-50 disabled:opacity-40 ' +
+                  'btn-secondary h-7 px-2 ' +
                   (rock.completed === 1
-                    ? 'border-green-500 bg-green-100 font-medium'
-                    : 'border-slate-300')
+                    ? 'border-[var(--color-ok-border)] bg-[var(--color-ok-surface)] font-semibold text-[var(--color-ok-ink)]'
+                    : '')
                 }
               >
                 ✓
@@ -396,11 +413,12 @@ function RocksPage() {
               <button
                 disabled={busy}
                 onClick={() => handleScore(rock.id, false)}
+                title="Mark incomplete"
                 className={
-                  'rounded border px-2 py-0.5 hover:bg-slate-100 disabled:opacity-40 ' +
+                  'btn-secondary h-7 px-2 ' +
                   (rock.completed === 0
-                    ? 'border-slate-500 bg-slate-200 font-medium'
-                    : 'border-slate-300')
+                    ? 'border-[var(--color-standby-border)] bg-[var(--color-panel)] font-semibold'
+                    : '')
                 }
               >
                 ✗
@@ -410,7 +428,7 @@ function RocksPage() {
                   disabled={busy}
                   onClick={() => handleCarry(rock.id)}
                   title="Copy into a future quarter as a new goal (original untouched)"
-                  className="rounded border border-purple-400 px-2 py-0.5 text-purple-700 hover:bg-purple-50 disabled:opacity-40"
+                  className="btn-secondary h-7 px-2 disabled:opacity-40"
                 >
                   ↩ carry
                 </button>
@@ -422,84 +440,122 @@ function RocksPage() {
     )
   }
 
-  /** Week-by-week colored dots (oldest → newest) with a title tooltip. */
+  /** Week-by-week status tiles (oldest → newest) with a tooltip carrying the full entry. */
   function StatusDots({ history }: { history: { statuses: Array<{ week: string; status: string; actual: number | null; comment: string | null }> } }) {
     return (
-      <span className="mt-1 flex gap-1" title="weekly status history">
-        {history.statuses.map((s) => (
+      <span className="mt-3 flex flex-wrap gap-1" title="weekly status history">
+        {history.statuses.map((s, i) => (
           <span
             key={s.week}
             title={`${s.week}: ${s.status}${s.actual != null ? ` (${s.actual})` : ''}${s.comment ? ` — ${s.comment}` : ''}`}
             className={
-              'inline-block h-2.5 w-2.5 rounded-full ' +
+              'tnum inline-flex h-7 min-w-8 items-center justify-center rounded border font-mono text-xs ' +
               (s.status === 'on_track'
-                ? 'bg-green-500'
+                ? 'border-[var(--color-ok-border)] bg-[var(--color-ok-surface)] text-[var(--color-ok-ink)]'
                 : s.status === 'off_track'
-                  ? 'bg-red-500'
-                  : 'bg-blue-500')
+                  ? 'border-[var(--color-crit-border)] bg-[var(--color-crit-surface)] text-[var(--color-crit-ink)]'
+                  : 'border-[var(--color-line)] bg-[var(--color-canvas)] text-[var(--color-beacon)]') +
+              (i === history.statuses.length - 1 ? ' ring-1 ring-[var(--color-ruler)]' : '')
             }
-          />
+          >
+            {s.status === 'on_track' ? '✓' : s.status === 'off_track' ? '✗' : '📊'}
+          </span>
         ))}
       </span>
     )
   }
 
   return (
-    <main className="mx-auto max-w-3xl p-8">
+    <main className="mx-auto max-w-4xl p-8">
       <header className="flex items-center justify-between">
-        <Link to="/" className="text-sm text-blue-600 hover:underline">
+        <Link to="/" className="btn-ghost">
           ← Home
         </Link>
-        <button
-          onClick={handleSignOut}
-          className="rounded border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100"
-        >
+        <button onClick={handleSignOut} className="btn-ghost">
           Sign out
         </button>
       </header>
 
-      <div className="mt-6 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Goals</h1>
-        <select
-          value={quarterId ?? ''}
-          onChange={(e) => selectQuarter(Number(e.target.value))}
-          className="rounded border border-slate-300 px-3 py-1.5 text-sm"
-        >
-          {data.quarters.map((q) => (
-            <option key={q.id} value={q.id}>
-              {q.label}
-            </option>
-          ))}
-        </select>
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="label-sm">Quarterly priorities</p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Goals</h1>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          {quarterId != null && (
+            <span className={'badge ' + (writable ? 'badge-ok' : 'badge-neutral')}>
+              {writable ? 'Active quarter' : 'Quarter ended'}
+            </span>
+          )}
+          {rocks && (
+            <span className="badge badge-neutral">
+              {goalCount} {goalCount === 1 ? 'goal' : 'goals'}
+            </span>
+          )}
+          <select
+            value={quarterId ?? ''}
+            onChange={(e) => selectQuarter(Number(e.target.value))}
+            className="input"
+            aria-label="Quarter"
+          >
+            {data.quarters.map((q) => (
+              <option key={q.id} value={q.id}>
+                {q.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
-      {warning && (
-        <p className="mt-3 rounded border border-yellow-300 bg-yellow-50 px-3 py-2 text-sm text-yellow-800">
-          {warning}
+      {rocks && writable && (
+        <p className="mt-3 text-sm text-[var(--color-ink-secondary)]">
+          Quarterly priorities: <span className="font-medium">{goalCount}</span> active goals of the
+          recommended 3–7 target envelope
+          <span className="tnum ml-2 rounded border border-[var(--color-line)] bg-[var(--color-canvas)] px-1.5 py-0.5 font-mono text-xs">
+            {goalCount} / 7
+          </span>
         </p>
       )}
-      {formError && <p className="mt-3 text-sm text-red-600">{formError}</p>}
+
+      {warning && (
+        <div className="mt-3 flex items-start gap-2 rounded border border-[var(--color-warn-border)] bg-[var(--color-warn-surface)] px-4 py-2 text-sm text-[var(--color-warn-ink)]">
+          {warning}
+        </div>
+      )}
+      {formError && (
+        <div className="mt-3 rounded border border-[var(--color-crit-border)] bg-[var(--color-crit-surface)] px-4 py-2 text-sm text-[var(--color-crit-ink)]">
+          {formError}
+        </div>
+      )}
 
       {completion && completion.ended && completion.people.length > 0 && (
-        <div className="mt-3 rounded border border-slate-200 bg-white p-3 text-sm shadow-sm">
-          <span className="font-medium">Quarter completion</span>
-          <span className="ml-2 text-slate-500">
-            team {completion.team.completed}/{completion.team.total} = {completion.team.rate ?? '—'}%
-            <span className="text-slate-400"> (~80% norm)</span>
-          </span>
-          <ul className="mt-2 space-y-1">
+        <div className="card mt-4 p-4">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <span className="label-sm">Quarter completion</span>
+            <span className="tnum text-sm text-[var(--color-ink-secondary)]">
+              team {completion.team.completed}/{completion.team.total} ={' '}
+              <span className="font-mono font-medium">{completion.team.rate ?? '—'}%</span>
+              <span className="ml-1 text-[var(--color-ink-faint)]">(~80% norm)</span>
+            </span>
+          </div>
+          <ul className="mt-3 space-y-2">
             {completion.people.map((p) => (
-              <li key={p.personId ?? 'company'} className="flex items-center gap-2">
-                <span className="w-28 shrink-0 text-slate-600">{p.personName ?? 'Company'}</span>
-                <span className="h-2 flex-1 rounded bg-slate-100">
+              <li key={p.personId ?? 'company'} className="flex items-center gap-3">
+                <span className="w-28 shrink-0 truncate text-sm text-[var(--color-ink-secondary)]">
+                  {p.personName ?? 'Company'}
+                </span>
+                <span className="h-1.5 flex-1 rounded-full bg-[var(--color-panel)]">
                   <span
                     className={
-                      'block h-2 rounded ' + ((p.rate ?? 0) >= 80 ? 'bg-green-500' : 'bg-amber-400')
+                      'block h-1.5 rounded-full ' +
+                      ((p.rate ?? 0) >= 80
+                        ? 'bg-[var(--color-ok-dot)]'
+                        : 'bg-[var(--color-warn-dot)]')
                     }
                     style={{ width: `${Math.min(100, p.rate ?? 0)}%` }}
                   />
                 </span>
-                <span className="w-24 shrink-0 text-right text-slate-500">
+                <span className="tnum w-28 shrink-0 text-right font-mono text-xs text-[var(--color-ink-secondary)]">
                   {p.completed}/{p.total} = {p.rate ?? '—'}%
                 </span>
               </li>
@@ -509,38 +565,35 @@ function RocksPage() {
       )}
 
       {editing && (
-        <form
-          onSubmit={handleSave}
-          className="mt-4 space-y-3 rounded border border-slate-200 bg-white p-4 shadow-sm"
-        >
-          <h2 className="font-medium">{editing.id ? 'Edit goal' : 'New goal'}</h2>
+        <form onSubmit={handleSave} className="card-raised mt-4 space-y-4 p-5">
+          <h2 className="text-base font-semibold">{editing.id ? 'Edit goal' : 'New goal'}</h2>
           <label className="block text-sm">
-            <span className="text-slate-700">
-              Statement <span className="text-slate-400">(verb + what + done-by)</span>
+            <span className="label-sm">
+              Statement <span className="normal-case text-[var(--color-ink-faint)]">(verb + what + done-by)</span>
             </span>
             <input
               required
               value={editing.statement}
               onChange={(e) => setEditing({ ...editing, statement: e.target.value })}
-              className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
+              className="input mt-1 w-full"
             />
           </label>
           <label className="block text-sm">
-            <span className="text-slate-700">Detail (optional)</span>
+            <span className="label-sm">Detail (optional)</span>
             <textarea
               value={editing.detail}
               onChange={(e) => setEditing({ ...editing, detail: e.target.value })}
-              className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
+              className="input mt-1 w-full"
               rows={2}
             />
           </label>
           {!editing.id && (
             <label className="block text-sm">
-              <span className="text-slate-700">Owner</span>
+              <span className="label-sm">Owner</span>
               <select
                 value={editing.ownerPersonId}
                 onChange={(e) => setEditing({ ...editing, ownerPersonId: e.target.value })}
-                className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
+                className="input mt-1 w-full"
                 disabled={!isAdmin}
               >
                 {isAdmin && <option value="">Company goal (no owner)</option>}
@@ -551,23 +604,23 @@ function RocksPage() {
           )}
           <div className="grid grid-cols-3 gap-3">
             <label className="block text-sm">
-              <span className="text-slate-700">Target (optional)</span>
+              <span className="label-sm">Target (optional)</span>
               <input
                 type="number"
                 step="any"
                 value={editing.target}
                 onChange={(e) => setEditing({ ...editing, target: e.target.value })}
-                className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
+                className="input mt-1 w-full"
               />
             </label>
             <label className="block text-sm">
-              <span className="text-slate-700">Direction</span>
+              <span className="label-sm">Direction</span>
               <select
                 value={editing.direction}
                 onChange={(e) =>
                   setEditing({ ...editing, direction: e.target.value as RockFormState['direction'] })
                 }
-                className="mt-1 w-full rounded border border-slate-300 px-3 py-2"
+                className="input mt-1 w-full"
               >
                 <option value="">—</option>
                 <option value="gte">Higher is better</option>
@@ -576,18 +629,10 @@ function RocksPage() {
             </label>
           </div>
           <div className="flex gap-2">
-            <button
-              type="submit"
-              disabled={busy}
-              className="rounded bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
-            >
+            <button type="submit" disabled={busy} className="btn-primary">
               Save
             </button>
-            <button
-              type="button"
-              onClick={() => setEditing(null)}
-              className="rounded border border-slate-300 px-4 py-2 text-sm hover:bg-slate-100"
-            >
+            <button type="button" onClick={() => setEditing(null)} className="btn-secondary">
               Cancel
             </button>
           </div>
@@ -596,22 +641,19 @@ function RocksPage() {
 
       {rocks && (
         <>
-          <section className="mt-6">
+          <section className="mt-8">
             <div className="flex items-center justify-between">
-              <h2 className="font-medium text-slate-700">Company goals</h2>
+              <h2 className="label-sm">Company goals</h2>
               {isAdmin && !editing && writable && (
-                <button
-                  onClick={() => openCreate('')}
-                  className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
-                >
+                <button onClick={() => openCreate('')} className="btn-primary">
                   Add company goal
                 </button>
               )}
             </div>
             {rocks.company.length === 0 ? (
-              <p className="mt-2 text-sm text-slate-400">No company goals yet.</p>
+              <p className="mt-2 text-sm text-[var(--color-ink-faint)]">No company goals yet.</p>
             ) : (
-              <ul className="mt-2 space-y-2">
+              <ul className="mt-3 space-y-3">
                 {rocks.company.map((r) => (
                   <RockRow key={r.id} rock={r} />
                 ))}
@@ -621,21 +663,21 @@ function RocksPage() {
 
           <section className="mt-8">
             <div className="flex items-center justify-between">
-              <h2 className="font-medium text-slate-700">Personal goals</h2>
+              <h2 className="label-sm">Personal goals</h2>
               {!editing && writable && (
                 <button
                   onClick={() => openCreate(String(myPersonId ?? ''))}
                   disabled={!isAdmin && myPersonId == null}
-                  className="rounded border border-blue-600 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 disabled:opacity-40"
+                  className="btn-secondary disabled:opacity-40"
                 >
                   {isAdmin ? 'Add personal goal' : 'Add my goal'}
                 </button>
               )}
             </div>
             {rocks.personal.length === 0 ? (
-              <p className="mt-2 text-sm text-slate-400">No personal goals yet.</p>
+              <p className="mt-2 text-sm text-[var(--color-ink-faint)]">No personal goals yet.</p>
             ) : (
-              <ul className="mt-2 space-y-2">
+              <ul className="mt-3 space-y-3">
                 {rocks.personal.map((r) => (
                   <RockRow key={r.id} rock={r} />
                 ))}
@@ -677,7 +719,7 @@ function StatusControls(props: {
         <button
           disabled={props.busy}
           onClick={() => set('on_track')}
-          className="rounded border border-green-600 px-1.5 py-0.5 text-green-700 hover:bg-green-50 disabled:opacity-40"
+          className="btn-secondary h-7 border-[var(--color-ok-border)] px-2 text-[var(--color-ok-ink)] hover:border-[var(--color-ok-dot)] hover:bg-[var(--color-ok-surface)] disabled:opacity-40"
           title="On track"
         >
           ✓
@@ -685,7 +727,7 @@ function StatusControls(props: {
         <button
           disabled={props.busy}
           onClick={() => set('off_track')}
-          className="rounded border border-red-600 px-1.5 py-0.5 text-red-700 hover:bg-red-50 disabled:opacity-40"
+          className="btn-secondary h-7 border-[var(--color-crit-border)] px-2 text-[var(--color-crit-ink)] hover:border-[var(--color-crit-dot)] hover:bg-[var(--color-crit-surface)] disabled:opacity-40"
           title="Off track"
         >
           ✗
@@ -694,7 +736,7 @@ function StatusControls(props: {
           <button
             disabled={props.busy}
             onClick={() => set('measuring')}
-            className="rounded border border-blue-600 px-1.5 py-0.5 text-blue-700 hover:bg-blue-50 disabled:opacity-40"
+            className="btn-secondary h-7 border-[var(--color-line)] px-2 text-[var(--color-beacon)] hover:border-[var(--color-beacon)] disabled:opacity-40"
             title="Measuring (with actual)"
           >
             📊
@@ -710,14 +752,14 @@ function StatusControls(props: {
             placeholder="actual"
             value={actual}
             onChange={(e) => setActual(e.target.value)}
-            className="w-20 rounded border border-slate-300 px-1.5 py-0.5"
+            className="input h-7 w-20 px-1.5 text-xs"
           />
           <input
             placeholder="note (optional)"
             maxLength={200}
             value={comment}
             onChange={(e) => setComment(e.target.value)}
-            className="w-28 rounded border border-slate-300 px-1.5 py-0.5"
+            className="input h-7 w-28 px-1.5 text-xs"
           />
           <button
             disabled={props.busy}
@@ -725,7 +767,7 @@ function StatusControls(props: {
               props.onSet(props.rock.id, 'measuring', actual, comment)
               setShowDetail(false)
             }}
-            className="rounded bg-blue-600 px-1.5 py-0.5 text-white hover:bg-blue-700 disabled:opacity-50"
+            className="btn-primary h-7 px-2 text-xs"
           >
             Save
           </button>
