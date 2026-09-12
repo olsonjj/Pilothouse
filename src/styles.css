@@ -1,1 +1,391 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap');
 @import 'tailwindcss';
+
+/*
+ * Pilothouse design system — tokens from docs/design/DESIGN.md.
+ * Instrument-grade command environment: deep navies/slates for structure,
+ * porcelain surfaces, muted high-fidelity status signals.
+ */
+@theme {
+  /* Command navies & slates */
+  --color-navy: #0f172a; /* primary command — typography, active surfaces */
+  --color-navy-hover: #1e293b;
+  --color-navy-active: #020617;
+  --color-slate-deep: #1e293b; /* tertiary structural */
+  --color-beacon: #0369a1; /* marine beacon blue — interactive anchors */
+  --color-beacon-ring: rgba(3, 105, 161, 0.15);
+
+  /* Surfaces & architecture */
+  --color-canvas: #f8fafc; /* base deck */
+  --color-panel: #f1f5f9; /* sub-panel fills, hover, disabled tracks */
+  --color-sheet: #ffffff; /* primary card/row background */
+  --color-line: #e2e8f0; /* structural 1px boundaries */
+  --color-ruler: #cbd5e1; /* precision rulers, input borders */
+  --color-line-soft: #f1f5f9; /* cell dividers */
+  --color-ink: #0f172a; /* high-priority typography */
+  --color-ink-secondary: #475569;
+  --color-ink-muted: #64748b;
+  --color-ink-faint: #94a3b8;
+
+  /* Status: on track / nominal */
+  --color-ok-ink: #15803d;
+  --color-ok-surface: #dcfce7;
+  --color-ok-border: #86efac;
+  --color-ok-dot: #16a34a;
+
+  /* Status: caution / warning */
+  --color-warn-ink: #b45309;
+  --color-warn-surface: #fef3c7;
+  --color-warn-border: #fcd34d;
+  --color-warn-dot: #d97706;
+
+  /* Status: critical / off track */
+  --color-crit-ink: #b91c1c;
+  --color-crit-surface: #fee2e2;
+  --color-crit-border: #fca5a5;
+  --color-crit-dot: #dc2626;
+
+  /* Status: neutral / standby */
+  --color-standby-ink: #475569;
+  --color-standby-surface: #f1f5f9;
+  --color-standby-border: #cbd5e1;
+  --color-standby-dot: #94a3b8;
+
+  /* Typography */
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+/* Instrument-grade baseline: matte deck, Inter everywhere. */
+body {
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tabular numerals for every metric, date, percentage. */
+.tnum {
+  font-feature-settings: 'tnum' 1, 'cv05' 1;
+}
+
+@layer components {
+  /* ---- Buttons (DESIGN.md "Buttons & Actions") ---- */
+  .btn-primary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    height: 2.25rem; /* 36px compact */
+    padding: 0 1rem;
+    border-radius: 0.5rem;
+    background: var(--color-navy);
+    color: #ffffff;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: background-color 120ms ease;
+  }
+  .btn-primary:hover {
+    background: var(--color-navy-hover);
+  }
+  .btn-primary:active {
+    background: var(--color-navy-active);
+  }
+  .btn-primary:focus-visible {
+    outline: 2px solid var(--color-beacon);
+    outline-offset: 2px;
+  }
+  .btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .btn-primary.btn-lg {
+    height: 2.5rem; /* 40px standard */
+  }
+
+  .btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    height: 2.25rem;
+    padding: 0 1rem;
+    border-radius: 0.5rem;
+    background: #ffffff;
+    border: 1px solid var(--color-ruler);
+    color: var(--color-ink);
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition:
+      background-color 120ms ease,
+      border-color 120ms ease;
+  }
+  .btn-secondary:hover {
+    background: var(--color-canvas);
+    border-color: var(--color-ink-faint);
+  }
+  .btn-secondary:focus-visible {
+    outline: 2px solid var(--color-beacon);
+    outline-offset: 2px;
+  }
+  .btn-secondary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .btn-secondary.btn-lg {
+    height: 2.5rem;
+  }
+
+  .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.375rem;
+    height: 2.25rem;
+    padding: 0 0.75rem;
+    border-radius: 0.5rem;
+    background: transparent;
+    color: var(--color-ink-secondary);
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition:
+      background-color 120ms ease,
+      color 120ms ease;
+  }
+  .btn-ghost:hover {
+    background: var(--color-panel);
+    color: var(--color-ink);
+  }
+  .btn-ghost:focus-visible {
+    outline: 2px solid var(--color-beacon);
+    outline-offset: 2px;
+  }
+  .btn-ghost:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* ---- Badges (DESIGN.md "Badges & Status Indicators") ---- */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    height: 1.5rem; /* 24px */
+    padding: 2px 8px 2px 6px;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .badge::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 9999px;
+    flex-shrink: 0;
+  }
+  .badge-ok {
+    background: var(--color-ok-surface);
+    color: var(--color-ok-ink);
+  }
+  .badge-ok::before {
+    background: var(--color-ok-dot);
+  }
+  .badge-warn {
+    background: var(--color-warn-surface);
+    color: var(--color-warn-ink);
+  }
+  .badge-warn::before {
+    background: var(--color-warn-dot);
+  }
+  .badge-crit {
+    background: var(--color-crit-surface);
+    color: var(--color-crit-ink);
+  }
+  .badge-crit::before {
+    background: var(--color-crit-dot);
+  }
+  .badge-neutral {
+    background: var(--color-standby-surface);
+    color: var(--color-standby-ink);
+  }
+  .badge-neutral::before {
+    background: var(--color-standby-dot);
+  }
+
+  /* ---- Elevation containers ("Elevation & Depth") ---- */
+  /* Level 1: instrument container */
+  .card {
+    background: #ffffff;
+    border: 1px solid var(--color-line);
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 2px 0 rgba(15, 23, 42, 0.04);
+  }
+  /* Level 2: raised interactive pane */
+  .card-raised {
+    background: #ffffff;
+    border: 1px solid var(--color-ruler);
+    border-radius: 0.5rem;
+    box-shadow:
+      0 1px 3px 0 rgba(15, 23, 42, 0.08),
+      0 4px 6px -2px rgba(15, 23, 42, 0.04);
+  }
+
+  /* ---- Form fields ("Form Fields & Inputs") ---- */
+  .input {
+    height: 2.375rem; /* 38px */
+    background: #ffffff;
+    border: 1px solid var(--color-ruler);
+    border-radius: 0.5rem;
+    padding: 0 0.75rem;
+    font-size: 0.875rem;
+    color: var(--color-ink);
+    transition:
+      border-color 120ms ease,
+      box-shadow 120ms ease;
+  }
+  .input::placeholder {
+    color: var(--color-ink-faint);
+  }
+  .input:focus {
+    outline: none;
+    border-color: var(--color-beacon);
+    box-shadow: 0 0 0 3px var(--color-beacon-ring);
+  }
+  .input:disabled {
+    background: var(--color-panel);
+    cursor: not-allowed;
+  }
+  textarea.input {
+    height: auto;
+    padding: 0.5rem 0.75rem;
+  }
+  select.input {
+    padding-right: 0.5rem;
+  }
+
+  /* ---- Precision tables ("Precision Tables & Scorecards") ---- */
+  .table-precision {
+    width: 100%;
+    border: 1px solid var(--color-line);
+    border-radius: 0.5rem;
+    overflow: hidden;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: #ffffff;
+  }
+  .table-precision thead th {
+    background: var(--color-canvas);
+    height: 2rem; /* 32px */
+    padding: 0 0.75rem;
+    font-size: 0.6875rem; /* label-sm */
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-ink-muted);
+    text-align: left;
+    border-bottom: 1px solid var(--color-ruler);
+    white-space: nowrap;
+  }
+  .table-precision tbody td {
+    height: 2.75rem; /* 44px */
+    padding: 0 0.75rem;
+    font-size: 0.875rem;
+    color: var(--color-ink);
+    border-bottom: 1px solid var(--color-panel);
+  }
+  .table-precision tbody tr:last-child td {
+    border-bottom: none;
+  }
+  .table-precision tbody tr:hover td {
+    background: var(--color-canvas);
+  }
+  /* Numeric cells: monospace tabular, right-aligned */
+  .table-precision td.num,
+  .table-precision th.num {
+    font-family: var(--font-mono);
+    font-feature-settings: 'tnum' 1;
+    text-align: right;
+  }
+
+  /* ---- Instrument micro-label (label-sm) ---- */
+  .label-sm {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    line-height: 0.875rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-ink-muted);
+  }
+
+  /* ---- Checklist & cadence row ---- */
+  .check-row {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    border-radius: 0.5rem;
+    transition: background-color 120ms ease;
+  }
+  .check-row:hover {
+    background: var(--color-canvas);
+  }
+  .check-box {
+    width: 1rem;
+    height: 1rem;
+    border-radius: 0.25rem;
+    border: 1.5px solid var(--color-ruler);
+    flex-shrink: 0;
+  }
+  .check-box.checked {
+    background: var(--color-navy);
+    border-color: var(--color-navy);
+  }
+
+  /* ---- Segmented control tabs ---- */
+  .segmented {
+    display: inline-flex;
+    background: var(--color-panel);
+    border-radius: 0.375rem; /* 6px internal radius */
+    padding: 2px;
+  }
+  .segmented > button {
+    height: 1.75rem;
+    padding: 0 0.75rem;
+    border-radius: 0.375rem;
+    font-size: 0.8125rem;
+    color: var(--color-ink-secondary);
+    transition:
+      background-color 120ms ease,
+      box-shadow 120ms ease;
+  }
+  .segmented > button:hover {
+    color: var(--color-ink);
+  }
+  .segmented > button.active {
+    background: #ffffff;
+    color: var(--color-ink);
+    font-weight: 500;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  }
+
+  /* ---- Meeting cadence timer pill ---- */
+  .timer-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    height: 1.5rem;
+    padding: 0 0.75rem;
+    border-radius: 9999px;
+    background: var(--color-navy);
+    font-family: var(--font-mono);
+    font-feature-settings: 'tnum' 1;
+    font-size: 0.8125rem;
+    font-weight: 600;
+  }
+  .timer-pill.ok {
+    color: #bbf7d0;
+  }
+  .timer-pill.warn {
+    color: #fde68a;
+  }
+}
