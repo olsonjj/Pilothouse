@@ -24,7 +24,7 @@ Home — the command deck:
 
 ![Home](docs/screenshots/home.png)
 
-▶ **[Watch the walkthrough](docs/screenshots/walkthrough.mp4)** — a ~26-second
+▶ **[Watch the walkthrough](docs/screenshots/tour.gif)** — a ~26-second
 tour of every screen (Data, To-Dos, Goals, Issues, Company, Weekly Meeting,
 Org Chart, People, Employee Assessment).
 
