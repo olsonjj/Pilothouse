@@ -97,32 +97,32 @@ the expected result (include what you saw).
       access denied.
 - [x] 6.6 Quarter selector defaults to the **current** quarter.
 
-## 7. Company page (tickets 05–07)
+## 7. Company page (tickets 05–07) — DONE
 
-- [ ] 7.1 Read view shows all eight questions; "published as of" date.
-- [ ] 7.2 Edit (admin): fill core focus, 10-year target, marketing strategy
+- [x] 7.1 Read view shows all eight questions; "published as of" date.
+- [x] 7.2 Edit (admin): fill core focus, 10-year target, marketing strategy
       (three uniques via list editor with add/remove/reorder), 3-Year Picture
       and 1-Year Plan (structured lists + numbers) → Save.
-- [ ] 7.3 Save creates a version (history panel: "#N, timestamp, author,
+- [x] 7.3 Save creates a version (history panel: "#N, timestamp, author,
       current"); "published as of" updates.
-- [ ] 7.4 Edit again → save → restore version #1 → content reverts AND a new
+- [x] 7.4 Edit again → save → restore version #1 → content reverts AND a new
       version is appended (originals never change).
-- [ ] 7.5 Core values panel: add, rename (ID stays — scores unaffected),
+- [x] 7.5 Core values panel: add, rename (ID stays — scores unaffected),
       reorder (↑/↓), deactivate/reactivate.
-- [ ] 7.6 Question 1 read view renders the ordered **active** values.
-- [ ] 7.7 *(member)* no Edit button; the edit form is unreachable.
+- [x] 7.6 Question 1 read view renders the ordered **active** values.
+- [x] 7.7 *(member)* no Edit button; the edit form is unreachable.
 
-## 8. To-Dos (tickets 11–12)
+## 8. To-Dos (tickets 11–12) — DONE
 
-- [ ] 8.1 Quick-add a to-do assigned to anyone → due date is exactly +7 days.
-- [ ] 8.2 It appears in the assignee's "My to-dos" immediately.
-- [ ] 8.3 Mark done → shows done; **Drop** → prompt requires a reason (blank
+- [x] 8.1 Quick-add a to-do assigned to anyone → due date is exactly +7 days.
+- [x] 8.2 It appears in the assignee's "My to-dos" immediately.
+- [x] 8.3 Mark done → shows done; **Drop** → prompt requires a reason (blank
       refused).
-- [ ] 8.4 Overdue open to-dos sort first and show red highlighting.
-- [ ] 8.5 "Weekly view & rates": to-dos grouped by week; completion table
+- [x] 8.4 Overdue open to-dos sort first and show red highlighting.
+- [x] 8.5 "Weekly view & rates": to-dos grouped by week; completion table
       (person + team, one decimal) over the 4 fully-elapsed weeks; dropped
       excluded; empty window shows "—".
-- [ ] 8.6 Any member can complete/drop anyone's to-do (team property).
+- [x] 8.6 Any member can complete/drop anyone's to-do (team property).
 
 ## 9. Data (the scorecard; tickets 13–15)
 
