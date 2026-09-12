@@ -24,9 +24,10 @@ Home — the command deck:
 
 ![Home](docs/screenshots/home.png)
 
-▶ **[Watch the walkthrough](docs/screenshots/tour.gif)** — a ~26-second
-tour of every screen (Data, To-Dos, Goals, Issues, Company, Weekly Meeting,
-Org Chart, People, Employee Assessment).
+<img src="docs/screenshots/tour.gif" alt="Walkthrough tour" width="800">
+
+<p align="center"><em>A ~26-second tour of every screen (Data, To-Dos, Goals,
+Issues, Company, Weekly Meeting, Org Chart, People, Employee Assessment).</em></p>
 
 ## Stack
 
