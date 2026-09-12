@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CompanyRouteImport } from './routes/company'
 import { Route as DataRouteImport } from './routes/data'
+import { Route as EmployeeAssessmentRouteImport } from './routes/employee-assessment'
 import { Route as GoalsRouteImport } from './routes/goals'
 import { Route as IssuesRouteImport } from './routes/issues'
 import { Route as MeetingRouteImport } from './routes/meeting'
@@ -20,7 +21,6 @@ import { Route as PeopleRouteImport } from './routes/people'
 import { Route as SigninRouteImport } from './routes/signin'
 import { Route as TodosRouteImport } from './routes/todos'
 import { Route as UsersRouteImport } from './routes/users'
-import { Route as PeopleAnalyzerRouteImport } from './routes/people/analyzer'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -35,6 +35,11 @@ const CompanyRoute = CompanyRouteImport.update({
 const DataRoute = DataRouteImport.update({
   id: '/data',
   path: '/data',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EmployeeAssessmentRoute = EmployeeAssessmentRouteImport.update({
+  id: '/employee-assessment',
+  path: '/employee-assessment',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GoalsRoute = GoalsRouteImport.update({
@@ -77,54 +82,49 @@ const UsersRoute = UsersRouteImport.update({
   path: '/users',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PeopleAnalyzerRoute = PeopleAnalyzerRouteImport.update({
-  id: '/analyzer',
-  path: '/analyzer',
-  getParentRoute: () => PeopleRoute,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/company': typeof CompanyRoute
   '/data': typeof DataRoute
+  '/employee-assessment': typeof EmployeeAssessmentRoute
   '/goals': typeof GoalsRoute
   '/issues': typeof IssuesRoute
   '/meeting': typeof MeetingRoute
   '/org-chart': typeof OrgChartRoute
-  '/people': typeof PeopleRouteWithChildren
+  '/people': typeof PeopleRoute
   '/signin': typeof SigninRoute
   '/todos': typeof TodosRoute
   '/users': typeof UsersRoute
-  '/people/analyzer': typeof PeopleAnalyzerRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/company': typeof CompanyRoute
   '/data': typeof DataRoute
+  '/employee-assessment': typeof EmployeeAssessmentRoute
   '/goals': typeof GoalsRoute
   '/issues': typeof IssuesRoute
   '/meeting': typeof MeetingRoute
   '/org-chart': typeof OrgChartRoute
-  '/people': typeof PeopleRouteWithChildren
+  '/people': typeof PeopleRoute
   '/signin': typeof SigninRoute
   '/todos': typeof TodosRoute
   '/users': typeof UsersRoute
-  '/people/analyzer': typeof PeopleAnalyzerRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/company': typeof CompanyRoute
   '/data': typeof DataRoute
+  '/employee-assessment': typeof EmployeeAssessmentRoute
   '/goals': typeof GoalsRoute
   '/issues': typeof IssuesRoute
   '/meeting': typeof MeetingRoute
   '/org-chart': typeof OrgChartRoute
-  '/people': typeof PeopleRouteWithChildren
+  '/people': typeof PeopleRoute
   '/signin': typeof SigninRoute
   '/todos': typeof TodosRoute
   '/users': typeof UsersRoute
-  '/people/analyzer': typeof PeopleAnalyzerRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -132,6 +132,7 @@ export interface FileRouteTypes {
     | '/'
     | '/company'
     | '/data'
+    | '/employee-assessment'
     | '/goals'
     | '/issues'
     | '/meeting'
@@ -140,12 +141,12 @@ export interface FileRouteTypes {
     | '/signin'
     | '/todos'
     | '/users'
-    | '/people/analyzer'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/company'
     | '/data'
+    | '/employee-assessment'
     | '/goals'
     | '/issues'
     | '/meeting'
@@ -154,12 +155,12 @@ export interface FileRouteTypes {
     | '/signin'
     | '/todos'
     | '/users'
-    | '/people/analyzer'
   id:
     | '__root__'
     | '/'
     | '/company'
     | '/data'
+    | '/employee-assessment'
     | '/goals'
     | '/issues'
     | '/meeting'
@@ -168,18 +169,18 @@ export interface FileRouteTypes {
     | '/signin'
     | '/todos'
     | '/users'
-    | '/people/analyzer'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CompanyRoute: typeof CompanyRoute
   DataRoute: typeof DataRoute
+  EmployeeAssessmentRoute: typeof EmployeeAssessmentRoute
   GoalsRoute: typeof GoalsRoute
   IssuesRoute: typeof IssuesRoute
   MeetingRoute: typeof MeetingRoute
   OrgChartRoute: typeof OrgChartRoute
-  PeopleRoute: typeof PeopleRouteWithChildren
+  PeopleRoute: typeof PeopleRoute
   SigninRoute: typeof SigninRoute
   TodosRoute: typeof TodosRoute
   UsersRoute: typeof UsersRoute
@@ -206,6 +207,13 @@ declare module '@tanstack/react-router' {
       path: '/data'
       fullPath: '/data'
       preLoaderRoute: typeof DataRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/employee-assessment': {
+      id: '/employee-assessment'
+      path: '/employee-assessment'
+      fullPath: '/employee-assessment'
+      preLoaderRoute: typeof EmployeeAssessmentRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/goals': {
@@ -264,36 +272,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UsersRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/people/analyzer': {
-      id: '/people/analyzer'
-      path: '/analyzer'
-      fullPath: '/people/analyzer'
-      preLoaderRoute: typeof PeopleAnalyzerRouteImport
-      parentRoute: typeof PeopleRoute
-    }
   }
 }
-
-interface PeopleRouteChildren {
-  PeopleAnalyzerRoute: typeof PeopleAnalyzerRoute
-}
-
-const PeopleRouteChildren: PeopleRouteChildren = {
-  PeopleAnalyzerRoute: PeopleAnalyzerRoute,
-}
-
-const PeopleRouteWithChildren =
-  PeopleRoute._addFileChildren(PeopleRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CompanyRoute: CompanyRoute,
   DataRoute: DataRoute,
+  EmployeeAssessmentRoute: EmployeeAssessmentRoute,
   GoalsRoute: GoalsRoute,
   IssuesRoute: IssuesRoute,
   MeetingRoute: MeetingRoute,
   OrgChartRoute: OrgChartRoute,
-  PeopleRoute: PeopleRouteWithChildren,
+  PeopleRoute: PeopleRoute,
   SigninRoute: SigninRoute,
   TodosRoute: TodosRoute,
   UsersRoute: UsersRoute,

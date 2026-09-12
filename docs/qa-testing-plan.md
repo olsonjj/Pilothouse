@@ -85,7 +85,7 @@ the expected result (include what you saw).
 
 ## 6. Employee Assessment (ticket 10)
 
-- [ ] 6.1 As admin: `/people/analyzer` — quarter selector, people × core-values
+- [ ] 6.1 As admin: `/employee-assessment` — quarter selector, people × core-values
       grid, Right Fit summary column, verdict column ("Complete Right Fit first" when Right Fit
       incomplete).
 - [ ] 6.2 Set +/−/−− scores; re-entering overwrites (no duplicate rows).

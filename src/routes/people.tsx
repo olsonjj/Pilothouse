@@ -164,7 +164,7 @@ function PeoplePage() {
         <div className="flex items-center gap-3">
           {isAdmin && (
             <Link
-              to="/people/analyzer"
+              to="/employee-assessment"
               className="text-sm text-blue-600 hover:underline"
             >
               Employee Assessment

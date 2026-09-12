@@ -1,11 +1,11 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
-import { getCurrentUserFn, signOutFn } from '../../functions/auth'
-import { getCurrentPeriodFn, listQuartersFn } from '../../functions/quarters'
-import { getAnalyzerFn, setScoreFn } from '../../functions/peopleAnalyzer'
-import type { AnalyzerRow, Score } from '../../server/peopleAnalyzer'
+import { getCurrentUserFn, signOutFn } from '../functions/auth'
+import { getCurrentPeriodFn, listQuartersFn } from '../functions/quarters'
+import { getAnalyzerFn, setScoreFn } from '../functions/peopleAnalyzer'
+import type { AnalyzerRow, Score } from '../server/peopleAnalyzer'
 
-export const Route = createFileRoute('/people/analyzer')({
+export const Route = createFileRoute('/employee-assessment')({
   loader: async () => {
     const [me, quarterList, period] = await Promise.all([
       getCurrentUserFn(),
