@@ -73,16 +73,26 @@ function omit(obj: Record<number, string>, key: number): Record<number, string> 
 function SegmentTimer(props: { segment: SegmentView; now: number }) {
   const { segment } = props
   if (segment.done) {
-    return <span className="text-xs text-slate-400">{fmtClock(segment.elapsedSeconds)} used</span>
+    return (
+      <span className="tnum font-mono text-xs text-ink-secondary">
+        {fmtClock(segment.elapsedSeconds)} used
+      </span>
+    )
   }
   if (!segment.active) {
-    return <span className="text-xs text-slate-400">{segment.plannedMinutes} min</span>
+    return <span className="tnum text-xs text-ink-faint">{segment.plannedMinutes} min</span>
   }
   const elapsed = Math.max(0, Math.floor((props.now - Date.parse(segment.enteredAt!)) / 1000))
   const planned = segment.plannedMinutes * 60
   const remaining = planned - elapsed
+  // Lit countdown on the navy active card: pale green nominal, amber when over.
   return (
-    <span className={'text-xs font-mono ' + (remaining < 0 ? 'text-red-600' : 'text-slate-600')}>
+    <span
+      className={
+        'tnum font-mono text-xs font-semibold ' +
+        (remaining < 0 ? 'text-warn-border' : 'text-ok-border')
+      }
+    >
       {fmtClock(Math.max(0, remaining))} left {remaining < 0 ? '(over)' : ''}
     </span>
   )
@@ -113,7 +123,7 @@ function SegmentNotes(props: {
     return () => clearTimeout(t)
   }, [props.savedTick])
   return (
-    <div className="mt-2">
+    <div className="mt-1">
       <textarea
         value={props.draft}
         placeholder="segment notes…"
@@ -121,9 +131,9 @@ function SegmentNotes(props: {
         onBlur={() => props.onEditingChange(null)}
         onChange={(e) => props.onDraft(props.segment.id, e.target.value)}
         rows={2}
-        className="w-full rounded border border-slate-200 px-2 py-1 text-xs"
+        className="input w-full !text-xs"
       />
-      <span className="text-[10px] text-slate-400">
+      <span className="text-[10px] text-ink-faint">
         {saved ? 'saved' : props.editing ? 'editing…' : ''}
       </span>
     </div>
@@ -156,6 +166,23 @@ function errorText(error: string): string {
       return 'Notes are too large (100KB max).'
     default:
       return 'Something went wrong.'
+  }
+}
+
+/** Queue origin → badge pill text ("from data" / "from goal" / "from to-do" / "from meeting"). */
+function originLabel(origin: string): string {
+  switch (origin) {
+    case 'manual':
+    case 'from_meeting':
+      return 'from meeting'
+    case 'from_data':
+      return 'from data'
+    case 'from_goal':
+      return 'from goal'
+    case 'from_todo':
+      return 'from to-do'
+    default:
+      return origin.startsWith('from_') ? origin.replace('from_', 'from ') : origin
   }
 }
 
@@ -450,58 +477,54 @@ function L10Page() {
   }
 
   const pre = preloaded?.ok ? preloaded.value : null
+  const doneCount = open ? open.segments.filter((s) => s.done).length : 0
 
   return (
-    <main className="mx-auto max-w-4xl p-8">
+    <main className="mx-auto max-w-6xl p-8">
       <header className="flex items-center justify-between">
-        <Link to="/" className="text-sm text-blue-600 hover:underline">
+        <Link to="/" className="btn-ghost">
           ← Home
         </Link>
-        <button
-          onClick={handleSignOut}
-          className="rounded border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100"
-        >
+        <button onClick={handleSignOut} className="btn-ghost">
           Sign out
         </button>
       </header>
 
-      <div className="mt-6 flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Weekly Meeting</h1>
-        {!open && (
-          <button
-            onClick={handleStart}
-            disabled={busy}
-            className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
-          >
-            Start meeting
-          </button>
-        )}
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="label-sm">Weekly cadence</p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-tight">Weekly Meeting</h1>
+        </div>
       </div>
 
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {error && (
+        <p className="mt-4 rounded border border-crit-border bg-crit-surface px-3 py-2 text-sm text-crit-ink">
+          {error}
+        </p>
+      )}
 
       {open ? (
-        <section className="mt-4 rounded border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="font-medium">
-                Meeting of {open.date}
-                <span className="ml-2 text-xs font-normal text-slate-500">
-                  total {fmtClock(open.totalElapsedSeconds)} elapsed ·{' '}
-                  {open.segments.filter((s) => s.done).length}/{open.segments.length} segments done
-                </span>
-              </h2>
-              <p className="text-xs text-slate-500">
-                Facilitator (advisory):{' '}
-                {open.facilitatorName ?? 'none'}
-              </p>
+        <section className="card mt-4">
+          {/* Cockpit header: meeting identity, elapsed timer, progress, facilitator, delete */}
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-line px-4 py-3">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-1">
+              <h2 className="text-base font-semibold">Meeting of {open.date}</h2>
+              <span className="timer-pill ok tnum">
+                {fmtClock(open.totalElapsedSeconds)} total elapsed
+              </span>
+              <span className="tnum text-xs font-medium text-ink-secondary">
+                {doneCount}/{open.segments.length} segments done
+              </span>
+              <span className="text-xs text-ink-muted">
+                Facilitator (advisory): {open.facilitatorName ?? 'none'}
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <select
                 value={open.facilitatorPersonId ?? ''}
                 onChange={(e) => handleFacilitator(e.target.value ? Number(e.target.value) : null)}
                 disabled={busy}
-                className="rounded border border-slate-300 px-2 py-1 text-xs"
+                className="input !h-8 !text-xs"
               >
                 <option value="">Set facilitator…</option>
                 {data.people.map((p) => (
@@ -513,121 +536,173 @@ function L10Page() {
               <button
                 onClick={handleDelete}
                 disabled={busy}
-                className="rounded border border-red-300 px-2 py-1 text-xs text-red-600 hover:bg-red-50"
+                className="btn-secondary !h-8 !border-crit-border !px-2.5 !text-xs !text-crit-ink hover:!bg-crit-surface"
               >
                 Delete meeting
               </button>
             </div>
           </div>
 
-          <ol className="mt-4 space-y-2">
+          {/* Segment rail: active lit navy with mono countdown, done checked with
+              actual durations, upcoming dimmed with planned minutes. */}
+          <ol className="grid grid-cols-2 gap-2 p-4 sm:grid-cols-4 lg:grid-cols-7">
             {open.segments.map((s, i) => (
               <li
                 key={s.id}
                 className={
-                  'rounded border px-3 py-2 text-sm ' +
+                  'flex flex-col justify-between rounded-lg border p-2.5 ' +
                   (s.active
-                    ? 'border-blue-400 bg-blue-50'
+                    ? 'border-navy bg-navy text-white shadow-[0_4px_6px_-2px_rgba(15,23,42,0.25)]'
                     : s.done
-                      ? 'border-slate-200 bg-slate-50 text-slate-500'
-                      : 'border-slate-200 bg-white')
+                      ? 'border-line bg-canvas text-ink-secondary'
+                      : 'border-line bg-white text-ink-faint')
                 }
               >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <span className="font-medium">
-                      {i + 1}. {s.label}
-                    </span>
-                    <span className="ml-2 text-xs text-slate-400">
-                      {s.done ? 'done' : s.active ? 'in progress' : 'upcoming'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <SegmentTimer segment={s} now={now} />
-                    {s.active && s.segmentKey !== 'conclude' && (
-                      <button
-                        onClick={() => handleAdvance(s)}
-                        disabled={busy}
-                        className="rounded bg-blue-600 px-2 py-1 text-xs text-white hover:bg-blue-700 disabled:opacity-50"
-                      >
-                        Advance
-                      </button>
-                    )}
-                  </div>
+                <div className="flex items-center justify-between gap-1">
+                  <span
+                    className={
+                      'label-sm !tracking-normal ' + (s.active ? '!text-white/70' : '')
+                    }
+                  >
+                    {String(i + 1).padStart(2, '0')} · {s.label}
+                  </span>
+                  {s.active ? (
+                    <span className="badge badge-warn !h-4 !px-1.5 !text-[9px]">active</span>
+                  ) : s.done ? (
+                    <span className="font-mono text-xs font-semibold text-ok-dot">✓</span>
+                  ) : null}
                 </div>
-                <SegmentNotes
-                  meetingId={open.id}
-                  segment={s}
-                  draft={drafts[s.id] ?? s.notes}
-                  editing={editingId === s.id}
-                  savedTick={savedTicks[s.id] ?? 0}
-                  onDraft={handleDraft}
-                  onEditingChange={setEditingId}
-                />
+                <div className="mt-2 flex items-end justify-between gap-2">
+                  <SegmentTimer segment={s} now={now} />
+                  {!s.active && !s.done && (
+                    <span className="text-[10px] uppercase tracking-wide">upcoming</span>
+                  )}
+                  {s.active && s.segmentKey !== 'conclude' && (
+                    <button
+                      onClick={() => handleAdvance(s)}
+                      disabled={busy}
+                      className="shrink-0 rounded bg-white px-2 py-1 text-[11px] font-semibold text-navy transition-colors hover:bg-canvas disabled:opacity-50"
+                    >
+                      Advance
+                    </button>
+                  )}
+                </div>
               </li>
             ))}
           </ol>
 
-          {pre && (
-            <div className="mt-4 grid grid-cols-1 gap-3 text-xs md:grid-cols-3">
-              <div className="rounded border border-slate-200 p-3">
-                <h3 className="font-medium text-slate-700">
-                  Data {pre.scorecard.previousWeekLabel ? `· ${pre.scorecard.previousWeekLabel}` : ''}
-                </h3>
-                {pre.scorecard.metrics.length === 0 ? (
-                  <p className="mt-1 text-slate-400">No metrics defined.</p>
-                ) : (
-                  <ul className="mt-1 space-y-1">
-                    {pre.scorecard.metrics.map((m) => (
-                      <li key={m.name} className="flex items-center justify-between gap-2">
-                        <span className="truncate">{m.name}</span>
+          {/* Per-segment notes with autosave */}
+          <div className="border-t border-line px-4 py-3">
+            <p className="label-sm">Segment notes · autosave</p>
+            <div className="mt-2 space-y-2">
+              {open.segments.map((s, i) => (
+                <div
+                  key={s.id}
+                  className={
+                    s.active
+                      ? 'rounded border border-beacon/40 bg-canvas px-3 py-2'
+                      : 'px-3 py-1'
+                  }
+                >
+                  <span className="label-sm">
+                    {i + 1}. {s.label}
+                  </span>
+                  <SegmentNotes
+                    meetingId={open.id}
+                    segment={s}
+                    draft={drafts[s.id] ?? s.notes}
+                    editing={editingId === s.id}
+                    savedTick={savedTicks[s.id] ?? 0}
+                    onDraft={handleDraft}
+                    onEditingChange={setEditingId}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : (
+        <div className="card mt-4 flex flex-wrap items-center justify-between gap-3 p-4">
+          <p className="text-sm text-ink-secondary">
+            No meeting is open. Start one to run this week's weekly meeting.
+          </p>
+          <button onClick={handleStart} disabled={busy} className="btn-primary shrink-0">
+            Start meeting
+          </button>
+        </div>
+      )}
+
+      {open && (
+        <div className="mt-4 grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
+          {/* Pre-loads: three hairline-separated panels (Data · Goals · To-Dos) */}
+          <section className={pre ? 'card divide-y divide-line' : 'hidden xl:block'}>
+            {pre && (
+            <>
+            <div className="p-4">
+              <h3 className="label-sm">
+                Data {pre.scorecard.previousWeekLabel ? `· ${pre.scorecard.previousWeekLabel}` : ''}
+              </h3>
+              {pre.scorecard.metrics.length === 0 ? (
+                <p className="mt-2 text-sm text-ink-faint">No metrics defined.</p>
+              ) : (
+                <ul className="mt-2 space-y-1.5">
+                  {pre.scorecard.metrics.map((m) => (
+                    <li key={m.name} className="flex items-center justify-between gap-2 text-sm">
+                      <span className="truncate">{m.name}</span>
+                      <span className="flex shrink-0 items-center gap-2">
                         <span
                           className={
-                            m.pass == null
-                              ? 'text-slate-400'
+                            'tnum font-mono ' +
+                            (m.pass == null
+                              ? 'text-ink-faint'
                               : m.pass
-                                ? 'text-green-600'
-                                : 'font-semibold text-red-600'
+                                ? 'text-ink'
+                                : 'font-semibold text-crit-ink')
                           }
                         >
                           {m.actual ?? '—'}
                         </span>
+                        {m.pass === true && <span className="badge badge-ok">Pass</span>}
+                        {m.pass === false && <span className="badge badge-crit">Fail</span>}
                         {open && m.pass === false && m.entryId != null && (
                           <button
                             onClick={() => handlePushRedCell(m.entryId!)}
                             disabled={busy}
                             title="Make this an issue"
-                            className="shrink-0 rounded border border-red-300 px-1.5 py-0.5 text-[10px] text-red-600 hover:bg-red-50 disabled:opacity-50"
+                            className="shrink-0 rounded border border-crit-border bg-white px-1.5 py-0.5 text-[10px] font-medium text-crit-ink transition-colors hover:bg-crit-surface disabled:opacity-50"
                           >
                             Make issue
                           </button>
                         )}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-              <div className="rounded border border-slate-200 p-3">
-                <h3 className="font-medium text-slate-700">Goals</h3>
-                {pre.rocks.length === 0 ? (
-                  <p className="mt-1 text-slate-400">No goals this quarter.</p>
-                ) : (
-                  <ul className="mt-1 space-y-1">
-                    {pre.rocks.map((r) => (
-                      <li key={r.id} className="flex items-center justify-between gap-2">
-                        <span className="truncate">{r.statement}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="p-4">
+              <h3 className="label-sm">Goals</h3>
+              {pre.rocks.length === 0 ? (
+                <p className="mt-2 text-sm text-ink-faint">No goals this quarter.</p>
+              ) : (
+                <ul className="mt-2 space-y-1.5">
+                  {pre.rocks.map((r) => (
+                    <li key={r.id} className="flex items-center justify-between gap-2 text-sm">
+                      <span className="truncate">{r.statement}</span>
+                      <span className="flex shrink-0 items-center gap-2">
                         <span
                           className={
                             r.twoConsecutiveOffTrack
-                              ? 'font-semibold text-red-600'
+                              ? 'badge badge-crit font-semibold'
                               : r.latestStatus === 'off_track'
-                                ? 'text-red-500'
+                                ? 'badge badge-crit'
                                 : r.latestStatus === 'on_track'
-                                  ? 'text-green-600'
-                                  : 'text-slate-400'
+                                  ? 'badge badge-ok'
+                                  : 'badge badge-neutral'
                           }
                         >
-                          {r.latestStatus ?? 'unreported'}
+                          {(r.latestStatus ?? 'unreported').replace(/_/g, ' ')}
                         </span>
                         {open &&
                           (r.latestStatus === 'off_track' || r.twoConsecutiveOffTrack) && (
@@ -635,91 +710,323 @@ function L10Page() {
                               onClick={() => handlePushRock(r.id)}
                               disabled={busy}
                               title="Make this an issue"
-                              className="shrink-0 rounded border border-red-300 px-1.5 py-0.5 text-[10px] text-red-600 hover:bg-red-50 disabled:opacity-50"
+                              className="shrink-0 rounded border border-crit-border bg-white px-1.5 py-0.5 text-[10px] font-medium text-crit-ink transition-colors hover:bg-crit-surface disabled:opacity-50"
                             >
                               Make issue
                             </button>
                           )}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="p-4">
+              <h3 className="label-sm">
+                To-Dos {pre.todos ? `· ${pre.todos.label}` : ''}
+              </h3>
+              {!pre.todos ? (
+                <p className="mt-2 text-sm text-ink-faint">No to-dos due last week.</p>
+              ) : (
+                <>
+                  <p className="tnum mt-2 text-xs text-ink-secondary">
+                    {pre.todos.done} done · {pre.todos.open} open · {pre.todos.dropped} dropped
+                  </p>
+                  <ul className="mt-2 space-y-1.5">
+                    {pre.todos.items.map((t) => (
+                      <li key={t.id} className="flex items-center justify-between gap-2 text-sm">
+                        <span
+                          className={
+                            'truncate ' +
+                            (t.status === 'done' ? 'text-ink-faint line-through' : '')
+                          }
+                        >
+                          {t.title}
+                        </span>
+                        <span className="flex shrink-0 items-center gap-2">
+                          <span
+                            className={
+                              t.status === 'open'
+                                ? 'font-semibold text-crit-ink'
+                                : 'text-ink-faint'
+                            }
+                          >
+                            {t.assigneeName}
+                          </span>
+                          {open && t.status !== 'done' && (
+                            <button
+                              onClick={() => handlePushTodo(t.id)}
+                              disabled={busy}
+                              title="Make this an issue"
+                              className="shrink-0 rounded border border-crit-border bg-white px-1.5 py-0.5 text-[10px] font-medium text-crit-ink transition-colors hover:bg-crit-surface disabled:opacity-50"
+                            >
+                              Make issue
+                            </button>
+                          )}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </div>
+            </>
+            )}
+          </section>
+
+          <div className="space-y-4">
+            {/* Issue queue: pull-from-long-term, headline composer, origin badges, inline solve */}
+            <section className="card">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
+                <h3 className="text-sm font-semibold">Issue queue ({meetingIssues.length})</h3>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => (showPull ? setShowPull(false) : void openPullPanel())}
+                    disabled={busy}
+                    className="btn-secondary !h-8 !px-2.5 !text-xs"
+                  >
+                    Pull from long-term list
+                  </button>
+                  <input
+                    value={headline}
+                    onChange={(e) => setHeadline(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && void handlePushHeadline()}
+                    placeholder="Headline…"
+                    className="input !h-8 w-56 !text-xs"
+                  />
+                  <button
+                    onClick={handlePushHeadline}
+                    disabled={busy || headline.trim() === ''}
+                    className="btn-primary !h-8 !px-2.5 !text-xs"
+                  >
+                    Add headline as issue
+                  </button>
+                </div>
+              </div>
+              <div className="p-4">
+                {showPull && (
+                  <div className="mb-3 rounded border border-line bg-canvas p-3">
+                    <p className="label-sm">Unresolved long-term issues (current quarter)</p>
+                    {pullables.length === 0 ? (
+                      <p className="mt-1.5 text-sm text-ink-faint">
+                        Nothing to pull — the long-term list is clear.
+                      </p>
+                    ) : (
+                      <ul className="mt-2 space-y-1.5">
+                        {pullables.map((p) => (
+                          <li key={p.id} className="flex items-center gap-2 text-sm">
+                            <label className="flex flex-1 items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={pullSelection[p.id] === true}
+                                onChange={(e) =>
+                                  setPullSelection({ ...pullSelection, [p.id]: e.target.checked })
+                                }
+                                className="h-4 w-4 rounded accent-navy"
+                              />
+                              <span className="truncate">{p.title}</span>
+                            </label>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                    <button
+                      onClick={handlePull}
+                      disabled={busy || !Object.values(pullSelection).some(Boolean)}
+                      className="btn-primary mt-3 !h-8 !px-2.5 !text-xs"
+                    >
+                      Pull selected
+                    </button>
+                  </div>
+                )}
+                {meetingIssues.length === 0 ? (
+                  <p className="text-sm text-ink-faint">
+                    Nothing queued yet — push red cells, off-track goals, or missed to-dos above.
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {meetingIssues.map((mi) => (
+                      <li key={mi.meetingIssueId} className="rounded border border-line px-3 py-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="flex min-w-0 flex-wrap items-center gap-2">
+                            <span
+                              className={
+                                'truncate text-sm ' +
+                                (mi.status === 'resolved'
+                                  ? 'text-ink-faint line-through'
+                                  : 'font-medium')
+                              }
+                            >
+                              {mi.title}
+                            </span>
+                            <span className="badge badge-neutral !h-5 !px-1.5 !text-[10px]">
+                              {originLabel(mi.origin)}
+                            </span>
+                          </span>
+                          <span className="flex shrink-0 items-center gap-2">
+                            <span
+                              className={
+                                'text-xs ' +
+                                (mi.status === 'resolved'
+                                  ? 'text-ink-faint line-through'
+                                  : 'text-ink-secondary')
+                              }
+                            >
+                              {mi.state === 'in_ids' ? 'in Issues' : mi.state}
+                            </span>
+                            {mi.state === 'in_ids' && (
+                              <>
+                                <button
+                                  onClick={() =>
+                                    solvingId === mi.meetingIssueId
+                                      ? setSolvingId(null)
+                                      : openSolvePanel(mi)
+                                  }
+                                  disabled={busy}
+                                  title="Solve: capture resolution + assign to-dos"
+                                  className="btn-primary !h-7 !px-2 !text-[11px]"
+                                >
+                                  Solve
+                                </button>
+                                <button
+                                  onClick={() => handleRemoveMeetingIssue(mi.issueId)}
+                                  disabled={busy}
+                                  title="Remove from queue (issue itself persists)"
+                                  className="btn-secondary !h-7 !px-2 !text-[11px]"
+                                >
+                                  Remove
+                                </button>
+                              </>
+                            )}
+                          </span>
+                        </div>
+                        {solvingId === mi.meetingIssueId && (
+                          <div className="mt-2 border-t border-line pt-2">
+                            <textarea
+                              value={solveNote}
+                              onChange={(e) => setSolveNote(e.target.value)}
+                              placeholder="Resolution (what was decided)…"
+                              rows={2}
+                              className="input w-full !text-xs"
+                            />
+                            {solveTodos.map((t, i) => (
+                              <div key={i} className="mt-1.5 flex items-center gap-2">
+                                <input
+                                  value={t.title}
+                                  onChange={(e) =>
+                                    setSolveTodos(
+                                      solveTodos.map((s, j) =>
+                                        j === i ? { ...s, title: e.target.value } : s,
+                                      ),
+                                    )
+                                  }
+                                  placeholder="New to-do…"
+                                  className="input !h-8 flex-1 !text-xs"
+                                />
+                                <select
+                                  value={t.assigneePersonId ?? ''}
+                                  onChange={(e) =>
+                                    setSolveTodos(
+                                      solveTodos.map((s, j) =>
+                                        j === i
+                                          ? {
+                                              ...s,
+                                              assigneePersonId: e.target.value
+                                                ? Number(e.target.value)
+                                                : null,
+                                            }
+                                          : s,
+                                      ),
+                                    )
+                                  }
+                                  className="input !h-8 !text-xs"
+                                >
+                                  <option value="">Assign to…</option>
+                                  {data.people.map((p) => (
+                                    <option key={p.id} value={p.id}>
+                                      {p.fullName}
+                                    </option>
+                                  ))}
+                                </select>
+                                <button
+                                  onClick={() =>
+                                    setSolveTodos(solveTodos.filter((_, j) => j !== i))
+                                  }
+                                  className="btn-ghost !h-7 !px-1.5 !text-xs"
+                                  title="Remove to-do row"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            ))}
+                            <div className="mt-2 flex items-center gap-2">
+                              <button
+                                onClick={() =>
+                                  setSolveTodos([...solveTodos, { title: '', assigneePersonId: null }])
+                                }
+                                className="btn-ghost !h-7 !px-1.5 !text-[11px]"
+                              >
+                                + add to-do
+                              </button>
+                              <button
+                                onClick={() => void handleSolve()}
+                                disabled={busy || solveNote.trim() === ''}
+                                className="btn-primary !h-8 !px-2.5 !text-xs"
+                              >
+                                Solve issue
+                              </button>
+                              <button
+                                onClick={() => setSolvingId(null)}
+                                className="btn-secondary !h-8 !px-2.5 !text-xs"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </li>
                     ))}
                   </ul>
                 )}
               </div>
-              <div className="rounded border border-slate-200 p-3">
-                <h3 className="font-medium text-slate-700">
-                  To-Dos {pre.todos ? `· ${pre.todos.label}` : ''}
-                </h3>
-                {!pre.todos ? (
-                  <p className="mt-1 text-slate-400">No to-dos due last week.</p>
-                ) : (
-                  <>
-                    <p className="mt-1 text-slate-500">
-                      {pre.todos.done} done · {pre.todos.open} open · {pre.todos.dropped} dropped
-                    </p>
-                    <ul className="mt-1 space-y-1">
-                      {pre.todos.items.map((t) => (
-                        <li key={t.id} className="flex items-center justify-between gap-2">
-                          <span className={'truncate ' + (t.status === 'done' ? 'line-through text-slate-400' : '')}>
-                            {t.title}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <span className={t.status === 'open' ? 'font-semibold text-red-600' : 'text-slate-400'}>
-                              {t.assigneeName}
-                            </span>
-                            {open && t.status !== 'done' && (
-                              <button
-                                onClick={() => handlePushTodo(t.id)}
-                                disabled={busy}
-                                title="Make this an issue"
-                                className="shrink-0 rounded border border-red-300 px-1.5 py-0.5 text-[10px] text-red-600 hover:bg-red-50 disabled:opacity-50"
-                              >
-                                Make issue
-                              </button>
-                            )}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </>
-                )}
-              </div>
-            </div>
-          )}
+            </section>
 
-          {/* Conclude panel (ticket 25): recap, ratings, cascading messages. */}
-          {open && (
-            <div className="mt-4 rounded border border-amber-200 bg-amber-50 p-3 text-xs">
-              <div className="flex items-center justify-between">
-                <h3 className="font-medium text-amber-800">Conclude</h3>
+            {/* Conclude panel (ticket 25): amber caution zone — recap, ratings, freeze */}
+            <section className="rounded-lg border border-warn-border bg-warn-surface p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="flex items-center gap-2 text-sm font-semibold text-warn-ink">
+                  <span aria-hidden>⚠</span> Conclude
+                </h3>
                 {recap && (
-                  <span className="text-[10px] text-amber-700">
+                  <span className="tnum text-xs text-warn-ink">
                     {recap.newTodos.length} new to-do{recap.newTodos.length === 1 ? '' : 's'} ·{' '}
-                    {recap.carriedCount} to carry back · avg rating{' '}
-                    {recap.avgRating ?? '—'}
+                    {recap.carriedCount} to carry back · avg rating {recap.avgRating ?? '—'}
                   </span>
                 )}
               </div>
               {recap && recap.newTodos.length > 0 && (
                 <div className="mt-2">
-                  <p className="text-[10px] font-medium text-amber-800">New to-dos this meeting:</p>
-                  <ul className="mt-1 space-y-0.5">
+                  <p className="text-xs font-semibold text-warn-ink">New to-dos this meeting:</p>
+                  <ul className="tnum mt-1 space-y-0.5 text-xs text-warn-ink">
                     {recap.newTodos.map((t) => (
                       <li key={t.id} className="truncate">
-                        {t.title} <span className="text-amber-600">→ {t.assigneeName}</span>
+                        {t.title} <span className="font-medium">→ {t.assigneeName}</span>
                       </li>
                     ))}
                   </ul>
                 </div>
               )}
-              <div className="mt-2 flex flex-wrap items-center gap-2">
-                <span className="text-[10px] text-amber-800">
-                  Your 1–10 rating{data.me?.personId == null ? ' (link your account to a person first)' : ''}:
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="text-xs text-warn-ink">
+                  Your 1–10 rating
+                  {data.me?.personId == null ? ' (link your account to a person first)' : ''}:
                 </span>
                 <select
                   value={myScore ?? ''}
                   onChange={(e) => setMyScore(e.target.value ? Number(e.target.value) : null)}
                   disabled={busy || data.me?.personId == null}
-                  className="rounded border border-amber-300 px-2 py-0.5"
+                  className="input !h-8 w-auto !border-warn-border !text-xs"
                 >
                   <option value="">Rate…</option>
                   {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
@@ -731,212 +1038,32 @@ function L10Page() {
                 <button
                   onClick={handleRate}
                   disabled={busy || myScore == null || data.me?.personId == null}
-                  className="rounded border border-amber-400 bg-white px-2 py-0.5 text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+                  className="btn-secondary !h-8 !border-warn-border !px-2.5 !text-xs !text-warn-ink hover:!bg-warn-surface"
                 >
                   Save rating
                 </button>
                 <button
                   onClick={handleConclude}
                   disabled={busy}
-                  className="ml-auto rounded bg-amber-600 px-3 py-1 text-white hover:bg-amber-700 disabled:opacity-50"
+                  className="btn-primary ml-auto"
                 >
                   Conclude meeting (freeze)
                 </button>
               </div>
               {recap && recap.ratings.length > 0 && (
-                <p className="mt-2 text-[10px] text-amber-700">
+                <p className="tnum mt-2 text-xs text-warn-ink">
                   Ratings so far:{' '}
                   {recap.ratings.map((r) => `${r.personName}: ${r.score}`).join(' · ')}
                 </p>
               )}
-              <p className="mt-2 text-[10px] text-amber-600">
+              <p className="mt-2 text-[11px] leading-relaxed text-warn-ink/80">
                 Cascading messages live in the Conclude segment's notes (editable above).
                 Concluding flips unsolved queue issues back to the long-term list and freezes
                 notes/issues/to-dos/durations; ratings stay open for late raters.
               </p>
-            </div>
-          )}
-
-          {/* Issue queue (ticket 23): pushed issues + the headline composer. */}
-          {open && (
-            <div className="mt-4 rounded border border-slate-200 bg-white p-3 text-xs">
-              <div className="flex items-center justify-between">
-                <h3 className="font-medium text-slate-700">Issue queue ({meetingIssues.length})</h3>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => (showPull ? setShowPull(false) : void openPullPanel())}
-                    disabled={busy}
-                    className="rounded border border-slate-300 px-2 py-1 text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-                  >
-                    Pull from long-term list
-                  </button>
-                  <input
-                    value={headline}
-                    onChange={(e) => setHeadline(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && void handlePushHeadline()}
-                    placeholder="Headline…"
-                    className="w-56 rounded border border-slate-300 px-2 py-1"
-                  />
-                  <button
-                    onClick={handlePushHeadline}
-                    disabled={busy || headline.trim() === ''}
-                    className="rounded bg-slate-700 px-2 py-1 text-white hover:bg-slate-800 disabled:opacity-50"
-                  >
-                    Add headline as issue
-                  </button>
-                </div>
-              </div>
-              {showPull && (
-                <div className="mt-2 rounded border border-slate-200 bg-slate-50 p-2">
-                  <p className="text-[10px] text-slate-500">Unresolved long-term issues (current quarter):</p>
-                  {pullables.length === 0 ? (
-                    <p className="mt-1 text-slate-400">Nothing to pull — the long-term list is clear.</p>
-                  ) : (
-                    <ul className="mt-1 space-y-1">
-                      {pullables.map((p) => (
-                        <li key={p.id} className="flex items-center gap-2">
-                          <label className="flex flex-1 items-center gap-2">
-                            <input
-                              type="checkbox"
-                              checked={pullSelection[p.id] === true}
-                              onChange={(e) => setPullSelection({ ...pullSelection, [p.id]: e.target.checked })}
-                            />
-                            <span className="truncate">{p.title}</span>
-                          </label>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  <button
-                    onClick={handlePull}
-                    disabled={busy || !Object.values(pullSelection).some(Boolean)}
-                    className="mt-2 rounded bg-blue-600 px-2 py-1 text-white hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    Pull selected
-                  </button>
-                </div>
-              )}
-              {meetingIssues.length === 0 ? (
-                <p className="mt-2 text-slate-400">
-                  Nothing queued yet — push red cells, off-track goals, or missed to-dos above.
-                </p>
-              ) : (
-                <ul className="mt-2 space-y-1">
-                  {meetingIssues.map((mi) => (
-                    <li key={mi.meetingIssueId} className="rounded border border-slate-100 px-2 py-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="truncate">
-                          {mi.title}{' '}
-                          <span className="text-slate-400">
-                            ({mi.origin === 'manual' ? 'headline/manual' : mi.origin.replace('from_', '')})
-                          </span>
-                        </span>
-                        <span className="flex items-center gap-2">
-                          <span className={mi.status === 'resolved' ? 'text-slate-400 line-through' : ''}>
-                            {mi.state === 'in_ids' ? 'in Issues' : mi.state}
-                          </span>
-                          {mi.state === 'in_ids' && (
-                            <>
-                              <button
-                                onClick={() => (solvingId === mi.meetingIssueId ? setSolvingId(null) : openSolvePanel(mi))}
-                                disabled={busy}
-                                title="Solve: capture resolution + assign to-dos"
-                                className="rounded bg-green-600 px-1.5 py-0.5 text-[10px] text-white hover:bg-green-700 disabled:opacity-50"
-                              >
-                                Solve
-                              </button>
-                              <button
-                                onClick={() => handleRemoveMeetingIssue(mi.issueId)}
-                                disabled={busy}
-                                title="Remove from queue (issue itself persists)"
-                                className="rounded border border-slate-300 px-1.5 py-0.5 text-[10px] text-slate-500 hover:bg-slate-50 disabled:opacity-50"
-                              >
-                                Remove
-                              </button>
-                            </>
-                          )}
-                        </span>
-                      </div>
-                      {solvingId === mi.meetingIssueId && (
-                        <div className="mt-2 border-t border-slate-100 pt-2">
-                          <textarea
-                            value={solveNote}
-                            onChange={(e) => setSolveNote(e.target.value)}
-                            placeholder="Resolution (what was decided)…"
-                            rows={2}
-                            className="w-full rounded border border-slate-300 px-2 py-1"
-                          />
-                          {solveTodos.map((t, i) => (
-                            <div key={i} className="mt-1 flex items-center gap-2">
-                              <input
-                                value={t.title}
-                                onChange={(e) =>
-                                  setSolveTodos(solveTodos.map((s, j) => (j === i ? { ...s, title: e.target.value } : s)))
-                                }
-                                placeholder="New to-do…"
-                                className="flex-1 rounded border border-slate-300 px-2 py-1"
-                              />
-                              <select
-                                value={t.assigneePersonId ?? ''}
-                                onChange={(e) =>
-                                  setSolveTodos(
-                                    solveTodos.map((s, j) =>
-                                      j === i ? { ...s, assigneePersonId: e.target.value ? Number(e.target.value) : null } : s,
-                                    ),
-                                  )
-                                }
-                                className="rounded border border-slate-300 px-2 py-1"
-                              >
-                                <option value="">Assign to…</option>
-                                {data.people.map((p) => (
-                                  <option key={p.id} value={p.id}>
-                                    {p.fullName}
-                                  </option>
-                                ))}
-                              </select>
-                              <button
-                                onClick={() => setSolveTodos(solveTodos.filter((_, j) => j !== i))}
-                                className="text-slate-400 hover:text-slate-600"
-                                title="Remove to-do row"
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          ))}
-                          <div className="mt-1 flex items-center gap-2">
-                            <button
-                              onClick={() => setSolveTodos([...solveTodos, { title: '', assigneePersonId: null }])}
-                              className="text-[10px] text-blue-600 hover:underline"
-                            >
-                              + add to-do
-                            </button>
-                            <button
-                              onClick={() => void handleSolve()}
-                              disabled={busy || solveNote.trim() === ''}
-                              className="rounded bg-green-600 px-2 py-1 text-white hover:bg-green-700 disabled:opacity-50"
-                            >
-                              Solve issue
-                            </button>
-                            <button
-                              onClick={() => setSolvingId(null)}
-                              className="rounded border border-slate-300 px-2 py-1 text-slate-500 hover:bg-slate-50"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
-        </section>
-      ) : (
-        <p className="mt-4 text-sm text-slate-500">
-          No meeting is open. Start one to run this week's weekly meeting.
-        </p>
+            </section>
+          </div>
+        </div>
       )}
       {frozen && (
         <FrozenArchive
@@ -956,47 +1083,63 @@ function L10Page() {
     </main>
   )
 }
+
 function HistoryList(props: {
   history: MeetingSummary[]
   trend: MeetingTrendPoint[]
   onOpenArchive: (meetingId: number) => void
 }) {
   if (props.history.length === 0) {
-    return <p className="mt-6 text-xs text-slate-400">No past meetings.</p>
+    return <p className="mt-6 text-sm text-ink-faint">No past meetings.</p>
   }
   const avg = new Map(props.trend.map((t) => [t.meetingId, t.avgRating]))
   return (
     <section className="mt-6">
-      <h2 className="text-sm font-medium text-slate-700">History</h2>
-      <ul className="mt-2 space-y-1 text-sm">
-        {props.history.map((m) => (
-          <li
-            key={m.id}
-            className="flex items-center justify-between rounded border border-slate-200 px-3 py-1.5"
-          >
-            <span>
-              {m.date}
-              {m.status === 'open' ? ' (open)' : ' (concluded)'}
-            </span>
-            <span className="flex items-center gap-3 text-xs text-slate-400">
-              {m.status === 'concluded' && (
-                <span>
-                  avg rating: <span className="font-medium text-slate-600">{avg.get(m.id) ?? '—'}</span>
-                </span>
-              )}
-              {m.facilitatorName ? `facilitated by ${m.facilitatorName}` : 'no facilitator'}
-              {m.status === 'concluded' && (
-                <button
-                  onClick={() => props.onOpenArchive(m.id)}
-                  className="rounded border border-slate-300 px-2 py-0.5 text-[10px] text-slate-600 hover:bg-slate-50"
-                >
-                  View archive
-                </button>
-              )}
-            </span>
-          </li>
-        ))}
-      </ul>
+      <div className="flex items-center justify-between">
+        <h2 className="text-base font-semibold">History</h2>
+        <span className="label-sm">Avg rating trend</span>
+      </div>
+      <table className="table-precision mt-2">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Status</th>
+            <th>Facilitator</th>
+            <th className="num">Avg rating</th>
+            <th className="!text-right">Archive</th>
+          </tr>
+        </thead>
+        <tbody>
+          {props.history.map((m) => (
+            <tr key={m.id}>
+              <td className="tnum font-medium">{m.date}</td>
+              <td>
+                {m.status === 'open' ? (
+                  <span className="badge badge-warn">open</span>
+                ) : (
+                  <span className="badge badge-neutral">concluded</span>
+                )}
+              </td>
+              <td className="text-ink-secondary">
+                {m.facilitatorName ? `facilitated by ${m.facilitatorName}` : 'no facilitator'}
+              </td>
+              <td className="num text-ink-secondary">
+                {m.status === 'concluded' ? (avg.get(m.id) ?? '—') : '—'}
+              </td>
+              <td className="text-right">
+                {m.status === 'concluded' && (
+                  <button
+                    onClick={() => props.onOpenArchive(m.id)}
+                    className="btn-secondary !h-7 !px-2 !text-[11px]"
+                  >
+                    View archive
+                  </button>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </section>
   )
 }
@@ -1008,48 +1151,64 @@ function FrozenArchive(props: {
   onClose: () => void
 }) {
   return (
-    <section className="mt-6 rounded border border-slate-300 bg-slate-50 p-4 text-sm">
-      <div className="flex items-center justify-between">
-        <h2 className="font-medium text-slate-700">
+    <section className="card mt-6">
+      <div className="flex items-center justify-between border-b border-line px-4 py-3">
+        <h2 className="text-base font-semibold">
           Archive — meeting of {props.meeting.date} (concluded)
         </h2>
-        <button onClick={props.onClose} className="text-xs text-slate-500 hover:underline">
+        <button onClick={props.onClose} className="btn-ghost !h-7 !px-2 !text-xs">
           Close
         </button>
       </div>
-      <p className="mt-1 text-xs text-slate-500">
-        Total {fmtClock(props.meeting.totalElapsedSeconds)} · frozen {props.meeting.concludedAt ?? ''} ·
-        read-only (ratings remain open for late raters)
-      </p>
-      {props.recap && (
-        <div className="mt-2 text-xs">
-          <p>
-            New to-dos: {props.recap.newTodos.length} · carried back: {props.recap.carriedCount} · avg
-            rating: {props.recap.avgRating ?? '—'}
-          </p>
-          {props.recap.ratings.length > 0 && (
-            <p className="mt-1">
-              Ratings: {props.recap.ratings.map((r) => `${r.personName}: ${r.score}`).join(' · ')}
+      <div className="p-4">
+        <p className="tnum text-xs text-ink-secondary">
+          Total {fmtClock(props.meeting.totalElapsedSeconds)} · frozen{' '}
+          {props.meeting.concludedAt ?? ''} · read-only (ratings remain open for late raters)
+        </p>
+        {props.recap && (
+          <div className="tnum mt-2 text-xs text-ink-secondary">
+            <p>
+              New to-dos: {props.recap.newTodos.length} · carried back:{' '}
+              {props.recap.carriedCount} · avg rating: {props.recap.avgRating ?? '—'}
             </p>
-          )}
-          {props.recap.cascadingMessages.trim() !== '' && (
-            <p className="mt-1">
-              <span className="font-medium">Cascading messages:</span> {props.recap.cascadingMessages}
-            </p>
-          )}
-        </div>
-      )}
-      <ol className="mt-3 space-y-1 text-xs">
-        {props.meeting.segments.map((s, i) => (
-          <li key={s.id} className="rounded border border-slate-200 bg-white px-3 py-1.5">
-            <span className="font-medium">
-              {i + 1}. {s.label}
-            </span>{' '}
-            <span className="text-slate-400">({fmtClock(s.elapsedSeconds)})</span>
-            {s.notes.trim() !== '' && <p className="mt-1 whitespace-pre-wrap text-slate-600">{s.notes}</p>}
-          </li>
-        ))}
-      </ol>
+            {props.recap.ratings.length > 0 && (
+              <p className="mt-1">
+                Ratings: {props.recap.ratings.map((r) => `${r.personName}: ${r.score}`).join(' · ')}
+              </p>
+            )}
+            {props.recap.cascadingMessages.trim() !== '' && (
+              <p className="mt-1">
+                <span className="font-medium">Cascading messages:</span>{' '}
+                {props.recap.cascadingMessages}
+              </p>
+            )}
+          </div>
+        )}
+        <table className="table-precision mt-3">
+          <thead>
+            <tr>
+              <th className="w-8">#</th>
+              <th>Segment</th>
+              <th className="num">Duration</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {props.meeting.segments.map((s, i) => (
+              <tr key={s.id}>
+                <td className="tnum font-mono text-xs text-ink-faint">
+                  {String(i + 1).padStart(2, '0')}
+                </td>
+                <td className="font-medium">{s.label}</td>
+                <td className="num text-ink-secondary">{fmtClock(s.elapsedSeconds)}</td>
+                <td className="whitespace-pre-wrap text-ink-secondary">
+                  {s.notes.trim() !== '' ? s.notes : '—'}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </section>
   )
 }
